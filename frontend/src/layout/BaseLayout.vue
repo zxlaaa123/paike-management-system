@@ -6,8 +6,8 @@ import { useAuthStore } from '../stores/auth'
 const router = useRouter()
 const authStore = useAuthStore()
 
-function handleLogout() {
-  authStore.clearToken()
+async function handleLogout() {
+  await authStore.logout()
   router.push('/login')
 }
 </script>
@@ -53,8 +53,8 @@ function handleLogout() {
 
     <el-container>
       <el-header class="app-header">
-        <span>V1 阶段 2 - 前端基础框架</span>
-        <el-button type="danger" plain @click="handleLogout">退出占位</el-button>
+        <span>当前登录：{{ authStore.userInfo?.realName || '管理员' }}</span>
+        <el-button type="danger" plain @click="handleLogout">退出登录</el-button>
       </el-header>
       <el-main class="app-main">
         <RouterView />

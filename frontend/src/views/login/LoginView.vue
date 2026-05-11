@@ -1,21 +1,43 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
+import { useAuthStore } from '../../stores/auth'
+import type { FormInstance, FormRules } from 'element-plus'
 
 const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
+const loading = ref(false)
+const formRef = ref<FormInstance>()
+
 const form = reactive({
   username: '',
   password: '',
 })
 
-function handleMockLogin() {
-  if (!form.username || !form.password) {
-    ElMessage.warning('请输入用户名和密码')
+const rules: FormRules = {
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+}
+
+async function handleLogin() {
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) {
     return
   }
-  ElMessage.success('登录页占位：阶段 3 将接入真实登录')
-  router.push('/dashboard')
+  loading.value = true
+  try {
+    await authStore.login(form.username, form.password)
+    ElMessage.success('登录成功')
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard'
+    router.push(redirect)
+  } catch (_error) {
+    // 请求拦截器会展示后端错误信息，这里不重复提示
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -23,21 +45,22 @@ function handleMockLogin() {
   <div class="login-page">
     <el-card class="login-card" shadow="never">
       <h2>高校排课管理系统</h2>
-      <p class="tip">管理员登录（占位页）</p>
-      <el-form label-position="top">
-        <el-form-item label="用户名">
-          <el-input v-model="form.username" placeholder="请输入用户名" />
+      <p class="tip">管理员登录</p>
+      <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="form.username" placeholder="请输入用户名" @keyup.enter="handleLogin" />
         </el-form-item>
-        <el-form-item label="密码">
+        <el-form-item label="密码" prop="password">
           <el-input
             v-model="form.password"
             type="password"
             show-password
             placeholder="请输入密码"
+            @keyup.enter="handleLogin"
           />
         </el-form-item>
-        <el-button type="primary" class="submit-btn" @click="handleMockLogin">
-          登录（占位）
+        <el-button type="primary" class="submit-btn" :loading="loading" @click="handleLogin">
+          登录
         </el-button>
       </el-form>
     </el-card>
