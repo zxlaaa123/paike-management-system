@@ -45,6 +45,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/teachingTask/TeachingTaskView.vue'),
       },
       {
+        path: 'schedule',
+        name: 'Schedule',
+        component: () => import('../views/schedule/ScheduleView.vue'),
+      },
+      {
         path: 'placeholder/:module',
         name: 'Placeholder',
         component: () => import('../views/PlaceholderView.vue'),

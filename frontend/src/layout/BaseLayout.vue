@@ -37,7 +37,7 @@ async function handleLogout() {
             <span>教学管理</span>
           </template>
           <el-menu-item index="/teaching-tasks">教学任务管理</el-menu-item>
-          <el-menu-item index="/placeholder/schedule">手动排课</el-menu-item>
+          <el-menu-item index="/schedule">手动排课</el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="timetable">
           <template #title>
