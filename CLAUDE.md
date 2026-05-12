@@ -1,5 +1,20 @@
 # CLAUDE.md
 
+## 0. 行为准则
+
+### 0.1 工具使用优先级
+- **Windows 环境下，优先使用 PowerShell 执行命令**，而非 Bash
+- Bash 仅用于：git 操作、mkdir/rm/mv 文件操作、cd 导航、简单脚本
+- 遇到 taskkill、sleep、Start-Process、管道重定向等命令时，**必须用 PowerShell**
+- 原因：Bash 在 Windows 上不兼容 PowerShell 语法（如 `$null`、`Start-Sleep`、`Get-Process` 等），会导致命令失败和调试时间浪费
+
+### 0.2 后端启动方式
+- **后端必须由用户在独立 PowerShell 终端手动启动**，AI 不负责启动和等待
+- 启动方式：`cd D:\paike\backend; mvn spring-boot:run`
+- 用户看到 `Started` 或 `Tomcat started` 后告诉 AI
+- AI 只负责：写代码、测试接口、看日志排查问题
+- **永远不要** 尝试在 AI 工具调用里用 Start-Process/sleep/run_in_background 等方式启动或等待 Spring Boot
+
 ## 1. 项目身份
 
 你正在开发一个毕业设计项目：
