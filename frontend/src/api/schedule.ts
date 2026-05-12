@@ -59,3 +59,9 @@ export function getSchedulesByTeacher(teacherId: number) {
 export function getSchedulesByClassroom(classroomId: number) {
   return request.get<ApiResponse<Schedule[]>>(`/schedules/classroom/${classroomId}`).then((r) => r.data.data)
 }
+
+export function checkConflict(data: ScheduleForm) {
+  return request.post<
+    ApiResponse<{ hasConflict: boolean; message: string }>
+  >('/schedules/check-conflict', data).then((r) => r.data.data)
+}

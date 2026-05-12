@@ -5,6 +5,7 @@ import {
   getScheduleList,
   createSchedule,
   deleteSchedule,
+  checkConflict,
   type Schedule,
   type ScheduleForm,
 } from '../../api/schedule'
@@ -28,6 +29,7 @@ const searchForm = reactive({
 
 const dialogVisible = ref(false)
 const formRef = ref()
+const submitting = ref(false)
 
 const form = reactive<ScheduleForm>({
   teachingTaskId: 0,
@@ -106,13 +108,33 @@ function openAdd() {
 async function handleSubmit() {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
+
+  if (form.teachingTaskId === 0 || form.timeSlotId === 0 || form.classroomId === 0) {
+    ElMessage.warning('请完整填写排课信息')
+    return
+  }
+
+  submitting.value = true
   try {
+    // 先调用预检接口
+    const checkResult = await checkConflict({
+      teachingTaskId: form.teachingTaskId,
+      timeSlotId: form.timeSlotId,
+      classroomId: form.classroomId,
+    })
+    if (checkResult.hasConflict) {
+      ElMessage.error(checkResult.message)
+      return
+    }
+    // 无冲突，正式提交
     await createSchedule(form)
     ElMessage.success('排课成功')
     dialogVisible.value = false
     fetchData()
   } catch (_e) {
     // 错误信息由拦截器显示
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -124,11 +146,23 @@ async function handleDelete(row: Schedule) {
 }
 
 function getTaskLabel(task: TeachingTask) {
-  return `${task.courseName} - ${task.teacherName} - ${task.className}`
+  const requiredSlots = Math.ceil((task.weeklyHours || 0) / 2)
+  const scheduledSlots = task.scheduledSlots || 0
+  return `${task.courseName} / ${task.teacherName} / ${task.className} / 每周${task.weeklyHours}节 / 已排${scheduledSlots}/${requiredSlots}大节`
 }
 
 function getClassroomLabel(room: Classroom) {
-  return `${room.roomName}（容量${room.capacity}）`
+  return `${room.roomName}（${room.building ? room.building + ' · ' : ''}容量${room.capacity} · ${roomTypeText(room.roomType)}）`
+}
+
+function roomTypeText(type: string) {
+  const map: Record<string, string> = {
+    NORMAL: '普通教室',
+    MULTIMEDIA: '多媒体教室',
+    LAB: '实验室',
+    COMPUTER: '机房',
+  }
+  return map[type] || type
 }
 
 function dayOfWeekText(day: number) {
@@ -181,11 +215,11 @@ onMounted(() => {
         </div>
       </template>
       <el-table :data="tableData" v-loading="loading" stripe>
-        <el-table-column prop="courseName" label="课程名称" width="140" />
+        <el-table-column prop="courseName" label="课程名称" min-width="140" />
         <el-table-column prop="teacherName" label="教师" width="100" />
         <el-table-column prop="className" label="班级" width="120" />
         <el-table-column prop="timeLabel" label="时间段" width="130" />
-        <el-table-column label="教室" width="140">
+        <el-table-column label="教室" min-width="160">
           <template #default="{ row }">
             <span>{{ row.roomName }}</span>
             <span v-if="row.building" style="color: #909399; margin-left: 4px">({{ row.building }})</span>
@@ -208,11 +242,16 @@ onMounted(() => {
       />
     </el-card>
 
-    <el-dialog v-model="dialogVisible" title="新增排课" width="520px" destroy-on-close>
+    <el-dialog v-model="dialogVisible" title="新增排课" width="560px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="教学任务" prop="teachingTaskId">
-          <el-select v-model="form.teachingTaskId" placeholder="请选择教学任务" style="width: 100%">
-            <el-option v-for="item in taskList" :key="item.id" :label="getTaskLabel(item)" :value="item.id" />
+          <el-select v-model="form.teachingTaskId" placeholder="请选择教学任务" filterable style="width: 100%">
+            <el-option
+              v-for="item in taskList"
+              :key="item.id"
+              :label="getTaskLabel(item)"
+              :value="item.id"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="时间段" prop="timeSlotId">
@@ -223,14 +262,19 @@ onMounted(() => {
           </el-select>
         </el-form-item>
         <el-form-item label="教室" prop="classroomId">
-          <el-select v-model="form.classroomId" placeholder="请选择教室" style="width: 100%">
-            <el-option v-for="item in classroomList" :key="item.id" :label="getClassroomLabel(item)" :value="item.id" />
+          <el-select v-model="form.classroomId" placeholder="请选择教室" filterable style="width: 100%">
+            <el-option
+              v-for="item in classroomList"
+              :key="item.id"
+              :label="getClassroomLabel(item)"
+              :value="item.id"
+            />
           </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit">确定</el-button>
+        <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
   </div>
