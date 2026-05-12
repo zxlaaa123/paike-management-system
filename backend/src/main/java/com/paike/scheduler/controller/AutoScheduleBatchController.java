@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.AutoScheduleBatch;
 import com.paike.scheduler.service.AutoScheduleBatchService;
+import com.paike.scheduler.service.AutoScheduleService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 public class AutoScheduleBatchController {
 
     private final AutoScheduleBatchService batchService;
+    private final AutoScheduleService autoScheduleService;
 
     /** 查询自动排课批次列表 */
     @GetMapping("/batches")
@@ -36,13 +38,15 @@ public class AutoScheduleBatchController {
         return Result.success(batch);
     }
 
-    /** 执行自动排课（阶段 5 仅创建批次记录，核心逻辑在阶段 6） */
+    /** 执行自动排课 */
     @PostMapping("/run")
-    public Result<AutoScheduleBatch> run(@RequestBody AutoScheduleRequest request) {
-        AutoScheduleBatch batch = batchService.createBatch(
-                request.getTaskIds() != null ? request.getTaskIds().size() : 0,
-                request.isClearOldAutoSchedule());
-        return Result.success(batch);
+    public Result<AutoScheduleService.AutoScheduleResult> run(@RequestBody AutoScheduleRequest request) {
+        AutoScheduleService.AutoScheduleRequest serviceRequest = new AutoScheduleService.AutoScheduleRequest();
+        serviceRequest.setTaskIds(request.getTaskIds());
+        serviceRequest.setClearOldAutoSchedule(request.isClearOldAutoSchedule());
+        serviceRequest.setClearAllSchedule(request.isClearAllSchedule());
+        AutoScheduleService.AutoScheduleResult result = autoScheduleService.run(serviceRequest);
+        return Result.success(result);
     }
 
     /** 清空某批次的自动排课结果 */
