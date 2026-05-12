@@ -81,3 +81,34 @@ CREATE TABLE IF NOT EXISTS teaching_task (
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) COMMENT='教学任务表';
+
+CREATE TABLE IF NOT EXISTS time_slot (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    day_of_week TINYINT NOT NULL COMMENT '星期几：1周一 2周二 3周三 4周四 5周五',
+    period_no TINYINT NOT NULL COMMENT '大节序号：1第1-2节 2第3-4节 3第5-6节 4第7-8节',
+    time_label VARCHAR(50) NOT NULL COMMENT '时间段标签，如：周一 第1-2节',
+    sort_order TINYINT NOT NULL COMMENT '排序序号：1~20',
+    UNIQUE KEY uk_day_period (day_of_week, period_no)
+) COMMENT='时间段表';
+
+INSERT IGNORE INTO time_slot (day_of_week, period_no, time_label, sort_order) VALUES
+(1, 1, '周一 第1-2节', 1),
+(1, 2, '周一 第3-4节', 2),
+(1, 3, '周一 第5-6节', 3),
+(1, 4, '周一 第7-8节', 4),
+(2, 1, '周二 第1-2节', 5),
+(2, 2, '周二 第3-4节', 6),
+(2, 3, '周二 第5-6节', 7),
+(2, 4, '周二 第7-8节', 8),
+(3, 1, '周三 第1-2节', 9),
+(3, 2, '周三 第3-4节', 10),
+(3, 3, '周三 第5-6节', 11),
+(3, 4, '周三 第7-8节', 12),
+(4, 1, '周四 第1-2节', 13),
+(4, 2, '周四 第3-4节', 14),
+(4, 3, '周四 第5-6节', 15),
+(4, 4, '周四 第7-8节', 16),
+(5, 1, '周五 第1-2节', 17),
+(5, 2, '周五 第3-4节', 18),
+(5, 3, '周五 第5-6节', 19),
+(5, 4, '周五 第7-8节', 20);
