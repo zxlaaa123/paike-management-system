@@ -26,10 +26,10 @@ async function handleLogout() {
             <el-icon><Reading /></el-icon>
             <span>基础数据管理</span>
           </template>
-          <el-menu-item index="/placeholder/teachers">教师管理</el-menu-item>
-          <el-menu-item index="/placeholder/classes">班级管理</el-menu-item>
-          <el-menu-item index="/placeholder/classrooms">教室管理</el-menu-item>
-          <el-menu-item index="/placeholder/courses">课程管理</el-menu-item>
+          <el-menu-item index="/teachers">教师管理</el-menu-item>
+          <el-menu-item index="/classes">班级管理</el-menu-item>
+          <el-menu-item index="/classrooms">教室管理</el-menu-item>
+          <el-menu-item index="/courses">课程管理</el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="teaching">
           <template #title>

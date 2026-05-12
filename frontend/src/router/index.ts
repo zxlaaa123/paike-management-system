@@ -20,6 +20,26 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/dashboard/DashboardView.vue'),
       },
       {
+        path: 'teachers',
+        name: 'Teachers',
+        component: () => import('../views/teacher/TeacherView.vue'),
+      },
+      {
+        path: 'classes',
+        name: 'Classes',
+        component: () => import('../views/classInfo/ClassInfoView.vue'),
+      },
+      {
+        path: 'classrooms',
+        name: 'Classrooms',
+        component: () => import('../views/classroom/ClassroomView.vue'),
+      },
+      {
+        path: 'courses',
+        name: 'Courses',
+        component: () => import('../views/course/CourseView.vue'),
+      },
+      {
         path: 'placeholder/:module',
         name: 'Placeholder',
         component: () => import('../views/PlaceholderView.vue'),
@@ -33,22 +53,19 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach(async (to, _from, next) => {
+router.beforeEach(async (to, _from) => {
   const authStore = useAuthStore()
   const needAuth = to.matched.some((record) => record.meta.requiresAuth)
 
   if (!needAuth) {
     if (to.path === '/login' && authStore.isLoggedIn) {
-      next('/dashboard')
-      return
+      return '/dashboard'
     }
-    next()
     return
   }
 
   if (!authStore.isLoggedIn) {
-    next({ path: '/login', query: { redirect: to.fullPath } })
-    return
+    return { path: '/login', query: { redirect: to.fullPath } }
   }
 
   if (!authStore.userInfo) {
@@ -56,11 +73,9 @@ router.beforeEach(async (to, _from, next) => {
       await authStore.fetchCurrentUser()
     } catch (_error) {
       await authStore.logout()
-      next('/login')
-      return
+      return '/login'
     }
   }
-  next()
 })
 
 export default router

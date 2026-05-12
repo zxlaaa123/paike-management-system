@@ -11,7 +11,7 @@ interface ApiResponse<T = unknown> {
 const TOKEN_KEY = 'paike_admin_token'
 
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: '/api',
   timeout: 10000,
 })
 
