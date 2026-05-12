@@ -65,4 +65,12 @@ public class Schedule {
 
     @TableField(exist = false)
     private String building;
+
+    /** V2 排课来源 */
+    @TableField(exist = false)
+    private String sourceTypeName;
+
+    /** V2 自动排课批次号 */
+    @TableField(exist = false)
+    private String batchNo;
 }

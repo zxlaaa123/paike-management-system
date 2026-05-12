@@ -14,6 +14,10 @@ export interface Schedule {
   periodNo: number
   roomName: string
   building: string
+  sourceType?: string
+  sourceTypeName?: string
+  batchId?: number
+  batchNo?: string
   createTime: string
   updateTime: string
 }

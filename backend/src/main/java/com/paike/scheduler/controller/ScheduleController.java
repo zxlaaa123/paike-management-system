@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+
 @RestController
 @RequestMapping("/api/schedules")
 @RequiredArgsConstructor
@@ -30,6 +31,7 @@ public class ScheduleController {
     private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
     private final ScheduleConflictService conflictService;
+    private final AutoScheduleBatchMapper autoScheduleBatchMapper;
 
     @GetMapping
     public Result<Page<Schedule>> list(
@@ -100,6 +102,7 @@ public class ScheduleController {
         schedule.setClassId(task.getClassId());
         schedule.setTimeSlotId(form.getTimeSlotId());
         schedule.setClassroomId(form.getClassroomId());
+        schedule.setSourceType("MANUAL");
         schedule.setDeleted(0);
         schedule.setCreateTime(LocalDateTime.now());
         schedule.setUpdateTime(LocalDateTime.now());
@@ -214,6 +217,17 @@ public class ScheduleController {
             if (teacher != null) s.setTeacherName(teacher.getName());
             ClassInfo classInfo = classInfoMapper.selectById(task.getClassId());
             if (classInfo != null) s.setClassName(classInfo.getClassName());
+        }
+        // 排课来源
+        if (s.getSourceType() != null) {
+            s.setSourceTypeName("AUTO".equals(s.getSourceType()) ? "自动排课" : "手动排课");
+        } else {
+            s.setSourceTypeName("手动排课");
+        }
+        // 自动排课批次
+        if (s.getBatchId() != null) {
+            AutoScheduleBatch batch = autoScheduleBatchMapper.selectById(s.getBatchId());
+            if (batch != null) s.setBatchNo(batch.getBatchNo());
         }
     }
 

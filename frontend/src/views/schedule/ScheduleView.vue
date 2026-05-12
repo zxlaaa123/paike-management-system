@@ -225,6 +225,13 @@ onMounted(() => {
             <span v-if="row.building" style="color: #909399; margin-left: 4px">({{ row.building }})</span>
           </template>
         </el-table-column>
+        <el-table-column prop="sourceTypeName" label="排课来源" width="100" />
+        <el-table-column label="自动排课批次" min-width="160">
+          <template #default="{ row }">
+            <span v-if="row.batchNo">{{ row.batchNo }}</span>
+            <span v-else style="color: #c0c4cc">—</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
             <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
