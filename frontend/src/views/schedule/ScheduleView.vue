@@ -165,10 +165,6 @@ function roomTypeText(type: string) {
   return map[type] || type
 }
 
-function dayOfWeekText(day: number) {
-  return dayNames[day] || ''
-}
-
 onMounted(() => {
   fetchData()
   fetchOptions()
