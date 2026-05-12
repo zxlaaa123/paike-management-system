@@ -40,6 +40,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/course/CourseView.vue'),
       },
       {
+        path: 'teaching-tasks',
+        name: 'TeachingTasks',
+        component: () => import('../views/teachingTask/TeachingTaskView.vue'),
+      },
+      {
         path: 'placeholder/:module',
         name: 'Placeholder',
         component: () => import('../views/PlaceholderView.vue'),
