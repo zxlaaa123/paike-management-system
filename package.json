@@ -1,0 +1,21 @@
+{
+  "name": "paike",
+  "version": "1.0.0",
+  "description": "基于 `Spring Boot + Vue` 的高校排课管理系统第一版。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "typescript": "^6.0.3"
+  }
+}
