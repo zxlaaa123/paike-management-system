@@ -55,6 +55,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/schedule/ScheduleRuleView.vue'),
       },
       {
+        path: 'auto-schedule',
+        name: 'AutoSchedule',
+        component: () => import('../views/schedule/AutoScheduleView.vue'),
+      },
+      {
         path: 'schedule',
         name: 'Schedule',
         component: () => import('../views/schedule/ScheduleView.vue'),
