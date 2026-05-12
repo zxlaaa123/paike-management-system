@@ -3,20 +3,21 @@ package com.paike.scheduler.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 @Data
-@TableName("schedule")
-public class Schedule {
+@TableName("unscheduled_task")
+public class UnscheduledTask {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long teachingTaskId;
+    private Long batchId;
+
+    private Long taskId;
 
     private Long courseId;
 
@@ -24,22 +25,17 @@ public class Schedule {
 
     private Long classId;
 
-    private Long timeSlotId;
+    private Integer requiredSlots;
 
-    private Long classroomId;
+    private Integer scheduledSlots;
 
-    private String sourceType;
+    private Integer remainingSlots;
 
-    private Long batchId;
+    private String reasonType;
 
-    @TableLogic
-    private Integer deleted;
+    private String reasonMessage;
 
-    @TableField("create_time")
     private LocalDateTime createTime;
-
-    @TableField("update_time")
-    private LocalDateTime updateTime;
 
     /** 关联字段 */
     @TableField(exist = false)
@@ -52,17 +48,5 @@ public class Schedule {
     private String className;
 
     @TableField(exist = false)
-    private String timeLabel;
-
-    @TableField(exist = false)
-    private Integer dayOfWeek;
-
-    @TableField(exist = false)
-    private Integer periodNo;
-
-    @TableField(exist = false)
-    private String roomName;
-
-    @TableField(exist = false)
-    private String building;
+    private String batchNo;
 }

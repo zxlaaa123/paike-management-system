@@ -113,14 +113,16 @@ INSERT IGNORE INTO time_slot (day_of_week, period_no, time_label, sort_order) VA
 (5, 3, '周五 第5-6节', 19),
 (5, 4, '周五 第7-8节', 20);
 
+-- V1 schedule table（使用 IF NOT EXISTS 避免重建）
 CREATE TABLE IF NOT EXISTS schedule (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
     teaching_task_id BIGINT NOT NULL COMMENT '教学任务ID',
+    course_id BIGINT NOT NULL COMMENT '课程ID（冗余）',
+    teacher_id BIGINT NOT NULL COMMENT '教师ID（冗余）',
+    class_id BIGINT NOT NULL COMMENT '班级ID（冗余）',
     time_slot_id BIGINT NOT NULL COMMENT '时间段ID',
     classroom_id BIGINT NOT NULL COMMENT '教室ID',
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删 1已删',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    UNIQUE KEY uk_task_timeslot (teaching_task_id, time_slot_id),
-    UNIQUE KEY uk_room_timeslot (time_slot_id, classroom_id)
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) COMMENT='排课表';

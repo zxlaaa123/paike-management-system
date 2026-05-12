@@ -7,30 +7,27 @@ import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("schedule")
-public class Schedule {
+@TableName("teacher_unavailable_time")
+public class TeacherUnavailableTime {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long teachingTaskId;
-
-    private Long courseId;
-
+    @NotNull(message = "教师不能为空")
     private Long teacherId;
 
-    private Long classId;
-
+    @NotNull(message = "时间段不能为空")
     private Long timeSlotId;
 
-    private Long classroomId;
+    private String reason;
 
-    private String sourceType;
+    private Integer status;
 
-    private Long batchId;
+    private String remark;
 
     @TableLogic
     private Integer deleted;
@@ -43,26 +40,17 @@ public class Schedule {
 
     /** 关联字段 */
     @TableField(exist = false)
-    private String courseName;
-
-    @TableField(exist = false)
     private String teacherName;
 
     @TableField(exist = false)
-    private String className;
+    private String department;
 
     @TableField(exist = false)
-    private String timeLabel;
+    private String timeSlotName;
 
     @TableField(exist = false)
     private Integer dayOfWeek;
 
     @TableField(exist = false)
     private Integer periodNo;
-
-    @TableField(exist = false)
-    private String roomName;
-
-    @TableField(exist = false)
-    private String building;
 }
