@@ -1,0 +1,60 @@
+package com.paike.scheduler.controller;
+
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.paike.scheduler.common.response.Result;
+import com.paike.scheduler.entity.TeacherUnavailableTime;
+import com.paike.scheduler.service.TeacherUnavailableTimeService;
+import jakarta.validation.Valid;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/teacher-unavailable-times")
+@RequiredArgsConstructor
+public class TeacherUnavailableTimeController {
+
+    private final TeacherUnavailableTimeService unavailableTimeService;
+
+    @GetMapping
+    public Result<Page<TeacherUnavailableTime>> list(
+            @RequestParam(required = false) Long teacherId,
+            @RequestParam(required = false) String teacherName,
+            @RequestParam(required = false) Long timeSlotId,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        Page<TeacherUnavailableTime> result = unavailableTimeService.list(teacherId, teacherName, timeSlotId, status, page, size);
+        return Result.success(result);
+    }
+
+    @PostMapping
+    public Result<TeacherUnavailableTime> create(@Valid @RequestBody TeacherUnavailableTime form) {
+        TeacherUnavailableTime result = unavailableTimeService.create(form);
+        return Result.success(result);
+    }
+
+    @PutMapping("/{id}")
+    public Result<TeacherUnavailableTime> update(@PathVariable Long id, @Valid @RequestBody TeacherUnavailableTime form) {
+        TeacherUnavailableTime result = unavailableTimeService.update(id, form);
+        return Result.success(result);
+    }
+
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        unavailableTimeService.delete(id);
+        return Result.success("删除成功", null);
+    }
+
+    @PutMapping("/{id}/status")
+    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody StatusForm form) {
+        unavailableTimeService.updateStatus(id, form.getStatus());
+        return Result.success("操作成功", null);
+    }
+
+    @Data
+    public static class StatusForm {
+        private Integer status;
+    }
+}

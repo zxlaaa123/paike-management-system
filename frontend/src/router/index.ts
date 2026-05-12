@@ -45,9 +45,34 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/teachingTask/TeachingTaskView.vue'),
       },
       {
+        path: 'teacher-unavailable-times',
+        name: 'TeacherUnavailableTimes',
+        component: () => import('../views/teacher/TeacherUnavailableTimeView.vue'),
+      },
+      {
+        path: 'schedule-rules',
+        name: 'ScheduleRules',
+        component: () => import('../views/schedule/ScheduleRuleView.vue'),
+      },
+      {
         path: 'schedule',
         name: 'Schedule',
         component: () => import('../views/schedule/ScheduleView.vue'),
+      },
+      {
+        path: 'timetable/class',
+        name: 'ClassTimetable',
+        component: () => import('../views/timetable/ClassTimetableView.vue'),
+      },
+      {
+        path: 'timetable/teacher',
+        name: 'TeacherTimetable',
+        component: () => import('../views/timetable/TeacherTimetableView.vue'),
+      },
+      {
+        path: 'timetable/classroom',
+        name: 'ClassroomTimetable',
+        component: () => import('../views/timetable/ClassroomTimetableView.vue'),
       },
       {
         path: 'placeholder/:module',

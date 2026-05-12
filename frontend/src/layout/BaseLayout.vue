@@ -37,6 +37,8 @@ async function handleLogout() {
             <span>教学管理</span>
           </template>
           <el-menu-item index="/teaching-tasks">教学任务管理</el-menu-item>
+          <el-menu-item index="/teacher-unavailable-times">教师禁排时间</el-menu-item>
+          <el-menu-item index="/schedule-rules">排课规则配置</el-menu-item>
           <el-menu-item index="/schedule">手动排课</el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="timetable">
@@ -44,9 +46,9 @@ async function handleLogout() {
             <el-icon><Calendar /></el-icon>
             <span>课表查询</span>
           </template>
-          <el-menu-item index="/placeholder/class-timetable">班级课表</el-menu-item>
-          <el-menu-item index="/placeholder/teacher-timetable">教师课表</el-menu-item>
-          <el-menu-item index="/placeholder/room-timetable">教室课表</el-menu-item>
+          <el-menu-item index="/timetable/class">班级课表</el-menu-item>
+          <el-menu-item index="/timetable/teacher">教师课表</el-menu-item>
+          <el-menu-item index="/timetable/classroom">教室课表</el-menu-item>
         </el-sub-menu>
       </el-menu>
     </el-aside>
