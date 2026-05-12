@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
+import com.paike.scheduler.service.ScheduleConflictService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -28,6 +29,7 @@ public class ScheduleController {
     private final CourseMapper courseMapper;
     private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
+    private final ScheduleConflictService conflictService;
 
     @GetMapping
     public Result<Page<Schedule>> list(
@@ -45,7 +47,6 @@ public class ScheduleController {
         Page<Schedule> result = scheduleMapper.selectPage(new Page<>(page, size), wrapper);
         fillRelations(result.getRecords());
 
-        // 内存过滤
         List<Schedule> filtered = result.getRecords().stream().filter(s -> {
             if (courseName != null && !courseName.isBlank()) {
                 if (s.getCourseName() == null || !s.getCourseName().contains(courseName)) return false;
@@ -83,24 +84,20 @@ public class ScheduleController {
 
     @PostMapping
     public Result<Schedule> create(@Valid @RequestBody ScheduleForm form) {
-        // 校验教学任务是否存在
+        // 冲突检测
+        String conflict = conflictService.checkConflict(
+            form.getTeachingTaskId(), form.getTimeSlotId(), form.getClassroomId(), null);
+        if (conflict != null) {
+            return Result.fail(400, conflict);
+        }
+
         TeachingTask task = teachingTaskMapper.selectById(form.getTeachingTaskId());
-        if (task == null || task.getDeleted() == 1) {
-            return Result.fail(400, "所选教学任务不存在");
-        }
-        // 校验时间段是否存在
-        TimeSlot timeSlot = timeSlotMapper.selectById(form.getTimeSlotId());
-        if (timeSlot == null) {
-            return Result.fail(400, "所选时间段不存在");
-        }
-        // 校验教室是否存在
-        Classroom classroom = classroomMapper.selectById(form.getClassroomId());
-        if (classroom == null || classroom.getDeleted() == 1) {
-            return Result.fail(400, "所选教室不存在");
-        }
 
         Schedule schedule = new Schedule();
         schedule.setTeachingTaskId(form.getTeachingTaskId());
+        schedule.setCourseId(task.getCourseId());
+        schedule.setTeacherId(task.getTeacherId());
+        schedule.setClassId(task.getClassId());
         schedule.setTimeSlotId(form.getTimeSlotId());
         schedule.setClassroomId(form.getClassroomId());
         schedule.setDeleted(0);
@@ -118,16 +115,13 @@ public class ScheduleController {
         if (schedule == null || schedule.getDeleted() == 1) {
             return Result.fail(404, "排课记录不存在");
         }
-        schedule.setDeleted(1);
-        schedule.setUpdateTime(LocalDateTime.now());
-        scheduleMapper.updateById(schedule);
+        scheduleMapper.deleteById(id);
         return Result.success("删除成功", null);
     }
 
     /** 按班级查询排课列表 */
     @GetMapping("/class/{classId}")
     public Result<List<Schedule>> listByClass(@PathVariable Long classId) {
-        // 先查该班级的所有教学任务
         List<TeachingTask> tasks = teachingTaskMapper.selectList(
             new LambdaQueryWrapper<TeachingTask>()
                 .eq(TeachingTask::getClassId, classId)
@@ -177,6 +171,17 @@ public class ScheduleController {
         );
         fillRelations(list);
         return Result.success(list);
+    }
+
+    /** 冲突检测接口（前端预检用，保存时仍会再次检测） */
+    @PostMapping("/check-conflict")
+    public Result<Map<String, Object>> checkConflict(@Valid @RequestBody ScheduleForm form) {
+        String conflict = conflictService.checkConflict(
+            form.getTeachingTaskId(), form.getTimeSlotId(), form.getClassroomId(), null);
+        if (conflict != null) {
+            return Result.success(Map.of("hasConflict", true, "message", conflict));
+        }
+        return Result.success(Map.of("hasConflict", false, "message", ""));
     }
 
     private void fillRelations(List<Schedule> list) {

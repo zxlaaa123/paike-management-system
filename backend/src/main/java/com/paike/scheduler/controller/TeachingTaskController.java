@@ -26,6 +26,7 @@ public class TeachingTaskController {
     private final CourseMapper courseMapper;
     private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
+    private final ScheduleMapper scheduleMapper;
 
     @GetMapping
     public Result<Page<TeachingTask>> list(
@@ -79,8 +80,12 @@ public class TeachingTaskController {
             t.setCourseName(courseNameMap.get(t.getCourseId()));
             t.setTeacherName(teacherNameMap.get(t.getTeacherId()));
             t.setClassName(classNameMap.get(t.getClassId()));
-            // 已排大节数：暂时为0，后续排课模块实现后从schedule表统计
-            t.setScheduledSlots(0);
+            // 统计已排大节数
+            Long count = scheduleMapper.selectCount(
+                new LambdaQueryWrapper<Schedule>()
+                    .eq(Schedule::getTeachingTaskId, t.getId())
+                    .eq(Schedule::getDeleted, 0));
+            t.setScheduledSlots(count != null ? count.intValue() : 0);
         }).collect(Collectors.toList());
 
         // 重建分页结果
@@ -97,7 +102,11 @@ public class TeachingTaskController {
             return Result.fail(404, "教学任务不存在");
         }
         fillRelation(task);
-        task.setScheduledSlots(0);
+        Long count = scheduleMapper.selectCount(
+            new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getTeachingTaskId, task.getId())
+                .eq(Schedule::getDeleted, 0));
+        task.setScheduledSlots(count != null ? count.intValue() : 0);
         return Result.success(task);
     }
 
@@ -186,7 +195,11 @@ public class TeachingTaskController {
         task.setCourseName(course.getCourseName());
         task.setTeacherName(teacher.getName());
         task.setClassName(classInfo.getClassName());
-        task.setScheduledSlots(0);
+        Long count = scheduleMapper.selectCount(
+            new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getTeachingTaskId, task.getId())
+                .eq(Schedule::getDeleted, 0));
+        task.setScheduledSlots(count != null ? count.intValue() : 0);
         return Result.success(task);
     }
 
@@ -212,7 +225,11 @@ public class TeachingTaskController {
         );
         for (TeachingTask task : list) {
             fillRelation(task);
-            task.setScheduledSlots(0);
+            Long count = scheduleMapper.selectCount(
+                new LambdaQueryWrapper<Schedule>()
+                    .eq(Schedule::getTeachingTaskId, task.getId())
+                    .eq(Schedule::getDeleted, 0));
+            task.setScheduledSlots(count != null ? count.intValue() : 0);
         }
         return Result.success(list);
     }
