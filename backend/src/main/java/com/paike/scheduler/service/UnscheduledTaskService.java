@@ -35,24 +35,27 @@ public class UnscheduledTaskService {
         wrapper.orderByDesc(UnscheduledTask::getCreateTime);
         Page<UnscheduledTask> result = unscheduledTaskMapper.selectPage(new Page<>(page, size), wrapper);
 
-        // 内存过滤关联字段
+        // 先填充关联字段，再进行内存过滤
+        fillRelationFields(result.getRecords());
+
+        List<UnscheduledTask> filtered = result.getRecords();
         if (courseName != null && !courseName.isBlank()) {
-            result.setRecords(result.getRecords().stream()
+            filtered = filtered.stream()
                     .filter(t -> t.getCourseName() != null && t.getCourseName().contains(courseName))
-                    .collect(Collectors.toList()));
+                    .collect(Collectors.toList());
         }
         if (teacherName != null && !teacherName.isBlank()) {
-            result.setRecords(result.getRecords().stream()
+            filtered = filtered.stream()
                     .filter(t -> t.getTeacherName() != null && t.getTeacherName().contains(teacherName))
-                    .collect(Collectors.toList()));
+                    .collect(Collectors.toList());
         }
         if (className != null && !className.isBlank()) {
-            result.setRecords(result.getRecords().stream()
+            filtered = filtered.stream()
                     .filter(t -> t.getClassName() != null && t.getClassName().contains(className))
-                    .collect(Collectors.toList()));
+                    .collect(Collectors.toList());
         }
-
-        fillRelationFields(result.getRecords());
+        result.setRecords(filtered);
+        result.setTotal(filtered.size());
         return result;
     }
 
