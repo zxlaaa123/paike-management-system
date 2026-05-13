@@ -6,6 +6,7 @@ import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,12 +34,13 @@ public class UnscheduledTaskService {
             wrapper.eq(UnscheduledTask::getReasonType, reasonType);
         }
         wrapper.orderByDesc(UnscheduledTask::getCreateTime);
-        Page<UnscheduledTask> result = unscheduledTaskMapper.selectPage(new Page<>(page, size), wrapper);
+        // 查询全部记录（不分页）
+        List<UnscheduledTask> allRecords = unscheduledTaskMapper.selectList(wrapper);
 
         // 先填充关联字段，再进行内存过滤
-        fillRelationFields(result.getRecords());
+        fillRelationFields(allRecords);
 
-        List<UnscheduledTask> filtered = result.getRecords();
+        List<UnscheduledTask> filtered = allRecords;
         if (courseName != null && !courseName.isBlank()) {
             filtered = filtered.stream()
                     .filter(t -> t.getCourseName() != null && t.getCourseName().contains(courseName))
@@ -54,9 +56,17 @@ public class UnscheduledTaskService {
                     .filter(t -> t.getClassName() != null && t.getClassName().contains(className))
                     .collect(Collectors.toList());
         }
-        result.setRecords(filtered);
-        result.setTotal(filtered.size());
-        return result;
+
+        // 手动分页
+        int total = filtered.size();
+        int fromIndex = (page - 1) * size;
+        int toIndex = Math.min(fromIndex + size, total);
+        List<UnscheduledTask> pageRecords = fromIndex < total ? filtered.subList(fromIndex, toIndex) : List.of();
+
+        Page<UnscheduledTask> pageResult = new Page<>(page, size);
+        pageResult.setRecords(pageRecords);
+        pageResult.setTotal(total);
+        return pageResult;
     }
 
     public void addUnscheduledTask(Long batchId, Long taskId, int requiredSlots,
@@ -80,11 +90,13 @@ public class UnscheduledTaskService {
         unscheduledTaskMapper.insert(ut);
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void clearByBatchId(Long batchId) {
         unscheduledTaskMapper.delete(new LambdaQueryWrapper<UnscheduledTask>()
                 .eq(UnscheduledTask::getBatchId, batchId));
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void clearAll() {
         unscheduledTaskMapper.delete(new LambdaQueryWrapper<>());
     }

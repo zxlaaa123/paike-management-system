@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +21,7 @@ public class ScheduleConflictService {
     private final CourseMapper courseMapper;
     private final TimeSlotMapper timeSlotMapper;
     private final TeacherUnavailableTimeService unavailableTimeService;
+    private final ScheduleRuleService ruleService;
 
     /**
      * 检查排课冲突。
@@ -122,6 +124,57 @@ public class ScheduleConflictService {
         int requiredSlots = (int) Math.ceil(task.getWeeklyHours() / 2.0);
         if (scheduledSlots + 1 > requiredSlots) {
             return "排课失败：该教学任务每周课时为" + task.getWeeklyHours() + "学时，最多排" + requiredSlots + "个大节，当前已排" + scheduledSlots + "个大节";
+        }
+
+        // 11. 检查排课规则配置
+        int teacherMaxDailySlots = ruleService.getIntValue("TEACHER_MAX_DAILY_SLOTS");
+        int classMaxDailySlots = ruleService.getIntValue("CLASS_MAX_DAILY_SLOTS");
+        boolean allowSameCourseSameDay = ruleService.getBoolValue("ALLOW_SAME_COURSE_SAME_DAY");
+
+        if (teacherMaxDailySlots > 0) {
+            List<TimeSlot> daySlots = timeSlotMapper.selectList(
+                    new LambdaQueryWrapper<TimeSlot>()
+                            .eq(TimeSlot::getDayOfWeek, timeSlot.getDayOfWeek()));
+            List<Long> daySlotIds = daySlots.stream().map(TimeSlot::getId).collect(Collectors.toList());
+            long teacherDailyCount = scheduleMapper.selectCount(
+                    new LambdaQueryWrapper<Schedule>()
+                            .eq(Schedule::getTeacherId, teacherId)
+                            .eq(Schedule::getDeleted, 0)
+                            .in(Schedule::getTimeSlotId, daySlotIds));
+            if (teacherDailyCount >= teacherMaxDailySlots) {
+                return "排课失败：" + teacherName + "老师每天最多" + teacherMaxDailySlots + "个大节，当前已排" + teacherDailyCount + "个";
+            }
+        }
+
+        if (classMaxDailySlots > 0) {
+            List<TimeSlot> daySlots = timeSlotMapper.selectList(
+                    new LambdaQueryWrapper<TimeSlot>()
+                            .eq(TimeSlot::getDayOfWeek, timeSlot.getDayOfWeek()));
+            List<Long> daySlotIds = daySlots.stream().map(TimeSlot::getId).collect(Collectors.toList());
+            long classDailyCount = scheduleMapper.selectCount(
+                    new LambdaQueryWrapper<Schedule>()
+                            .eq(Schedule::getClassId, classId)
+                            .eq(Schedule::getDeleted, 0)
+                            .in(Schedule::getTimeSlotId, daySlotIds));
+            if (classDailyCount >= classMaxDailySlots) {
+                return "排课失败：" + className + "每天最多" + classMaxDailySlots + "个大节，当前已排" + classDailyCount + "个";
+            }
+        }
+
+        if (!allowSameCourseSameDay) {
+            List<TimeSlot> daySlots = timeSlotMapper.selectList(
+                    new LambdaQueryWrapper<TimeSlot>()
+                            .eq(TimeSlot::getDayOfWeek, timeSlot.getDayOfWeek()));
+            List<Long> daySlotIds = daySlots.stream().map(TimeSlot::getId).collect(Collectors.toList());
+            long sameCourseCount = scheduleMapper.selectCount(
+                    new LambdaQueryWrapper<Schedule>()
+                            .eq(Schedule::getClassId, classId)
+                            .eq(Schedule::getCourseId, task.getCourseId())
+                            .eq(Schedule::getDeleted, 0)
+                            .in(Schedule::getTimeSlotId, daySlotIds));
+            if (sameCourseCount > 0) {
+                return "排课失败：同一课程同一天不允许重复";
+            }
         }
 
         return null; // 无冲突

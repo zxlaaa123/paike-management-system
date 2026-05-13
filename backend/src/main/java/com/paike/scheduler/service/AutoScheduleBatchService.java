@@ -3,19 +3,21 @@ package com.paike.scheduler.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.entity.AutoScheduleBatch;
+import com.paike.scheduler.entity.Schedule;
 import com.paike.scheduler.mapper.AutoScheduleBatchMapper;
+import com.paike.scheduler.mapper.ScheduleMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class AutoScheduleBatchService {
 
     private final AutoScheduleBatchMapper batchMapper;
+    private final ScheduleMapper scheduleMapper;
 
     public Page<AutoScheduleBatch> list(String batchNo, String status, int page, int size) {
         LambdaQueryWrapper<AutoScheduleBatch> wrapper = new LambdaQueryWrapper<>();
@@ -62,8 +64,9 @@ public class AutoScheduleBatchService {
     }
 
     public void deleteBatchSchedules(Long batchId) {
-        // 删除该批次自动生成的排课记录（source_type = AUTO 且 batch_id 匹配）
-        // 由 ScheduleController 或 ScheduleService 处理，此处仅作标记
+        scheduleMapper.delete(new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getBatchId, batchId)
+                .eq(Schedule::getSourceType, "AUTO"));
     }
 
     private String generateBatchNo() {

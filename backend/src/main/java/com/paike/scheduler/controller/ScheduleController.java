@@ -13,8 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 
@@ -43,13 +43,16 @@ public class ScheduleController {
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "10") int size
     ) {
-        LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<Schedule>()
-            .eq(Schedule::getDeleted, 0);
-        wrapper.orderByDesc(Schedule::getCreateTime);
-        Page<Schedule> result = scheduleMapper.selectPage(new Page<>(page, size), wrapper);
-        fillRelations(result.getRecords());
+        // 查询全部排课记录（不分页）
+        List<Schedule> allSchedules = scheduleMapper.selectList(
+            new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getDeleted, 0)
+                .orderByDesc(Schedule::getCreateTime));
+        // 批量填充关联数据
+        fillRelations(allSchedules);
 
-        List<Schedule> filtered = result.getRecords().stream().filter(s -> {
+        // 内存过滤
+        List<Schedule> filtered = allSchedules.stream().filter(s -> {
             if (courseName != null && !courseName.isBlank()) {
                 if (s.getCourseName() == null || !s.getCourseName().contains(courseName)) return false;
             }
@@ -68,9 +71,15 @@ public class ScheduleController {
             return true;
         }).collect(Collectors.toList());
 
+        // 手动分页
+        int total = filtered.size();
+        int fromIndex = (page - 1) * size;
+        int toIndex = Math.min(fromIndex + size, total);
+        List<Schedule> pageRecords = fromIndex < total ? filtered.subList(fromIndex, toIndex) : List.of();
+
         Page<Schedule> pageResult = new Page<>(page, size);
-        pageResult.setRecords(filtered);
-        pageResult.setTotal(filtered.size());
+        pageResult.setRecords(pageRecords);
+        pageResult.setTotal(total);
         return Result.success(pageResult);
     }
 
@@ -189,8 +198,71 @@ public class ScheduleController {
 
     private void fillRelations(List<Schedule> list) {
         if (list.isEmpty()) return;
+
+        // 收集所有需要查询的ID
+        List<Long> timeSlotIds = list.stream().map(Schedule::getTimeSlotId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        List<Long> classroomIds = list.stream().map(Schedule::getClassroomId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        List<Long> taskIds = list.stream().map(Schedule::getTeachingTaskId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        List<Long> batchIds = list.stream().map(Schedule::getBatchId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+
+        // 批量查询关联数据
+        Map<Long, TimeSlot> timeSlotMap = timeSlotIds.isEmpty() ? Map.of() :
+            timeSlotMapper.selectBatchIds(timeSlotIds).stream().collect(Collectors.toMap(TimeSlot::getId, Function.identity(), (a, b) -> a));
+        Map<Long, Classroom> classroomMap = classroomIds.isEmpty() ? Map.of() :
+            classroomMapper.selectBatchIds(classroomIds).stream().collect(Collectors.toMap(Classroom::getId, Function.identity(), (a, b) -> a));
+        Map<Long, TeachingTask> taskMap = taskIds.isEmpty() ? Map.of() :
+            teachingTaskMapper.selectBatchIds(taskIds).stream().collect(Collectors.toMap(TeachingTask::getId, Function.identity(), (a, b) -> a));
+        Map<Long, AutoScheduleBatch> batchMap = batchIds.isEmpty() ? Map.of() :
+            autoScheduleBatchMapper.selectBatchIds(batchIds).stream().collect(Collectors.toMap(AutoScheduleBatch::getId, Function.identity(), (a, b) -> a));
+
+        // 收集教学任务关联的课程/教师/班级ID
+        List<Long> courseIds = new ArrayList<>();
+        List<Long> teacherIds = new ArrayList<>();
+        List<Long> classIds = new ArrayList<>();
+        for (TeachingTask task : taskMap.values()) {
+            if (task.getCourseId() != null) courseIds.add(task.getCourseId());
+            if (task.getTeacherId() != null) teacherIds.add(task.getTeacherId());
+            if (task.getClassId() != null) classIds.add(task.getClassId());
+        }
+
+        Map<Long, Course> courseMap = courseIds.isEmpty() ? Map.of() :
+            courseMapper.selectBatchIds(courseIds).stream().collect(Collectors.toMap(Course::getId, Function.identity(), (a, b) -> a));
+        Map<Long, Teacher> teacherMap = teacherIds.isEmpty() ? Map.of() :
+            teacherMapper.selectBatchIds(teacherIds).stream().collect(Collectors.toMap(Teacher::getId, Function.identity(), (a, b) -> a));
+        Map<Long, ClassInfo> classMap = classIds.isEmpty() ? Map.of() :
+            classInfoMapper.selectBatchIds(classIds).stream().collect(Collectors.toMap(ClassInfo::getId, Function.identity(), (a, b) -> a));
+
+        // 填充每条记录
         for (Schedule s : list) {
-            fillRelation(s);
+            TimeSlot timeSlot = timeSlotMap.get(s.getTimeSlotId());
+            if (timeSlot != null) {
+                s.setTimeLabel(timeSlot.getTimeLabel());
+                s.setDayOfWeek(timeSlot.getDayOfWeek());
+                s.setPeriodNo(timeSlot.getPeriodNo());
+            }
+            Classroom classroom = classroomMap.get(s.getClassroomId());
+            if (classroom != null) {
+                s.setRoomName(classroom.getRoomName());
+                s.setBuilding(classroom.getBuilding());
+            }
+            TeachingTask task = taskMap.get(s.getTeachingTaskId());
+            if (task != null) {
+                Course course = courseMap.get(task.getCourseId());
+                if (course != null) s.setCourseName(course.getCourseName());
+                Teacher teacher = teacherMap.get(task.getTeacherId());
+                if (teacher != null) s.setTeacherName(teacher.getName());
+                ClassInfo classInfo = classMap.get(task.getClassId());
+                if (classInfo != null) s.setClassName(classInfo.getClassName());
+            }
+            if (s.getSourceType() != null) {
+                s.setSourceTypeName("AUTO".equals(s.getSourceType()) ? "自动排课" : "手动排课");
+            } else {
+                s.setSourceTypeName("手动排课");
+            }
+            if (s.getBatchId() != null) {
+                AutoScheduleBatch batch = batchMap.get(s.getBatchId());
+                if (batch != null) s.setBatchNo(batch.getBatchNo());
+            }
         }
     }
 

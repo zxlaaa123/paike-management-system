@@ -36,16 +36,18 @@ public class AutoScheduleService {
     private final CourseMapper courseMapper;
     private final ClassInfoMapper classInfoMapper;
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public AutoScheduleResult run(AutoScheduleRequest request) {
         // 1. 清空旧排课（如需要）
         if (request.isClearAllSchedule()) {
             scheduleMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Schedule>()
                     .eq(Schedule::getDeleted, 0));
+            unscheduledTaskService.clearAll();
         } else if (request.isClearOldAutoSchedule()) {
             scheduleMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Schedule>()
                     .eq(Schedule::getSourceType, "AUTO")
                     .eq(Schedule::getDeleted, 0));
+            unscheduledTaskService.clearAll();
         }
 
         // 2. 读取待排教学任务
@@ -131,6 +133,7 @@ public class AutoScheduleService {
 
             int currentSuccess = 0;
             String lastFailReason = "";
+            String lastFailReasonType = "UNKNOWN";
             Set<Integer> usedDays = new HashSet<>();
 
             for (int i = 0; i < remainingSlots; i++) {
@@ -140,18 +143,21 @@ public class AutoScheduleService {
                     // 跳过教师禁排时间
                     if (unavailableKeySet.contains(task.getTeacherId() + "_" + slot.getId())) {
                         lastFailReason = "教师禁排时间限制";
+                        lastFailReasonType = "TEACHER_UNAVAILABLE";
                         continue;
                     }
 
                     // 检查教师每日最大课程数
                     if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), teacherMaxDailySlots, batch.getId())) {
                         lastFailReason = "教师每天最多" + teacherMaxDailySlots + "个大节";
+                        lastFailReasonType = "TEACHER_DAILY_LIMIT";
                         continue;
                     }
 
                     // 检查班级每日最大课程数
                     if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), classMaxDailySlots, batch.getId())) {
                         lastFailReason = "班级每天最多" + classMaxDailySlots + "个大节";
+                        lastFailReasonType = "CLASS_DAILY_LIMIT";
                         continue;
                     }
 
@@ -160,6 +166,7 @@ public class AutoScheduleService {
                         // 检查当天是否已有同一课程
                         if (hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), batch.getId())) {
                             lastFailReason = "同一课程同一天不允许重复";
+                            lastFailReasonType = "SAME_COURSE_SAME_DAY";
                             continue;
                         }
                     }
@@ -177,6 +184,7 @@ public class AutoScheduleService {
                             break;
                         } else {
                             lastFailReason = conflict.replace("排课失败：", "");
+                            lastFailReasonType = categorizeReason(lastFailReason);
                         }
                     }
 
@@ -188,15 +196,13 @@ public class AutoScheduleService {
                 }
             }
 
-            if (currentSuccess > 0) {
+            if (currentSuccess >= remainingSlots) {
                 successTaskCount++;
-            }
-            if (currentSuccess < remainingSlots) {
+            } else {
                 failedTaskCount++;
-                String reasonType = categorizeReason(lastFailReason);
                 unscheduledTaskService.addUnscheduledTask(batch.getId(), task.getId(), requiredSlots,
                         scheduledSlots + currentSuccess, remainingSlots - currentSuccess,
-                        reasonType, lastFailReason);
+                        lastFailReasonType, lastFailReason);
             }
         }
 
@@ -298,9 +304,6 @@ public class AutoScheduleService {
                 .eq(Schedule::getTeacherId, teacherId)
                 .eq(Schedule::getDeleted, 0)
                 .in(Schedule::getTimeSlotId, slotIds);
-        if (currentBatchId != null) {
-            wrapper.ne(Schedule::getBatchId, currentBatchId);
-        }
         long count = scheduleMapper.selectCount(wrapper);
         return count < maxSlots;
     }
@@ -312,9 +315,6 @@ public class AutoScheduleService {
                 .eq(Schedule::getClassId, classId)
                 .eq(Schedule::getDeleted, 0)
                 .in(Schedule::getTimeSlotId, slotIds);
-        if (currentBatchId != null) {
-            wrapper.ne(Schedule::getBatchId, currentBatchId);
-        }
         long count = scheduleMapper.selectCount(wrapper);
         return count < maxSlots;
     }

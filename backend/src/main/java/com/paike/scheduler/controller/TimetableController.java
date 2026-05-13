@@ -41,11 +41,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @RestController
@@ -126,37 +123,69 @@ public class TimetableController {
     }
 
     private List<Schedule> queryByClassId(Long classId) {
+        // 通过教学任务查询
         List<TeachingTask> tasks = teachingTaskMapper.selectList(
             new LambdaQueryWrapper<TeachingTask>()
                 .eq(TeachingTask::getClassId, classId)
                 .eq(TeachingTask::getDeleted, 0)
         );
-        if (tasks.isEmpty()) {
-            return List.of();
-        }
         List<Long> taskIds = tasks.stream().map(TeachingTask::getId).collect(Collectors.toList());
-        return scheduleMapper.selectList(
+
+        // 直接通过schedule表的class_id查询（补充边界情况）
+        List<Schedule> schedules = scheduleMapper.selectList(
             new LambdaQueryWrapper<Schedule>()
-                .in(Schedule::getTeachingTaskId, taskIds)
+                .eq(Schedule::getClassId, classId)
                 .eq(Schedule::getDeleted, 0)
         );
+
+        // 合并两种查询结果，去重
+        if (!taskIds.isEmpty()) {
+            List<Schedule> taskSchedules = scheduleMapper.selectList(
+                new LambdaQueryWrapper<Schedule>()
+                    .in(Schedule::getTeachingTaskId, taskIds)
+                    .eq(Schedule::getDeleted, 0)
+            );
+            Set<Long> existingIds = schedules.stream().map(Schedule::getId).collect(Collectors.toSet());
+            for (Schedule s : taskSchedules) {
+                if (!existingIds.contains(s.getId())) {
+                    schedules.add(s);
+                }
+            }
+        }
+        return schedules;
     }
 
     private List<Schedule> queryByTeacherId(Long teacherId) {
+        // 通过教学任务查询
         List<TeachingTask> tasks = teachingTaskMapper.selectList(
             new LambdaQueryWrapper<TeachingTask>()
                 .eq(TeachingTask::getTeacherId, teacherId)
                 .eq(TeachingTask::getDeleted, 0)
         );
-        if (tasks.isEmpty()) {
-            return List.of();
-        }
         List<Long> taskIds = tasks.stream().map(TeachingTask::getId).collect(Collectors.toList());
-        return scheduleMapper.selectList(
+
+        // 直接通过schedule表的teacher_id查询（补充边界情况）
+        List<Schedule> schedules = scheduleMapper.selectList(
             new LambdaQueryWrapper<Schedule>()
-                .in(Schedule::getTeachingTaskId, taskIds)
+                .eq(Schedule::getTeacherId, teacherId)
                 .eq(Schedule::getDeleted, 0)
         );
+
+        // 合并两种查询结果，去重
+        if (!taskIds.isEmpty()) {
+            List<Schedule> taskSchedules = scheduleMapper.selectList(
+                new LambdaQueryWrapper<Schedule>()
+                    .in(Schedule::getTeachingTaskId, taskIds)
+                    .eq(Schedule::getDeleted, 0)
+            );
+            Set<Long> existingIds = schedules.stream().map(Schedule::getId).collect(Collectors.toSet());
+            for (Schedule s : taskSchedules) {
+                if (!existingIds.contains(s.getId())) {
+                    schedules.add(s);
+                }
+            }
+        }
+        return schedules;
     }
 
     private List<Schedule> queryByClassroomId(Long classroomId) {
@@ -168,8 +197,40 @@ public class TimetableController {
     }
 
     private List<TimetableVo> toTimetableVos(List<Schedule> schedules) {
+        if (schedules.isEmpty()) return List.of();
+
+        // 收集所有需要查询的ID
+        List<Long> timeSlotIds = schedules.stream().map(Schedule::getTimeSlotId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        List<Long> classroomIds = schedules.stream().map(Schedule::getClassroomId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        List<Long> taskIds = schedules.stream().map(Schedule::getTeachingTaskId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+
+        // 批量查询关联数据
+        Map<Long, TimeSlot> timeSlotMap = timeSlotIds.isEmpty() ? Map.of() :
+            timeSlotMapper.selectBatchIds(timeSlotIds).stream().collect(Collectors.toMap(TimeSlot::getId, Function.identity(), (a, b) -> a));
+        Map<Long, Classroom> classroomMap = classroomIds.isEmpty() ? Map.of() :
+            classroomMapper.selectBatchIds(classroomIds).stream().collect(Collectors.toMap(Classroom::getId, Function.identity(), (a, b) -> a));
+        Map<Long, TeachingTask> taskMap = taskIds.isEmpty() ? Map.of() :
+            teachingTaskMapper.selectBatchIds(taskIds).stream().collect(Collectors.toMap(TeachingTask::getId, Function.identity(), (a, b) -> a));
+
+        // 收集教学任务关联的课程/教师/班级ID
+        List<Long> courseIds = new ArrayList<>();
+        List<Long> teacherIds = new ArrayList<>();
+        List<Long> classIds = new ArrayList<>();
+        for (TeachingTask task : taskMap.values()) {
+            if (task.getCourseId() != null) courseIds.add(task.getCourseId());
+            if (task.getTeacherId() != null) teacherIds.add(task.getTeacherId());
+            if (task.getClassId() != null) classIds.add(task.getClassId());
+        }
+
+        Map<Long, Course> courseMap = courseIds.isEmpty() ? Map.of() :
+            courseMapper.selectBatchIds(courseIds).stream().collect(Collectors.toMap(Course::getId, Function.identity(), (a, b) -> a));
+        Map<Long, Teacher> teacherMap = teacherIds.isEmpty() ? Map.of() :
+            teacherMapper.selectBatchIds(teacherIds).stream().collect(Collectors.toMap(Teacher::getId, Function.identity(), (a, b) -> a));
+        Map<Long, ClassInfo> classMap = classIds.isEmpty() ? Map.of() :
+            classInfoMapper.selectBatchIds(classIds).stream().collect(Collectors.toMap(ClassInfo::getId, Function.identity(), (a, b) -> a));
+
         return schedules.stream()
-            .map(this::toTimetableVo)
+            .map(s -> buildTimetableVo(s, timeSlotMap, classroomMap, taskMap, courseMap, teacherMap, classMap))
             .sorted(Comparator
                 .comparing(TimetableVo::getDayOfWeek, Comparator.nullsLast(Integer::compareTo))
                 .thenComparing(TimetableVo::getPeriod, Comparator.nullsLast(Integer::compareTo))
@@ -177,11 +238,14 @@ public class TimetableController {
             .collect(Collectors.toList());
     }
 
-    private TimetableVo toTimetableVo(Schedule schedule) {
+    private TimetableVo buildTimetableVo(Schedule schedule, Map<Long, TimeSlot> timeSlotMap,
+                                          Map<Long, Classroom> classroomMap, Map<Long, TeachingTask> taskMap,
+                                          Map<Long, Course> courseMap, Map<Long, Teacher> teacherMap,
+                                          Map<Long, ClassInfo> classMap) {
         TimetableVo vo = new TimetableVo();
         vo.setScheduleId(schedule.getId());
 
-        TimeSlot timeSlot = timeSlotMapper.selectById(schedule.getTimeSlotId());
+        TimeSlot timeSlot = timeSlotMap.get(schedule.getTimeSlotId());
         if (timeSlot != null) {
             vo.setTimeSlotId(timeSlot.getId());
             vo.setDayOfWeek(timeSlot.getDayOfWeek());
@@ -189,24 +253,24 @@ public class TimetableController {
             vo.setTimeSlotName(timeSlot.getTimeLabel());
         }
 
-        Classroom classroom = classroomMapper.selectById(schedule.getClassroomId());
+        Classroom classroom = classroomMap.get(schedule.getClassroomId());
         if (classroom != null) {
             vo.setClassroomName(classroom.getRoomName());
             vo.setBuilding(classroom.getBuilding());
         }
 
-        TeachingTask task = teachingTaskMapper.selectById(schedule.getTeachingTaskId());
+        TeachingTask task = taskMap.get(schedule.getTeachingTaskId());
         if (task != null) {
-            Course course = courseMapper.selectById(task.getCourseId());
+            Course course = courseMap.get(task.getCourseId());
             if (course != null) {
                 vo.setCourseName(course.getCourseName());
                 vo.setCourseType(course.getCourseType());
             }
-            Teacher teacher = teacherMapper.selectById(task.getTeacherId());
+            Teacher teacher = teacherMap.get(task.getTeacherId());
             if (teacher != null) {
                 vo.setTeacherName(teacher.getName());
             }
-            ClassInfo classInfo = classInfoMapper.selectById(task.getClassId());
+            ClassInfo classInfo = classMap.get(task.getClassId());
             if (classInfo != null) {
                 vo.setClassName(classInfo.getClassName());
             }

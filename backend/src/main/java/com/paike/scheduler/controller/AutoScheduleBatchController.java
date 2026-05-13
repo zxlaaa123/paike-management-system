@@ -30,8 +30,8 @@ public class AutoScheduleBatchController {
 
     /** 查询批次详情 */
     @GetMapping("/batches/{batchId}")
-    public Result<AutoScheduleBatch> getBatchById(@PathVariable Long id) {
-        AutoScheduleBatch batch = batchService.getById(id);
+    public Result<AutoScheduleBatch> getBatchById(@PathVariable Long batchId) {
+        AutoScheduleBatch batch = batchService.getById(batchId);
         if (batch == null) {
             return Result.fail(404, "批次不存在");
         }

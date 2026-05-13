@@ -2,18 +2,14 @@ import request from '../utils/request'
 import type { ApiResponse, PageResult } from './types'
 
 export interface AutoScheduleBatch {
-  id: number
+  batchId: number
   batchNo: string
   totalTaskCount: number
   successTaskCount: number
   failedTaskCount: number
   generatedScheduleCount: number
-  clearOldSchedule: number
   status: string
   message: string
-  startTime: string
-  endTime: string
-  createTime: string
 }
 
 export function getBatchList(params: {

@@ -37,18 +37,20 @@ public class TeachingTaskController {
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "10") int size
     ) {
+        // 查询全部教学任务（不分页）
         LambdaQueryWrapper<TeachingTask> wrapper = new LambdaQueryWrapper<TeachingTask>()
             .eq(TeachingTask::getDeleted, 0);
         if (status != null) {
             wrapper.eq(TeachingTask::getStatus, status);
         }
         wrapper.orderByDesc(TeachingTask::getCreateTime);
-        Page<TeachingTask> result = teachingTaskMapper.selectPage(new Page<>(page, size), wrapper);
+        List<TeachingTask> allTasks = teachingTaskMapper.selectList(wrapper);
 
         // 收集所有关联ID
-        List<Long> courseIds = result.getRecords().stream().map(TeachingTask::getCourseId).distinct().collect(Collectors.toList());
-        List<Long> teacherIds = result.getRecords().stream().map(TeachingTask::getTeacherId).distinct().collect(Collectors.toList());
-        List<Long> classIds = result.getRecords().stream().map(TeachingTask::getClassId).distinct().collect(Collectors.toList());
+        List<Long> courseIds = allTasks.stream().map(TeachingTask::getCourseId).distinct().collect(Collectors.toList());
+        List<Long> teacherIds = allTasks.stream().map(TeachingTask::getTeacherId).distinct().collect(Collectors.toList());
+        List<Long> classIds = allTasks.stream().map(TeachingTask::getClassId).distinct().collect(Collectors.toList());
+        List<Long> taskIds = allTasks.stream().map(TeachingTask::getId).distinct().collect(Collectors.toList());
 
         // 批量查询关联数据
         Map<Long, String> courseNameMap = courseIds.isEmpty() ? Map.of() :
@@ -61,8 +63,16 @@ public class TeachingTaskController {
             classInfoMapper.selectBatchIds(classIds).stream()
                 .collect(Collectors.toMap(ClassInfo::getId, ClassInfo::getClassName));
 
-        // 内存过滤（课程名、教师名、班级名）
-        List<TeachingTask> filtered = result.getRecords().stream().filter(t -> {
+        // 批量统计已排大节数
+        Map<Long, Long> scheduledCountMap = taskIds.isEmpty() ? Map.of() :
+            scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
+                    .in(Schedule::getTeachingTaskId, taskIds)
+                    .eq(Schedule::getDeleted, 0))
+                .stream()
+                .collect(Collectors.groupingBy(Schedule::getTeachingTaskId, Collectors.counting()));
+
+        // 内存过滤并填充关联数据
+        List<TeachingTask> filtered = allTasks.stream().filter(t -> {
             if (courseName != null && !courseName.isBlank()) {
                 String cn = courseNameMap.get(t.getCourseId());
                 if (cn == null || !cn.contains(courseName)) return false;
@@ -80,18 +90,19 @@ public class TeachingTaskController {
             t.setCourseName(courseNameMap.get(t.getCourseId()));
             t.setTeacherName(teacherNameMap.get(t.getTeacherId()));
             t.setClassName(classNameMap.get(t.getClassId()));
-            // 统计已排大节数
-            Long count = scheduleMapper.selectCount(
-                new LambdaQueryWrapper<Schedule>()
-                    .eq(Schedule::getTeachingTaskId, t.getId())
-                    .eq(Schedule::getDeleted, 0));
-            t.setScheduledSlots(count != null ? count.intValue() : 0);
+            Long count = scheduledCountMap.getOrDefault(t.getId(), 0L);
+            t.setScheduledSlots(count.intValue());
         }).collect(Collectors.toList());
 
-        // 重建分页结果
+        // 手动分页
+        int total = filtered.size();
+        int fromIndex = (page - 1) * size;
+        int toIndex = Math.min(fromIndex + size, total);
+        List<TeachingTask> pageRecords = fromIndex < total ? filtered.subList(fromIndex, toIndex) : List.of();
+
         Page<TeachingTask> pageResult = new Page<>(page, size);
-        pageResult.setRecords(filtered);
-        pageResult.setTotal(filtered.size());
+        pageResult.setRecords(pageRecords);
+        pageResult.setTotal(total);
         return Result.success(pageResult);
     }
 

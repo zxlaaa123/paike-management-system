@@ -93,7 +93,7 @@ public class ScheduleConflictReportService {
         return new GenerateResult(baseReportNo, reports.size(), message);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void clear(String reportNo) {
         LambdaQueryWrapper<ScheduleConflictReport> wrapper = new LambdaQueryWrapper<>();
         if (reportNo != null && !reportNo.isBlank()) {
