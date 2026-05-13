@@ -15,6 +15,32 @@ const request = axios.create({
   timeout: 10000,
 })
 
+function isJsonBlob(data: unknown): data is Blob {
+  return data instanceof Blob && data.type.includes('application/json')
+}
+
+function redirectToLogin() {
+  localStorage.removeItem(TOKEN_KEY)
+  if (router.currentRoute.value.path !== '/login') {
+    router.push({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
+  }
+}
+
+function handleBusinessUnauthorized(code?: number) {
+  if (code === 401) {
+    redirectToLogin()
+  }
+}
+
+async function parseJsonBlob(data: Blob): Promise<Partial<ApiResponse> | null> {
+  try {
+    const text = await data.text()
+    return JSON.parse(text) as Partial<ApiResponse>
+  } catch {
+    return null
+  }
+}
+
 request.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem(TOKEN_KEY)
@@ -27,22 +53,32 @@ request.interceptors.request.use(
 )
 
 request.interceptors.response.use(
-  (response) => {
+  async (response) => {
+    if (isJsonBlob(response.data)) {
+      const payload = await parseJsonBlob(response.data)
+      if (payload && typeof payload.message === 'string' && payload.message) {
+        handleBusinessUnauthorized(payload.code)
+        ElMessage.error(payload.message)
+        return Promise.reject(new Error(payload.message))
+      }
+      return response
+    }
     const payload = response.data as ApiResponse
     if (payload && typeof payload.code === 'number' && payload.code !== 200) {
+      handleBusinessUnauthorized(payload.code)
       ElMessage.error(payload.message || '请求失败')
       return Promise.reject(new Error(payload.message || '请求失败'))
     }
     return response
   },
-  (error) => {
+  async (error) => {
     if (error?.response?.status === 401) {
-      localStorage.removeItem(TOKEN_KEY)
-      if (router.currentRoute.value.path !== '/login') {
-        router.push({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
-      }
+      redirectToLogin()
     }
-    const message = error?.response?.data?.message || error?.message || '网络异常'
+    const blobPayload = isJsonBlob(error?.response?.data) ? await parseJsonBlob(error.response.data) : null
+    handleBusinessUnauthorized(blobPayload?.code)
+    const blobMessage = blobPayload?.message
+    const message = blobMessage || error?.response?.data?.message || error?.message || '网络异常'
     ElMessage.error(message)
     return Promise.reject(error)
   },

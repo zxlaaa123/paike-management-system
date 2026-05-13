@@ -2,13 +2,14 @@
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getAllClasses, type ClassInfo } from '../../api/classInfo'
-import { getClassTimetable, type TimetableItem } from '../../api/timetable'
+import { exportClassTimetable, getClassTimetable, type TimetableItem } from '../../api/timetable'
 import TimetableGrid from '../../components/TimetableGrid.vue'
 
 const classList = ref<ClassInfo[]>([])
 const selectedClassId = ref<number | undefined>()
 const timetable = ref<TimetableItem[]>([])
 const loading = ref(false)
+const exportLoading = ref(false)
 
 const selectedClassName = computed(() => {
   const c = classList.value.find((x) => x.id === selectedClassId.value)
@@ -34,6 +35,21 @@ async function handleChange(classId: number) {
     loading.value = false
   }
 }
+
+async function handleExport() {
+  if (!selectedClassId.value) {
+    ElMessage.warning('请先选择班级')
+    return
+  }
+  exportLoading.value = true
+  try {
+    await exportClassTimetable(selectedClassId.value)
+  } catch {
+    // request 拦截器已统一提示错误，这里吞掉异常避免控制台未处理告警
+  } finally {
+    exportLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -55,6 +71,11 @@ async function handleChange(classId: number) {
               :value="c.id"
             />
           </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :disabled="!selectedClassId" :loading="exportLoading" @click="handleExport">
+            导出班级课表
+          </el-button>
         </el-form-item>
       </el-form>
     </el-card>

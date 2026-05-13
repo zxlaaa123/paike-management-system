@@ -2,13 +2,14 @@
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getAllClassrooms, type Classroom } from '../../api/classroom'
-import { getClassroomTimetable, type TimetableItem } from '../../api/timetable'
+import { exportClassroomTimetable, getClassroomTimetable, type TimetableItem } from '../../api/timetable'
 import TimetableGrid from '../../components/TimetableGrid.vue'
 
 const roomList = ref<Classroom[]>([])
 const selectedRoomId = ref<number | undefined>()
 const timetable = ref<TimetableItem[]>([])
 const loading = ref(false)
+const exportLoading = ref(false)
 
 const selectedRoomName = computed(() => {
   const r = roomList.value.find((x) => x.id === selectedRoomId.value)
@@ -34,6 +35,21 @@ async function handleChange(roomId: number) {
     loading.value = false
   }
 }
+
+async function handleExport() {
+  if (!selectedRoomId.value) {
+    ElMessage.warning('请先选择教室')
+    return
+  }
+  exportLoading.value = true
+  try {
+    await exportClassroomTimetable(selectedRoomId.value)
+  } catch {
+    // request 拦截器已统一提示错误，这里吞掉异常避免控制台未处理告警
+  } finally {
+    exportLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -55,6 +71,11 @@ async function handleChange(roomId: number) {
               :value="r.id"
             />
           </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :disabled="!selectedRoomId" :loading="exportLoading" @click="handleExport">
+            导出教室占用表
+          </el-button>
         </el-form-item>
       </el-form>
     </el-card>
