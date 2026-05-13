@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted, watch } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { getUnscheduledTaskList, clearUnscheduledTasks, type UnscheduledTask } from '../../api/unscheduledTask'

@@ -22,6 +22,9 @@ dist/
 coverage/
 .pnpm-store/
 .npm/
+.playwright-mcp/
+test-results/
+tests/test-results/
 
 # Java / Maven / Backend
 target/

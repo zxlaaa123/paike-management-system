@@ -65,6 +65,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/schedule/UnscheduledTaskView.vue'),
       },
       {
+        path: 'schedule-conflict-reports',
+        name: 'ScheduleConflictReports',
+        component: () => import('../views/schedule/ScheduleConflictReportView.vue'),
+      },
+      {
         path: 'schedule',
         name: 'Schedule',
         component: () => import('../views/schedule/ScheduleView.vue'),
