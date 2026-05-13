@@ -40,9 +40,16 @@ async function handleLogout() {
           <el-menu-item index="/teacher-unavailable-times">教师禁排时间</el-menu-item>
           <el-menu-item index="/schedule-rules">排课规则配置</el-menu-item>
           <el-menu-item index="/auto-schedule">自动排课</el-menu-item>
+          <el-menu-item index="/schedule">手动排课</el-menu-item>
+        </el-sub-menu>
+        <el-sub-menu index="analysis">
+          <template #title>
+            <el-icon><DataLine /></el-icon>
+            <span>排课分析</span>
+          </template>
           <el-menu-item index="/unscheduled-tasks">未排任务</el-menu-item>
           <el-menu-item index="/schedule-conflict-reports">冲突报告</el-menu-item>
-          <el-menu-item index="/schedule">手动排课</el-menu-item>
+          <el-menu-item index="/schedule-score">课表评分</el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="timetable">
           <template #title>
