@@ -95,6 +95,7 @@ onMounted(() => {
             <span>V3 排课优化</span>
           </template>
           <el-menu-item index="/v3/schedule-plans">排课方案管理</el-menu-item>
+          <el-menu-item index="/v3/schedule-rules">规则权重配置</el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="analysis">
           <template #title>
