@@ -10,6 +10,8 @@ import {
 } from '../../api/scheduleScoreReport'
 
 const generating = ref(false)
+// currentScore 表示本次刚生成的新结果，latestReport 表示后端持久化的最近一次结果。
+// 页面优先展示 currentScore，这样用户点击“重新评分”后无需等待下一次刷新就能看到新结果。
 const currentScore = ref<ScheduleScoreResult | null>(null)
 const latestReport = ref<ScheduleScoreReport | null>(null)
 
@@ -70,6 +72,7 @@ async function fetchLatest() {
   try {
     latestReport.value = await getLatestScheduleScore()
   } catch (_e) {
+    // 首次进入系统时可能还没有任何评分记录，这里按“无数据”处理，不打断页面展示。
     latestReport.value = null
   }
 }
@@ -175,6 +178,7 @@ onMounted(() => {
       </template>
       <div class="deduction-list">
         <div
+          <!-- 实时评分返回数组，历史记录里存的是换行拼接字符串，这里统一折算成列表渲染。 -->
           v-for="(item, index) in (currentScore?.deductionDetail ?? latestReport?.deductionDetail?.split('\n') ?? [])"
           :key="index"
           class="deduction-item"

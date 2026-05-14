@@ -21,10 +21,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TeacherUnavailableTimeService {
 
+    /**
+     * 维护教师禁排时间。
+     * 这些记录会在自动排课和冲突检测里被当作硬约束使用。
+     */
     private final TeacherUnavailableTimeMapper unavailableTimeMapper;
     private final TeacherMapper teacherMapper;
     private final TimeSlotMapper timeSlotMapper;
 
+    /**
+     * 列表查询支持按教师、时间段和状态筛选，返回前补齐页面展示所需的关联字段。
+     */
     public Page<TeacherUnavailableTime> list(Long teacherId, String teacherName, Long timeSlotId, Integer status, int page, int size) {
         LambdaQueryWrapper<TeacherUnavailableTime> wrapper = new LambdaQueryWrapper<TeacherUnavailableTime>()
                 .eq(TeacherUnavailableTime::getDeleted, 0);
@@ -57,6 +64,9 @@ public class TeacherUnavailableTimeService {
         return result;
     }
 
+    /**
+     * 页面表格直接展示教师姓名、部门、时间段名称，因此这里统一做一次关联字段回填。
+     */
     private void fillRelationFields(List<TeacherUnavailableTime> records) {
         if (records.isEmpty()) return;
 
@@ -86,6 +96,10 @@ public class TeacherUnavailableTimeService {
         }
     }
 
+    /**
+     * 禁排时间只允许配置到有效教师和有效时间段上。
+     * 同一教师同一时间段只能有一条有效记录，避免冲突检测口径出现歧义。
+     */
     public TeacherUnavailableTime create(TeacherUnavailableTime form) {
         // 校验教师是否存在且启用
         Teacher teacher = teacherMapper.selectById(form.getTeacherId());
@@ -125,6 +139,9 @@ public class TeacherUnavailableTimeService {
         return entity;
     }
 
+    /**
+     * 更新时沿用创建时的业务约束，但重复校验需要排除当前记录自身。
+     */
     public TeacherUnavailableTime update(Long id, TeacherUnavailableTime form) {
         TeacherUnavailableTime existing = unavailableTimeMapper.selectById(id);
         if (existing == null || existing.getDeleted() == 1) {
@@ -167,6 +184,9 @@ public class TeacherUnavailableTimeService {
         return existing;
     }
 
+    /**
+     * 删除采用逻辑删除，历史数据仍可用于审计和问题排查。
+     */
     public void delete(Long id) {
         TeacherUnavailableTime existing = unavailableTimeMapper.selectById(id);
         if (existing == null || existing.getDeleted() == 1) {
@@ -177,6 +197,9 @@ public class TeacherUnavailableTimeService {
         unavailableTimeMapper.updateById(existing);
     }
 
+    /**
+     * 状态切换用于临时启停一条禁排规则，不影响记录本身的其他信息。
+     */
     public void updateStatus(Long id, Integer status) {
         TeacherUnavailableTime existing = unavailableTimeMapper.selectById(id);
         if (existing == null || existing.getDeleted() == 1) {

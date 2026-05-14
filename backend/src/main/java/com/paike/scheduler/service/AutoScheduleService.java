@@ -29,6 +29,10 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AutoScheduleService {
 
+    /**
+     * 自动排课主流程。
+     * 核心思路是先把“更难排的任务”放前面，再按规则优先级尝试时间段和教室。
+     */
     private final AutoScheduleBatchService batchService;
     private final UnscheduledTaskService unscheduledTaskService;
     private final ScheduleConflictService conflictService;
@@ -168,7 +172,7 @@ public class AutoScheduleService {
 
                     // 检查同一课程同一天重复
                     if (!allowSameCourseSameDay && usedDays.contains(slot.getDayOfWeek())) {
-                        // 检查当天是否已有同一课程
+                        // 先判断本次 run 中是否已经给当前任务占过这一天，再回库里确认历史排课是否也已占用。
                         if (hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), batch.getId())) {
                             lastFailReason = "同一课程同一天不允许重复";
                             lastFailReasonType = "SAME_COURSE_SAME_DAY";
@@ -242,6 +246,10 @@ public class AutoScheduleService {
 
     // ========== 排序方法 ==========
 
+    /**
+     * 难排任务优先。
+     * 先排对资源要求高、班级人数多、周课时多、教师禁排更多的任务，能减少后续无解概率。
+     */
     private List<TeachingTask> sortTasks(List<TeachingTask> tasks, List<TeacherUnavailableTime> unavailableTimes) {
         Map<Long, Long> unavailableCount = unavailableTimes.stream()
                 .collect(Collectors.groupingBy(TeacherUnavailableTime::getTeacherId, Collectors.counting()));
@@ -269,6 +277,10 @@ public class AutoScheduleService {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * 时间段排序体现的是排课偏好，不是硬限制。
+     * 规则允许时优先上午、尽量避开周五下午，但仍保留这些时间段作为兜底候选。
+     */
     private List<TimeSlot> sortTimeSlots(List<TimeSlot> slots, boolean prioritizeMorning, boolean avoidFridayAfternoon) {
         return slots.stream().sorted((a, b) -> {
             if (prioritizeMorning) {
@@ -302,6 +314,10 @@ public class AutoScheduleService {
                         .eq(Schedule::getDeleted, 0)).intValue();
     }
 
+    /**
+     * 这里用 < maxSlots，而不是 <= maxSlots。
+     * 原因是当前正在尝试插入一个新大节，若已达到上限，则本次尝试必须拦下。
+     */
     private boolean checkTeacherDailyLimit(Long teacherId, int dayOfWeek, int maxSlots, Long currentBatchId) {
         List<Long> slotIds = getTimeSlotIdsByDay(dayOfWeek);
         if (slotIds.isEmpty()) return true;
@@ -313,6 +329,9 @@ public class AutoScheduleService {
         return count < maxSlots;
     }
 
+    /**
+     * 班级每日上限和教师上限同口径处理，避免新增当前大节后越过规则阈值。
+     */
     private boolean checkClassDailyLimit(Long classId, int dayOfWeek, int maxSlots, Long currentBatchId) {
         List<Long> slotIds = getTimeSlotIdsByDay(dayOfWeek);
         if (slotIds.isEmpty()) return true;
@@ -369,9 +388,10 @@ public class AutoScheduleService {
         return classInfo != null ? classInfo.getStudentCount() : 0;
     }
 
-    // 修正：直接注入所需的 mapper
-    // 上面的 getCourseType 和 getClassStudentCount 写法不对，改为注入
-
+    /**
+     * 未排课记录需要稳定的失败类型编码，便于前端筛选和后续统计。
+     * 这里把冲突检测返回的中文原因归一化为枚举风格字符串。
+     */
     private String categorizeReason(String reason) {
         if (reason == null || reason.isBlank()) return "UNKNOWN";
         if (reason.contains("教师禁排")) return "TEACHER_UNAVAILABLE";

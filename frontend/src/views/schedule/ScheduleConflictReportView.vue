@@ -26,6 +26,7 @@ const pagination = reactive({
   size: 10,
 })
 
+// 这些编码来自后端冲突报告生成逻辑，页面只做标签翻译，不单独发明新的类型。
 const conflictTypeOptions = [
   { value: 'TEACHER_CONFLICT', label: '教师冲突' },
   { value: 'CLASS_CONFLICT', label: '班级冲突' },
@@ -111,6 +112,7 @@ async function handleGenerate() {
   generating.value = true
   try {
     const result = await generateScheduleConflictReport()
+    // 生成后自动把搜索条件切到当前 reportNo，方便用户第一眼只看本次新报告。
     latestReportNo.value = result.reportNo
     searchForm.reportNo = result.reportNo
     pagination.page = 1
@@ -122,6 +124,7 @@ async function handleGenerate() {
 }
 
 async function handleClear() {
+  // 当 reportNo 有值时只清当前报告；为空时清全部，和后端接口语义保持一致。
   const targetText = searchForm.reportNo.trim() ? `报告 ${searchForm.reportNo.trim()}` : '全部冲突报告'
   await ElMessageBox.confirm(`确定清空${targetText}吗？此操作不可恢复。`, '确认清空', {
     type: 'warning',

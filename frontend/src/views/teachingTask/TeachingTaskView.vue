@@ -62,6 +62,7 @@ async function fetchData() {
     })
     tableData.value = res.records.map((t) => ({
       ...t,
+      // 后端 weeklyHours 还是按学时存储，页面列表统一折算成“大节”方便和排课结果对照。
       requiredSlots: Math.ceil(t.weeklyHours / 2),
     }))
     total.value = res.total
@@ -71,6 +72,7 @@ async function fetchData() {
 }
 
 async function fetchOptions() {
+  // 弹窗里的课程、教师、班级都是稳定选项，页面初始化一次性预加载即可。
   const [courses, teachers, classes] = await Promise.all([
     getAllCourses(),
     getAllTeachers(),
@@ -97,6 +99,7 @@ function handleReset() {
 function openAdd() {
   dialogTitle.value = '新增教学任务'
   editingId.value = null
+  // 这里显式重置每个字段，避免上一次编辑残留到新增表单里。
   form.courseId = 0
   form.teacherId = 0
   form.classId = 0

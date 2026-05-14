@@ -24,6 +24,7 @@ const pagination = reactive({
   size: 10,
 })
 
+// reasonType 需要和后端未排原因编码保持一致，前端只负责做可读化展示和颜色区分。
 const reasonTypeOptions = [
   { value: 'TEACHER_UNAVAILABLE', label: '教师禁排' },
   { value: 'TEACHER_CONFLICT', label: '教师冲突' },
@@ -86,6 +87,7 @@ async function fetchTasks() {
 
 async function fetchBatches() {
   try {
+    // 批次筛选和按批次清空都依赖批次号，这里一次性拉取最近批次列表供页面复用。
     const res = await getBatchList({ page: 1, size: 100 })
     batchList.value = res.records
   } catch (_e) {
@@ -124,6 +126,7 @@ async function handleClearAll() {
 }
 
 async function handleClearBatch(batchId: number) {
+  // 按批次清理时保留其他批次记录，方便排课失败后只回收本轮自动排课产生的未排项。
   await ElMessageBox.confirm('确定清空该批次的未排任务记录吗？', '确认清空', {
     type: 'warning',
     confirmButtonText: '确定',
@@ -139,6 +142,7 @@ async function handleClearBatch(batchId: number) {
 }
 
 function gotoManualSchedule() {
+  // 未排任务最终还是要回到手动排课页处理，这里提供固定跳转入口。
   router.push('/schedule')
 }
 

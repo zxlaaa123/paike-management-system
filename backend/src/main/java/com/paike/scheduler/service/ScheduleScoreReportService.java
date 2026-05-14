@@ -20,6 +20,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ScheduleScoreReportService {
 
+    /**
+     * 根据当前排课结果生成质量评分报告。
+     * 这里的评分不是“越多越好”的统计，而是从满分开始按冲突和排课体验逐项扣分。
+     */
     private static final int FULL_SCORE = 100;
 
     private static final int DEDUCT_PER_CONFLICT = 10;
@@ -60,6 +64,9 @@ public class ScheduleScoreReportService {
         return scoreReportMapper.selectPage(new Page<>(page, size), wrapper);
     }
 
+    /**
+     * 生成一次完整评分，并把结果持久化，供列表和详情页直接查询。
+     */
     @Transactional
     public ScoreResult generate() {
         List<Schedule> schedules = scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
@@ -117,6 +124,10 @@ public class ScheduleScoreReportService {
         return result;
     }
 
+    /**
+     * 把评分过程中会重复使用的基础数据一次性查出，避免后续各项统计重复访问数据库。
+     * 同时把“已排课数据”和“全部启用中的教学任务”放到同一上下文里，便于判断未排满任务。
+     */
     private Context buildContext(List<Schedule> schedules) {
         Context context = new Context();
         context.schedules = schedules;
@@ -163,9 +174,14 @@ public class ScheduleScoreReportService {
         return context;
     }
 
+    /**
+     * 硬冲突按“冲突组”计数，不按具体排课记录条数计数。
+     * 例如同一教师同一时间排了 3 条课，只记 1 个教师时间冲突组。
+     */
     private int countHardConflicts(Context context) {
         int count = 0;
 
+        // 教师、班级、教室占用冲突都按“同一对象 + 同一时间段”分组统计。
         Map<String, List<Schedule>> byTeacher = context.schedules.stream()
                 .filter(s -> s.getTeacherId() != null && s.getTimeSlotId() != null)
                 .collect(Collectors.groupingBy(s -> buildPairKey(s.getTeacherId(), s.getTimeSlotId())));
@@ -187,6 +203,7 @@ public class ScheduleScoreReportService {
             if (group.size() > 1) count++;
         }
 
+        // 容量不足和教室类型不匹配按单条排课记录计数，因为每条记录都代表一次明确的不合理安排。
         for (Schedule schedule : context.schedules) {
             ClassInfo classInfo = context.classMap.get(schedule.getClassId());
             Classroom classroom = context.classroomMap.get(schedule.getClassroomId());
@@ -203,6 +220,7 @@ public class ScheduleScoreReportService {
             }
         }
 
+        // 教师禁排时间一旦被占用，也按单条记录视为一次硬冲突。
         for (Schedule schedule : context.schedules) {
             TeacherUnavailableTime ut = context.unavailableMap.get(buildPairKey(schedule.getTeacherId(), schedule.getTimeSlotId()));
             if (ut != null) count++;
@@ -211,6 +229,9 @@ public class ScheduleScoreReportService {
         return count;
     }
 
+    /**
+     * 未排满统计关注的是“教学任务是否达到周课时要求”，不是单看是否存在排课记录。
+     */
     private int countUnfinishedTasks(Context context) {
         Map<Long, List<Schedule>> taskScheduleMap = context.schedules.stream()
                 .filter(s -> s.getTeachingTaskId() != null)
@@ -225,6 +246,10 @@ public class ScheduleScoreReportService {
         return count;
     }
 
+    /**
+     * 当天课时上限来自规则表。
+     * 这里只统计超限的“教师-日期”组合数量，用来反映课表集中度问题。
+     */
     private int countTeacherOverload(Context context) {
         if (context.teacherDailyLimit <= 0) return 0;
         Map<String, List<Schedule>> grouped = context.schedules.stream()
@@ -237,6 +262,9 @@ public class ScheduleScoreReportService {
         return count;
     }
 
+    /**
+     * 和教师过载同口径，统计超限的“班级-日期”组合数量。
+     */
     private int countClassOverload(Context context) {
         if (context.classDailyLimit <= 0) return 0;
         Map<String, List<Schedule>> grouped = context.schedules.stream()
@@ -249,6 +277,9 @@ public class ScheduleScoreReportService {
         return count;
     }
 
+    /**
+     * 周五下午不是硬冲突，但通常被视为体验较差的排课位置，因此只做轻度扣分。
+     */
     private int countFridayAfternoon(Context context) {
         int count = 0;
         for (Schedule schedule : context.schedules) {
@@ -261,6 +292,9 @@ public class ScheduleScoreReportService {
         return count;
     }
 
+    /**
+     * 成绩分级只依赖最终分数，阈值在这里集中维护，便于后续调整评分标准。
+     */
     private String calculateGrade(int score) {
         if (score >= 90) return "EXCELLENT";
         if (score >= 80) return "GOOD";
@@ -340,6 +374,10 @@ public class ScheduleScoreReportService {
         return CourseType.COMPUTER.getCode().equals(course.getCourseType()) && !RoomType.COMPUTER.getCode().equals(classroom.getRoomType());
     }
 
+    /**
+     * 当前系统以“大节”为排课单位，默认 2 课时折算 1 个大节。
+     * 因此奇数课时需要向上取整，保证任务不会少排。
+     */
     private int calculateRequiredSlots(TeachingTask task) {
         if (task == null || task.getWeeklyHours() == null) return 0;
         return (int) Math.ceil(task.getWeeklyHours() / 2.0);

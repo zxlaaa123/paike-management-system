@@ -75,6 +75,7 @@ function handleReset() {
 
 async function loadOptions() {
   try {
+    // 教师和时间段都是基础档案数据，弹窗编辑依赖它们，页面初始化时统一预加载。
     teachers.value = await getAllTeachers()
     timeSlots.value = await getAllTimeSlots()
   } catch (_e) {
@@ -85,6 +86,7 @@ async function loadOptions() {
 function openAdd() {
   dialogTitle.value = '新增禁排时间'
   editingId.value = null
+  // 显式重置表单，避免上次编辑残留的教师或时间段误带入新增操作。
   form.teacherId = 0
   form.timeSlotId = 0
   form.reason = ''
@@ -130,6 +132,7 @@ async function handleDelete(row: TeacherUnavailableTime) {
 }
 
 async function handleStatusChange(row: TeacherUnavailableTime) {
+  // 状态切换只决定该禁排规则是否参与排课约束，不删除原记录，便于后续临时恢复。
   const newStatus = row.status === 1 ? 0 : 1
   const action = newStatus === 1 ? '启用' : '停用'
   await ElMessageBox.confirm(`确定${action}该禁排时间吗？`, '提示', { type: 'warning' })

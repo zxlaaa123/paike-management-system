@@ -17,6 +17,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ScheduleConflictService {
 
+    /**
+     * 手动排课和自动排课共用的冲突检测入口。
+     * 返回 null 表示允许排入，返回字符串表示第一个命中的阻塞原因。
+     */
     private final ScheduleMapper scheduleMapper;
     private final TeachingTaskMapper teachingTaskMapper;
     private final TeacherMapper teacherMapper;
@@ -82,7 +86,7 @@ public class ScheduleConflictService {
             return "排课失败：机房课必须安排在机房";
         }
 
-        // 构建排除当前记录的查询条件（编辑时排除自身）
+        // 编辑已有排课记录时，需要把自己排除掉，否则会把原记录误判成冲突。
         LambdaQueryWrapper<Schedule> baseWrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getDeleted, 0);
         if (excludeScheduleId != null) {
@@ -143,12 +147,13 @@ public class ScheduleConflictService {
             return "排课失败：该教学任务每周课时为" + task.getWeeklyHours() + "学时，最多排" + requiredSlots + "个大节，当前已排" + scheduledSlots + "个大节";
         }
 
-        // 11. 检查排课规则配置
+        // 11. 读取软规则。前面的资源占用、容量、类型属于硬约束，这里的每日上限和同课同日属于配置化约束。
         int teacherMaxDailySlots = ruleService.getIntValue("TEACHER_MAX_DAILY_SLOTS");
         int classMaxDailySlots = ruleService.getIntValue("CLASS_MAX_DAILY_SLOTS");
         boolean allowSameCourseSameDay = ruleService.getBoolValue("ALLOW_SAME_COURSE_SAME_DAY");
 
         if (teacherMaxDailySlots > 0) {
+            // 这里用 >=，因为当前待插入的大节尚未入库；一旦已达到上限，本次排课就必须拒绝。
             List<TimeSlot> daySlots = timeSlotMapper.selectList(
                     new LambdaQueryWrapper<TimeSlot>()
                             .eq(TimeSlot::getDayOfWeek, timeSlot.getDayOfWeek()));
@@ -179,6 +184,7 @@ public class ScheduleConflictService {
         }
 
         if (!allowSameCourseSameDay) {
+            // 这里约束的是“同一班级 + 同一课程 + 同一天”，不是简单按教师或时间段去重。
             List<TimeSlot> daySlots = timeSlotMapper.selectList(
                     new LambdaQueryWrapper<TimeSlot>()
                             .eq(TimeSlot::getDayOfWeek, timeSlot.getDayOfWeek()));
