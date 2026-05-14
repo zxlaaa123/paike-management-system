@@ -39,5 +39,8 @@ export function rescore(planId: number) {
     planId: number
     totalScore: number
     scoreLevel: string
-  }>>(`/v3/schedule-plans/${planId}/rescore`)
+  }>>(`/v3/schedule-plans/${planId}/rescore`).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
 }

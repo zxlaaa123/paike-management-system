@@ -176,9 +176,9 @@ onMounted(() => {
       <template #header>
         <span>扣分详情</span>
       </template>
+      <!-- 实时评分返回数组，历史记录里存的是换行拼接字符串，这里统一折算成列表渲染。 -->
       <div class="deduction-list">
         <div
-          <!-- 实时评分返回数组，历史记录里存的是换行拼接字符串，这里统一折算成列表渲染。 -->
           v-for="(item, index) in (currentScore?.deductionDetail ?? latestReport?.deductionDetail?.split('\n') ?? [])"
           :key="index"
           class="deduction-item"

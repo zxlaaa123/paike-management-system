@@ -98,17 +98,6 @@ async function handleBatchSave() {
   }
 }
 
-function strategyText(type: string) {
-  const map: Record<string, string> = {
-    TEACHER_PRIORITY: '教师优先',
-    CLASS_BALANCE: '班级均衡',
-    CLASSROOM_UTILIZATION: '教室利用率',
-    COMPREHENSIVE: '综合最优',
-    CUSTOM: '自定义',
-  }
-  return map[type] || type
-}
-
 onMounted(() => {
   fetchOptions().then(fetchData)
 })
@@ -172,7 +161,7 @@ onMounted(() => {
         <el-table-column label="启用" width="80">
           <template #default="{ row }">
             <el-switch v-model="row.enabled" :active-value="1" :inactive-value="0" />
-          </el-template>
+          </template>
         </el-table-column>
         <el-table-column prop="description" label="说明" min-width="200" />
         <el-table-column label="操作" width="80" fixed="right">

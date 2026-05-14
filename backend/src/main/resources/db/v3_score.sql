@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS schedule_rule_weight (
     description VARCHAR(500) NULL COMMENT '规则说明',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uk_rule_weight_semester_strategy_rule (semester_id, strategy_type, rule_code),
     INDEX idx_rule_weight_semester (semester_id),
     INDEX idx_rule_weight_strategy (strategy_type),
     INDEX idx_rule_weight_rule_code (rule_code)

@@ -18,6 +18,7 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
         ensureSemesterIndexes();
         ensureTeachingTaskSemesterColumn();
         ensureScheduleSemesterColumns();
+        ensureScheduleRuleWeightUniqueIndex();
     }
 
     private void ensureSemesterIndexes() {
@@ -91,6 +92,44 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
             }
         } catch (Exception e) {
             log.warn("Failed to add plan_id to schedule: {}", e.getMessage());
+        }
+    }
+
+    private void ensureScheduleRuleWeightUniqueIndex() {
+        try {
+            Integer tableExists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLES " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_rule_weight'",
+                Integer.class);
+            if (tableExists == null || tableExists == 0) {
+                return;
+            }
+
+            Integer indexCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_rule_weight' " +
+                "AND INDEX_NAME = 'uk_rule_weight_semester_strategy_rule'",
+                Integer.class);
+            if (indexCount != null && indexCount > 0) {
+                return;
+            }
+
+            // 清理历史重复数据，保留最早一条，避免唯一索引创建失败。
+            jdbcTemplate.execute(
+                "DELETE t1 FROM schedule_rule_weight t1 " +
+                "INNER JOIN schedule_rule_weight t2 " +
+                "ON t1.semester_id = t2.semester_id " +
+                "AND t1.strategy_type = t2.strategy_type " +
+                "AND t1.rule_code = t2.rule_code " +
+                "AND t1.id > t2.id");
+
+            jdbcTemplate.execute(
+                "ALTER TABLE schedule_rule_weight " +
+                "ADD CONSTRAINT uk_rule_weight_semester_strategy_rule " +
+                "UNIQUE (semester_id, strategy_type, rule_code)");
+            log.info("Created unique index uk_rule_weight_semester_strategy_rule on schedule_rule_weight");
+        } catch (Exception e) {
+            log.warn("Failed to create unique index on schedule_rule_weight: {}", e.getMessage());
         }
     }
 }

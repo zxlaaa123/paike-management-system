@@ -115,12 +115,14 @@ async function handleSubmit() {
 }
 
 async function handleDelete(row: Semester) {
+  if (row.isCurrent === 1) {
+    ElMessage.warning('当前学期不能直接删除，请先设置其他学期为当前学期')
+    return
+  }
   await ElMessageBox.confirm(
-    row.isCurrent === 1
-      ? '当前学期不能直接删除，请先设置其他学期为当前学期'
-      : `确定删除学期「${row.name}」吗？`,
+    `确定删除学期「${row.name}」吗？`,
     '提示',
-    { type: 'warning', confirmButtonDisabled: row.isCurrent === 1 }
+    { type: 'warning' }
   )
   await deleteSemester(row.id)
   ElMessage.success('删除成功')
