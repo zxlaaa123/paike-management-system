@@ -9,6 +9,7 @@ Thumbs.db
 
 # Logs
 *.log
+*.err
 logs/
 
 # Environment files
@@ -39,3 +40,7 @@ out/
 *.tmp
 *.temp
 *.swp
+
+# Local artifacts
+output/
+test_result.json
