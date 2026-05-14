@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { House, DataLine, Calendar, Reading, PieChart, School, ArrowDown, Warning, Loading } from '@element-plus/icons-vue'
+import { House, DataLine, Calendar, Reading, PieChart, School, ArrowDown, Warning, Loading, Collection } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
@@ -88,6 +88,13 @@ onMounted(() => {
           <el-menu-item index="/schedule-rules">排课规则配置</el-menu-item>
           <el-menu-item index="/auto-schedule">自动排课</el-menu-item>
           <el-menu-item index="/schedule">手动排课</el-menu-item>
+        </el-sub-menu>
+        <el-sub-menu index="v3-schedule">
+          <template #title>
+            <el-icon><Collection /></el-icon>
+            <span>V3 排课优化</span>
+          </template>
+          <el-menu-item index="/v3/schedule-plans">排课方案管理</el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="analysis">
           <template #title>
