@@ -90,6 +90,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/schedule/SchedulePlanView.vue'),
       },
       {
+        path: 'v3/schedule-generate',
+        name: 'ScheduleGenerate',
+        component: () => import('../views/schedule/ScheduleGenerateView.vue'),
+      },
+      {
         path: 'v3/schedule-plans/:id',
         name: 'SchedulePlanDetail',
         component: () => import('../views/schedule/SchedulePlanDetailView.vue'),
