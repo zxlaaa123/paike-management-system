@@ -22,6 +22,8 @@ public class ScheduleScoreDetail {
 
     private String ruleCode;
 
+    private String ruleType;
+
     private String ruleName;
 
     private BigDecimal score;

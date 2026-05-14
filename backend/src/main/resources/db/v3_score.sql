@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS schedule_score_detail (
     plan_id BIGINT NOT NULL COMMENT '排课方案ID',
     semester_id BIGINT NOT NULL COMMENT '所属学期ID',
     rule_code VARCHAR(100) NOT NULL COMMENT '规则编码',
+    rule_type VARCHAR(20) NOT NULL DEFAULT 'SOFT' COMMENT '规则类型：HARD硬约束、SOFT软约束',
     rule_name VARCHAR(100) NOT NULL COMMENT '规则名称',
     score DECIMAL(6,2) NOT NULL DEFAULT 0 COMMENT '该项得分或扣分',
     max_score DECIMAL(6,2) NULL COMMENT '该项最高分',

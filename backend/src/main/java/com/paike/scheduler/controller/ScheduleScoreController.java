@@ -33,7 +33,11 @@ public class ScheduleScoreController {
         int softViolation = 0;
         for (ScheduleScoreDetail d : details) {
             if (d.getScore() != null && d.getScore().compareTo(BigDecimal.ZERO) < 0) {
-                softViolation++;
+                if ("HARD".equals(d.getRuleType())) {
+                    hardViolation++;
+                } else {
+                    softViolation++;
+                }
             }
         }
         return Result.success(Map.of(

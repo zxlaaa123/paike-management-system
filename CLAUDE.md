@@ -9,6 +9,7 @@
 - 原因：Bash 在 Windows 上不兼容 PowerShell 语法（如 `$null`、`Start-Sleep`、`Get-Process` 等），会导致命令失败和调试时间浪费
 
 ### 0.2 后端启动方式
+- **如果用户明确要求 AI 执行启动，可以暂时忽视以下两条限制**
 - **后端必须由用户在独立 PowerShell 终端手动启动**，AI 不负责启动和等待
 - 启动方式：`cd D:\paike\backend; mvn spring-boot:run`
 - 用户看到 `Started` 或 `Tomcat started` 后告诉 AI
