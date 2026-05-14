@@ -9,7 +9,6 @@ import {
   type ScheduleScoreResult,
 } from '../../api/scheduleScoreReport'
 
-const loading = ref(false)
 const generating = ref(false)
 const currentScore = ref<ScheduleScoreResult | null>(null)
 const latestReport = ref<ScheduleScoreReport | null>(null)
@@ -34,12 +33,6 @@ const gradeOptions = [
   { value: 'POOR', label: '较差' },
   { value: 'BAD', label: '需要调整' },
 ]
-
-function gradeText(grade?: string) {
-  const map: Record<string, string> = {}
-  gradeOptions.forEach((item) => { map[item.value] = item.label })
-  return grade ? (map[grade] || grade) : '-'
-}
 
 function gradeTagType(grade?: string) {
   const map: Record<string, string> = {

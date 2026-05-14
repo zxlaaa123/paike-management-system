@@ -78,7 +78,7 @@ async function loadOptions() {
     teachers.value = await getAllTeachers()
     timeSlots.value = await getAllTimeSlots()
   } catch (_e) {
-    // 错误由拦截器处理
+    console.error(_e)
   }
 }
 
@@ -118,7 +118,7 @@ async function handleSubmit() {
     dialogVisible.value = false
     fetchData()
   } catch (_e) {
-    // 错误信息由拦截器显示
+    console.error(_e)
   }
 }
 
@@ -219,12 +219,12 @@ onMounted(() => {
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="教师" prop="teacherId">
-          <el-select v-model="form.teacherId" placeholder="请选择教师" filterable style="width: 100%">
+          <el-select v-model="form.teacherId" placeholder="请选择教师" filterable :teleported="false" style="width: 100%">
             <el-option v-for="t in teachers" :key="t.id" :label="t.name" :value="t.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="时间段" prop="timeSlotId">
-          <el-select v-model="form.timeSlotId" placeholder="请选择时间段" style="width: 100%">
+          <el-select v-model="form.timeSlotId" placeholder="请选择时间段" :teleported="false" style="width: 100%">
             <el-option v-for="ts in timeSlots" :key="ts.id" :label="ts.timeLabel" :value="ts.id" />
           </el-select>
         </el-form-item>
@@ -233,8 +233,8 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="form.status">
-            <el-radio :label="1">启用</el-radio>
-            <el-radio :label="0">停用</el-radio>
+            <el-radio :value="1">启用</el-radio>
+            <el-radio :value="0">停用</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="备注" prop="remark">

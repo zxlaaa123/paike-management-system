@@ -120,7 +120,7 @@ async function handleSubmit() {
     dialogVisible.value = false
     fetchData()
   } catch (_e) {
-    // 错误信息由拦截器显示
+    console.error(_e)
   }
 }
 
@@ -234,7 +234,7 @@ onMounted(fetchData)
           <el-input-number v-model="form.capacity" :min="1" />
         </el-form-item>
         <el-form-item label="教室类型" prop="roomType">
-          <el-select v-model="form.roomType">
+          <el-select v-model="form.roomType" :teleported="false">
             <el-option v-for="opt in roomTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
         </el-form-item>

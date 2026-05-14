@@ -132,7 +132,7 @@ async function handleSubmit() {
     dialogVisible.value = false
     fetchData()
   } catch (_e) {
-    // 错误信息由拦截器显示
+    console.error(_e)
   } finally {
     submitting.value = false
   }
@@ -248,7 +248,13 @@ onMounted(() => {
     <el-dialog v-model="dialogVisible" title="新增排课" width="560px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="教学任务" prop="teachingTaskId">
-          <el-select v-model="form.teachingTaskId" placeholder="请选择教学任务" filterable style="width: 100%">
+          <el-select
+            v-model="form.teachingTaskId"
+            placeholder="请选择教学任务"
+            filterable
+            :teleported="false"
+            style="width: 100%"
+          >
             <el-option
               v-for="item in taskList"
               :key="item.id"
@@ -258,14 +264,14 @@ onMounted(() => {
           </el-select>
         </el-form-item>
         <el-form-item label="时间段" prop="timeSlotId">
-          <el-select v-model="form.timeSlotId" placeholder="请选择时间段" style="width: 100%">
+          <el-select v-model="form.timeSlotId" placeholder="请选择时间段" :teleported="false" style="width: 100%">
             <el-option-group v-for="(slots, day) in timeSlotsByDay" :key="day" :label="dayNames[day]">
               <el-option v-for="slot in slots" :key="slot.id" :label="slot.timeLabel" :value="slot.id" />
             </el-option-group>
           </el-select>
         </el-form-item>
         <el-form-item label="教室" prop="classroomId">
-          <el-select v-model="form.classroomId" placeholder="请选择教室" filterable style="width: 100%">
+          <el-select v-model="form.classroomId" placeholder="请选择教室" filterable :teleported="false" style="width: 100%">
             <el-option
               v-for="item in classroomList"
               :key="item.id"

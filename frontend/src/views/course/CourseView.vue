@@ -122,7 +122,7 @@ async function handleSubmit() {
     dialogVisible.value = false
     fetchData()
   } catch (_e) {
-    // 错误信息由拦截器显示
+    console.error(_e)
   }
 }
 
@@ -204,7 +204,7 @@ onMounted(fetchData)
           <el-input v-model="form.courseName" placeholder="请输入课程名称" />
         </el-form-item>
         <el-form-item label="课程类型" prop="courseType">
-          <el-select v-model="form.courseType">
+          <el-select v-model="form.courseType" :teleported="false">
             <el-option v-for="opt in courseTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
         </el-form-item>

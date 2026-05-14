@@ -2,18 +2,13 @@
   <div class="dashboard-page">
     <el-card shadow="never">
       <template #header>
-        <div class="header">首页统计（占位页）</div>
+        <div class="header">首页统计</div>
       </template>
-      <el-alert
-        type="info"
-        show-icon
-        :closable="false"
-        title="阶段 2 仅搭建基础框架，统计数据将在后续阶段接入。"
-      />
+      <el-alert v-if="loadError" type="warning" show-icon :closable="false" :title="loadError" />
       <div class="cards">
-        <el-card v-for="item in placeholders" :key="item.label" shadow="hover">
+        <el-card v-for="item in statsCards" :key="item.label" shadow="hover">
           <div class="label">{{ item.label }}</div>
-          <div class="value">--</div>
+          <div class="value">{{ item.value }}</div>
         </el-card>
       </div>
     </el-card>
@@ -21,12 +16,48 @@
 </template>
 
 <script setup lang="ts">
-const placeholders = [
-  { label: '教师数量' },
-  { label: '班级数量' },
-  { label: '教室数量' },
-  { label: '课程数量' },
-]
+import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { getTeacherList } from '../../api/teacher'
+import { getClassList } from '../../api/classInfo'
+import { getClassroomList } from '../../api/classroom'
+import { getCourseList } from '../../api/course'
+
+const loadError = ref('')
+const stats = reactive({
+  teacherCount: 0,
+  classCount: 0,
+  classroomCount: 0,
+  courseCount: 0,
+})
+
+const statsCards = computed(() => [
+  { label: '教师数量', value: stats.teacherCount },
+  { label: '班级数量', value: stats.classCount },
+  { label: '教室数量', value: stats.classroomCount },
+  { label: '课程数量', value: stats.courseCount },
+])
+
+async function fetchStats() {
+  loadError.value = ''
+  try {
+    const [teacherRes, classRes, classroomRes, courseRes] = await Promise.all([
+      getTeacherList({ page: 1, size: 1 }),
+      getClassList({ page: 1, size: 1 }),
+      getClassroomList({ page: 1, size: 1 }),
+      getCourseList({ page: 1, size: 1 }),
+    ])
+    stats.teacherCount = teacherRes.total
+    stats.classCount = classRes.total
+    stats.classroomCount = classroomRes.total
+    stats.courseCount = courseRes.total
+  } catch (_error) {
+    loadError.value = '统计数据加载失败，请稍后重试。'
+    ElMessage.error(loadError.value)
+  }
+}
+
+onMounted(fetchStats)
 </script>
 
 <style scoped>

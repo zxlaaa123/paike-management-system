@@ -88,7 +88,9 @@ async function fetchBatches() {
   try {
     const res = await getBatchList({ page: 1, size: 100 })
     batchList.value = res.records
-  } catch (_e) { /* 错误由拦截器处理 */ }
+  } catch (_e) {
+    console.error(_e)
+  }
 }
 
 function handleSearch() {
@@ -116,7 +118,9 @@ async function handleClearAll() {
     await clearUnscheduledTasks()
     ElMessage.success('清空成功')
     fetchTasks()
-  } catch (_e) { /* 错误由拦截器处理 */ }
+  } catch (_e) {
+    console.error(_e)
+  }
 }
 
 async function handleClearBatch(batchId: number) {
@@ -129,7 +133,9 @@ async function handleClearBatch(batchId: number) {
     await clearUnscheduledTasks(batchId)
     ElMessage.success('清空成功')
     fetchTasks()
-  } catch (_e) { /* 错误由拦截器处理 */ }
+  } catch (_e) {
+    console.error(_e)
+  }
 }
 
 function gotoManualSchedule() {
@@ -157,7 +163,7 @@ onMounted(() => {
       <el-form :model="searchForm" inline>
         <el-form-item label="批次号">
           <el-select v-model="searchForm.batchId" placeholder="全部批次" clearable style="width: 220px">
-            <el-option v-for="batch in batchList" :key="batch.id" :label="batch.batchNo" :value="batch.id" />
+            <el-option v-for="batch in batchList" :key="batch.batchId" :label="batch.batchNo" :value="batch.batchId" />
           </el-select>
         </el-form-item>
         <el-form-item label="课程">

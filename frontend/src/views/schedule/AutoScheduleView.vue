@@ -60,7 +60,9 @@ async function fetchBatches() {
 async function fetchTeachingTasks() {
   try {
     teachingTasks.value = await getAllTeachingTasks()
-  } catch (_e) { /* 错误由拦截器处理 */ }
+  } catch (_e) {
+    console.error(_e)
+  }
 }
 
 async function handleRunAutoSchedule() {
@@ -77,7 +79,7 @@ async function handleRunAutoSchedule() {
         '危险操作确认',
         { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
       )
-    } catch {
+    } catch (_e) {
       return
     }
   }
@@ -101,7 +103,9 @@ async function handleRunAutoSchedule() {
     }
 
     fetchBatches()
-  } catch (_e) { /* 错误由拦截器处理 */ } finally {
+  } catch (_e) {
+    console.error(_e)
+  } finally {
     running.value = false
   }
 }
@@ -109,10 +113,12 @@ async function handleRunAutoSchedule() {
 async function handleClearBatchSchedules(batch: AutoScheduleBatch) {
   await ElMessageBox.confirm(`确定清空批次 ${batch.batchNo} 的自动排课结果吗？`, '提示', { type: 'warning' })
   try {
-    await clearBatchSchedules(batch.id)
+    await clearBatchSchedules(batch.batchId)
     ElMessage.success('清空成功')
     fetchBatches()
-  } catch (_e) { /* 错误由拦截器处理 */ }
+  } catch (_e) {
+    console.error(_e)
+  }
 }
 
 function gotoTimetable() {
@@ -188,8 +194,8 @@ onMounted(() => {
       <div style="margin-bottom: 16px">
         <div style="margin-bottom: 8px; font-weight: 500">参与任务范围</div>
         <el-radio-group v-model="taskRange">
-          <el-radio label="all">全部未排满任务（{{ pendingTasks.length }} 个）</el-radio>
-          <el-radio label="selected">手动选择任务</el-radio>
+          <el-radio value="all">全部未排满任务（{{ pendingTasks.length }} 个）</el-radio>
+          <el-radio value="selected">手动选择任务</el-radio>
         </el-radio-group>
       </div>
 
