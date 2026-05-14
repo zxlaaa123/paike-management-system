@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.enums.ScheduleSourceType;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.*;
+import com.paike.scheduler.service.SemesterService;
 import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.ScheduleConflictService;
 import jakarta.validation.Valid;
@@ -34,6 +35,7 @@ public class ScheduleController {
     private final ClassInfoMapper classInfoMapper;
     private final ScheduleConflictService conflictService;
     private final AutoScheduleBatchMapper autoScheduleBatchMapper;
+    private final SemesterService semesterService;
 
     @GetMapping
     public Result<Page<Schedule>> list(
@@ -42,12 +44,23 @@ public class ScheduleController {
         @RequestParam(required = false) String className,
         @RequestParam(required = false) String roomName,
         @RequestParam(required = false) Integer dayOfWeek,
+        @RequestParam(required = false) Long semesterId,
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "10") int size
     ) {
+        // 如果传了 semesterId 则按指定学期查，否则默认按当前学期查
+        Long resolvedSemesterId = semesterId;
+        if (resolvedSemesterId == null) {
+            try {
+                Semester current = semesterService.getCurrentSemester();
+                resolvedSemesterId = current.getId();
+            } catch (Exception e) {
+                return Result.success(new Page<>(page, size));
+            }
+        }
         // 使用自定义 SQL 进行数据库层面过滤和分页
         Page<Schedule> pageResult = scheduleMapper.selectFilteredSchedulePage(
-            courseName, teacherName, className, roomName, dayOfWeek,
+            courseName, teacherName, className, roomName, dayOfWeek, resolvedSemesterId,
             new Page<>(page, size));
 
         if (pageResult.getRecords().isEmpty()) {
@@ -80,6 +93,7 @@ public class ScheduleController {
         TeachingTask task = teachingTaskMapper.selectById(form.getTeachingTaskId());
 
         Schedule schedule = new Schedule();
+        schedule.setSemesterId(semesterService.getCurrentSemester().getId());
         schedule.setTeachingTaskId(form.getTeachingTaskId());
         schedule.setCourseId(task.getCourseId());
         schedule.setTeacherId(task.getTeacherId());

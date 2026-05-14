@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getTeachingTaskList,
@@ -12,6 +12,7 @@ import {
 import { getAllCourses, type Course } from '../../api/course'
 import { getAllTeachers, type Teacher } from '../../api/teacher'
 import { getAllClasses, type ClassInfo } from '../../api/classInfo'
+import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
 
 const loading = ref(false)
 const tableData = ref<TeachingTask[]>([])
@@ -24,6 +25,7 @@ const searchForm = reactive({
   teacherName: '',
   className: '',
   status: undefined as number | undefined,
+  semesterId: undefined as number | undefined,
 })
 
 const dialogVisible = ref(false)
@@ -51,18 +53,22 @@ const rules = {
 const courseList = ref<Course[]>([])
 const teacherList = ref<Teacher[]>([])
 const classList = ref<ClassInfo[]>([])
+const semesterList = ref<Semester[]>([])
+const currentSemester = ref<Semester | null>(null)
+
+const hasCurrentSemester = computed(() => currentSemester.value !== null)
 
 async function fetchData() {
   loading.value = true
   try {
-    const res = await getTeachingTaskList({
-      ...searchForm,
-      page: currentPage.value,
-      size: pageSize.value,
-    })
+    const params: Record<string, unknown> = { ...searchForm, page: currentPage.value, size: pageSize.value }
+    // 如果没有指定 semesterId 且有当前学期，则传当前学期
+    if (!params.semesterId && currentSemester.value) {
+      params.semesterId = currentSemester.value.id
+    }
+    const res = await getTeachingTaskList(params)
     tableData.value = res.records.map((t) => ({
       ...t,
-      // 后端 weeklyHours 还是按学时存储，页面列表统一折算成“大节”方便和排课结果对照。
       requiredSlots: Math.ceil(t.weeklyHours / 2),
     }))
     total.value = res.total
@@ -72,15 +78,22 @@ async function fetchData() {
 }
 
 async function fetchOptions() {
-  // 弹窗里的课程、教师、班级都是稳定选项，页面初始化一次性预加载即可。
-  const [courses, teachers, classes] = await Promise.all([
+  const [courses, teachers, classes, semesters, current] = await Promise.all([
     getAllCourses(),
     getAllTeachers(),
     getAllClasses(),
+    getAllSemesters(),
+    getCurrentSemester().catch(() => null),
   ])
   courseList.value = courses
   teacherList.value = teachers
   classList.value = classes
+  semesterList.value = semesters
+  currentSemester.value = current
+  // 默认选中当前学期
+  if (current) {
+    searchForm.semesterId = current.id
+  }
 }
 
 function handleSearch() {
@@ -93,13 +106,17 @@ function handleReset() {
   searchForm.teacherName = ''
   searchForm.className = ''
   searchForm.status = undefined
+  searchForm.semesterId = currentSemester.value?.id
   handleSearch()
 }
 
 function openAdd() {
+  if (!hasCurrentSemester.value) {
+    ElMessage.warning('当前未设置学期，请先在「学期管理」中设置当前学期')
+    return
+  }
   dialogTitle.value = '新增教学任务'
   editingId.value = null
-  // 这里显式重置每个字段，避免上一次编辑残留到新增表单里。
   form.courseId = 0
   form.teacherId = 0
   form.classId = 0
@@ -160,16 +177,51 @@ function needContinuousText(val: number) {
   return val === 1 ? '是' : '否'
 }
 
+function getSemesterName(id: number | undefined) {
+  if (!id) return '—'
+  const s = semesterList.value.find((x) => x.id === id)
+  return s ? s.name : `ID:${id}`
+}
+
 onMounted(() => {
-  fetchData()
-  fetchOptions()
+  fetchOptions().then(fetchData)
 })
 </script>
 
 <template>
   <div class="page-container">
+    <!-- 无当前学期提示 -->
+    <el-alert
+      v-if="!hasCurrentSemester"
+      title="当前未设置学期，部分功能无法使用。请先在「学期管理」中创建并设置当前学期。"
+      type="warning"
+      show-icon
+      :closable="false"
+      style="margin-bottom: 16px"
+    />
+
+    <!-- 当前学期信息条 -->
+    <el-alert
+      v-if="currentSemester"
+      :title="`当前学期：${currentSemester.name}`"
+      type="info"
+      show-icon
+      :closable="false"
+      style="margin-bottom: 16px"
+    />
+
     <el-card class="search-card" shadow="never">
       <el-form :inline="true" :model="searchForm">
+        <el-form-item label="学期">
+          <el-select v-model="searchForm.semesterId" placeholder="选择学期" clearable style="width: 220px">
+            <el-option
+              v-for="s in semesterList"
+              :key="s.id"
+              :label="s.name"
+              :value="s.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="课程名称">
           <el-input v-model="searchForm.courseName" placeholder="请输入" clearable />
         </el-form-item>
@@ -196,10 +248,15 @@ onMounted(() => {
       <template #header>
         <div class="card-header">
           <span>教学任务列表</span>
-          <el-button type="primary" @click="openAdd">新增教学任务</el-button>
+          <el-button type="primary" @click="openAdd" :disabled="!hasCurrentSemester">新增教学任务</el-button>
         </div>
       </template>
       <el-table :data="tableData" v-loading="loading" stripe>
+        <el-table-column label="所属学期" width="180">
+          <template #default="{ row }">
+            <span>{{ getSemesterName(row.semesterId) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="courseName" label="课程名称" width="140" />
         <el-table-column prop="teacherName" label="教师姓名" width="100" />
         <el-table-column prop="className" label="班级名称" width="120" />

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
+import com.paike.scheduler.service.SemesterService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -28,6 +29,7 @@ public class TeachingTaskController {
     private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
     private final ScheduleMapper scheduleMapper;
+    private final SemesterService semesterService;
 
     @GetMapping
     public Result<Page<TeachingTask>> list(
@@ -35,13 +37,25 @@ public class TeachingTaskController {
         @RequestParam(required = false) String teacherName,
         @RequestParam(required = false) String className,
         @RequestParam(required = false) Integer status,
+        @RequestParam(required = false) Long semesterId,
         @RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "10") int pageSize
     ) {
+        // 如果传了 semesterId 则按指定学期查，否则默认按当前学期查
+        Long resolvedSemesterId = semesterId;
+        if (resolvedSemesterId == null) {
+            try {
+                Semester current = semesterService.getCurrentSemester();
+                resolvedSemesterId = current.getId();
+            } catch (Exception e) {
+                // 没有当前学期时返回空结果
+                return Result.success(new Page<>(pageNum, pageSize));
+            }
+        }
         // 数据库层面分页 + 过滤
         Page<TeachingTask> pageResult = new Page<>(pageNum, pageSize);
         List<TeachingTask> records = teachingTaskMapper.selectFilteredTaskIds(
-            courseName, teacherName, className, status, pageResult);
+            courseName, teacherName, className, status, resolvedSemesterId, pageResult);
         pageResult.setRecords(records);
 
         if (records.isEmpty()) {
@@ -88,6 +102,7 @@ public class TeachingTaskController {
         }
 
         TeachingTask task = new TeachingTask();
+        task.setSemesterId(semesterService.getCurrentSemester().getId());
         task.setCourseId(form.getCourseId());
         task.setTeacherId(form.getTeacherId());
         task.setClassId(form.getClassId());

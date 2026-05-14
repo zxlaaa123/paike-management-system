@@ -34,6 +34,7 @@ export function getScheduleList(params: {
   className?: string
   roomName?: string
   dayOfWeek?: number
+  semesterId?: number
   page?: number
   size?: number
 }) {

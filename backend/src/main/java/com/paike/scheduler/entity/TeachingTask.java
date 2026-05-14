@@ -16,6 +16,8 @@ public class TeachingTask {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private Long semesterId;
+
     private Long courseId;
 
     private Long teacherId;

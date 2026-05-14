@@ -34,6 +34,7 @@ export function getTeachingTaskList(params: {
   teacherName?: string
   className?: string
   status?: number
+  semesterId?: number
   page?: number
   size?: number
 }) {

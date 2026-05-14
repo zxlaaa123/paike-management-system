@@ -16,6 +16,8 @@ public class Schedule {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private Long semesterId;
+
     private Long teachingTaskId;
 
     private Long courseId;
@@ -31,6 +33,8 @@ public class Schedule {
     private String sourceType;
 
     private Long batchId;
+
+    private Long planId;
 
     @TableLogic
     private Integer deleted;

@@ -19,6 +19,7 @@ public interface TeachingTaskMapper extends BaseMapper<TeachingTask> {
         @Param("teacherName") String teacherName,
         @Param("className") String className,
         @Param("status") Integer status,
+        @Param("semesterId") Long semesterId,
         @Param("page") Page<TeachingTask> page
     );
 }

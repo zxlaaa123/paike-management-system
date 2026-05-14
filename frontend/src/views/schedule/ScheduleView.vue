@@ -12,6 +12,7 @@ import {
 import { getAllTeachingTasks, type TeachingTask } from '../../api/teachingTask'
 import { getAllTimeSlots, type TimeSlot } from '../../api/timeSlot'
 import { getAllClassrooms, type Classroom } from '../../api/classroom'
+import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
 
 const loading = ref(false)
 const tableData = ref<Schedule[]>([])
@@ -25,6 +26,7 @@ const searchForm = reactive({
   className: '',
   roomName: '',
   dayOfWeek: undefined as number | undefined,
+  semesterId: undefined as number | undefined,
 })
 
 const dialogVisible = ref(false)
@@ -46,6 +48,10 @@ const rules = {
 const taskList = ref<TeachingTask[]>([])
 const timeSlotList = ref<TimeSlot[]>([])
 const classroomList = ref<Classroom[]>([])
+const semesterList = ref<Semester[]>([])
+const currentSemester = ref<Semester | null>(null)
+
+const hasCurrentSemester = computed(() => currentSemester.value !== null)
 
 // 按星期分组的时间段
 const timeSlotsByDay = computed(() => {
@@ -61,11 +67,11 @@ const dayNames: Record<number, string> = { 1: '周一', 2: '周二', 3: '周三'
 async function fetchData() {
   loading.value = true
   try {
-    const res = await getScheduleList({
-      ...searchForm,
-      page: currentPage.value,
-      size: pageSize.value,
-    })
+    const params: Record<string, unknown> = { ...searchForm, page: currentPage.value, size: pageSize.value }
+    if (!params.semesterId && currentSemester.value) {
+      params.semesterId = currentSemester.value.id
+    }
+    const res = await getScheduleList(params)
     tableData.value = res.records
     total.value = res.total
   } finally {
@@ -74,14 +80,21 @@ async function fetchData() {
 }
 
 async function fetchOptions() {
-  const [tasks, slots, rooms] = await Promise.all([
+  const [tasks, slots, rooms, semesters, current] = await Promise.all([
     getAllTeachingTasks(),
     getAllTimeSlots(),
     getAllClassrooms(),
+    getAllSemesters(),
+    getCurrentSemester().catch(() => null),
   ])
   taskList.value = tasks
   timeSlotList.value = slots
   classroomList.value = rooms
+  semesterList.value = semesters
+  currentSemester.value = current
+  if (current) {
+    searchForm.semesterId = current.id
+  }
 }
 
 function handleSearch() {
@@ -95,6 +108,7 @@ function handleReset() {
   searchForm.className = ''
   searchForm.roomName = ''
   searchForm.dayOfWeek = undefined
+  searchForm.semesterId = currentSemester.value?.id
   handleSearch()
 }
 
@@ -116,7 +130,6 @@ async function handleSubmit() {
 
   submitting.value = true
   try {
-    // 先调用预检接口
     const checkResult = await checkConflict({
       teachingTaskId: form.teachingTaskId,
       timeSlotId: form.timeSlotId,
@@ -126,7 +139,6 @@ async function handleSubmit() {
       ElMessage.error(checkResult.message)
       return
     }
-    // 无冲突，正式提交
     await createSchedule(form)
     ElMessage.success('排课成功')
     dialogVisible.value = false
@@ -166,15 +178,44 @@ function roomTypeText(type: string) {
 }
 
 onMounted(() => {
-  fetchData()
-  fetchOptions()
+  fetchOptions().then(fetchData)
 })
 </script>
 
 <template>
   <div class="page-container">
+    <!-- 无当前学期提示 -->
+    <el-alert
+      v-if="!hasCurrentSemester"
+      title="当前未设置学期，部分功能无法使用。请先在「学期管理」中创建并设置当前学期。"
+      type="warning"
+      show-icon
+      :closable="false"
+      style="margin-bottom: 16px"
+    />
+
+    <!-- 当前学期信息条 -->
+    <el-alert
+      v-if="currentSemester"
+      :title="`当前学期：${currentSemester.name}`"
+      type="info"
+      show-icon
+      :closable="false"
+      style="margin-bottom: 16px"
+    />
+
     <el-card class="search-card" shadow="never">
       <el-form :inline="true" :model="searchForm">
+        <el-form-item label="学期">
+          <el-select v-model="searchForm.semesterId" placeholder="选择学期" clearable style="width: 220px">
+            <el-option
+              v-for="s in semesterList"
+              :key="s.id"
+              :label="s.name"
+              :value="s.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="课程名称">
           <el-input v-model="searchForm.courseName" placeholder="请输入" clearable />
         </el-form-item>
@@ -240,7 +281,7 @@ onMounted(() => {
         :total="total"
         :page-sizes="[10, 20, 50]"
         layout="total, sizes, prev, pager, next, jumper"
-        style="margin-top: 16px; justify-content: flex-end"
+        style="margin-top: 16px; justify-content: flex-content: flex-end"
         @change="fetchData"
       />
     </el-card>

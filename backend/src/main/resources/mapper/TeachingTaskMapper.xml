@@ -22,6 +22,9 @@
         <if test="className != null and className != ''">
             AND cl.class_name LIKE CONCAT('%', #{className}, '%')
         </if>
+        <if test="semesterId != null">
+            AND tt.semester_id = #{semesterId}
+        </if>
         ORDER BY tt.create_time DESC
     </select>
 

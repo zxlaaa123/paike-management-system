@@ -6,8 +6,6 @@ import com.paike.scheduler.entity.Schedule;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import java.util.List;
-
 @Mapper
 public interface ScheduleMapper extends BaseMapper<Schedule> {
 
@@ -20,6 +18,7 @@ public interface ScheduleMapper extends BaseMapper<Schedule> {
         @Param("className") String className,
         @Param("roomName") String roomName,
         @Param("dayOfWeek") Integer dayOfWeek,
+        @Param("semesterId") Long semesterId,
         @Param("page") Page<Schedule> page
     );
 }

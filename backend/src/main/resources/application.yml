@@ -12,7 +12,7 @@ spring:
   sql:
     init:
       mode: always
-      schema-locations: classpath:db/schema.sql,classpath:db/v2_schema.sql,classpath:db/v3_semester.sql
+      schema-locations: classpath:db/schema.sql,classpath:db/v2_schema.sql,classpath:db/v3_semester.sql,classpath:db/v3_semester_data_bind.sql
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
