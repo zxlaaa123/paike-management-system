@@ -2,6 +2,7 @@ package com.paike.scheduler.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
@@ -47,7 +48,7 @@ public class TeachingTaskController {
             try {
                 Semester current = semesterService.getCurrentSemester();
                 resolvedSemesterId = current.getId();
-            } catch (Exception e) {
+            } catch (BusinessException e) {
                 // 没有当前学期时返回空结果
                 return Result.success(new Page<>(pageNum, pageSize));
             }

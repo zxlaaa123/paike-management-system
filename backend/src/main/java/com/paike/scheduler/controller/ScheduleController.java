@@ -3,6 +3,7 @@ package com.paike.scheduler.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.enums.ScheduleSourceType;
+import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.service.SemesterService;
@@ -54,7 +55,7 @@ public class ScheduleController {
             try {
                 Semester current = semesterService.getCurrentSemester();
                 resolvedSemesterId = current.getId();
-            } catch (Exception e) {
+            } catch (BusinessException e) {
                 return Result.success(new Page<>(page, size));
             }
         }
