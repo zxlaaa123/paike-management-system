@@ -1,6 +1,7 @@
 -- =============================================
 -- V3 数据库迁移脚本 - 学期管理
 -- 在 V1/V2 基础上增量扩展，不删除或重建已有表
+-- 注意：索引由 Java 代码（SemesterSchemaInitializer）幂等创建，此处不创建索引
 -- =============================================
 
 -- -----------------------------------
@@ -19,32 +20,6 @@ CREATE TABLE IF NOT EXISTS semester (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) COMMENT='学期表';
-
--- 索引（存储过程确保幂等）
-DROP PROCEDURE IF EXISTS create_semester_indexes;
-DELIMITER $$
-CREATE PROCEDURE create_semester_indexes()
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.STATISTICS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'semester'
-          AND INDEX_NAME = 'idx_semester_current'
-    ) THEN
-        CREATE INDEX idx_semester_current ON semester(is_current);
-    END IF;
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.STATISTICS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'semester'
-          AND INDEX_NAME = 'idx_semester_school_year'
-    ) THEN
-        CREATE INDEX idx_semester_school_year ON semester(school_year);
-    END IF;
-END$$
-DELIMITER ;
-CALL create_semester_indexes();
-DROP PROCEDURE IF EXISTS create_semester_indexes;
 
 -- -----------------------------------
 -- 2. 初始化默认学期（如果没有任何学期数据）
