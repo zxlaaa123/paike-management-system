@@ -20,7 +20,10 @@ CREATE TABLE IF NOT EXISTS semester (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) COMMENT='学期表';
 
+-- 索引（先删后建，确保幂等）
+DROP INDEX IF EXISTS idx_semester_current ON semester;
 CREATE INDEX idx_semester_current ON semester(is_current);
+DROP INDEX IF EXISTS idx_semester_school_year ON semester;
 CREATE INDEX idx_semester_school_year ON semester(school_year);
 
 -- -----------------------------------
