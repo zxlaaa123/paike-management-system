@@ -36,7 +36,7 @@ public class ScheduleScoreService {
         for (ScheduleScoreDetail d : details) {
             total = total.add(d.getScore() != null ? d.getScore() : BigDecimal.ZERO);
         }
-        return total.setScale(2, RoundingMode.HALF_UP);
+        return normalizeTotalScore(total);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -79,12 +79,7 @@ public class ScheduleScoreService {
         }
 
         // 4. 限制总分在 0-100 之间
-        if (totalScore.compareTo(BigDecimal.ZERO) < 0) {
-            totalScore = BigDecimal.ZERO;
-        }
-        if (totalScore.compareTo(new BigDecimal("100")) > 0) {
-            totalScore = new BigDecimal("100");
-        }
+        totalScore = normalizeTotalScore(totalScore);
 
         // 5. 保存评分明细
         for (ScheduleScoreDetail detail : details) {
@@ -92,8 +87,21 @@ public class ScheduleScoreService {
         }
 
         // 6. 更新方案总分（持久化到数据库）
-        plan.setTotalScore(totalScore.setScale(2, RoundingMode.HALF_UP));
+        plan.setTotalScore(totalScore);
         planMapper.updateById(plan);
+    }
+
+    private BigDecimal normalizeTotalScore(BigDecimal totalScore) {
+        if (totalScore == null) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        if (totalScore.compareTo(BigDecimal.ZERO) < 0) {
+            totalScore = BigDecimal.ZERO;
+        }
+        if (totalScore.compareTo(new BigDecimal("100")) > 0) {
+            totalScore = new BigDecimal("100");
+        }
+        return totalScore.setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal calculateItemScore(ScheduleRuleWeight rule, SchedulePlan plan) {

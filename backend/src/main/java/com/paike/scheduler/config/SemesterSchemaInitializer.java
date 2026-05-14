@@ -18,6 +18,7 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
         ensureSemesterIndexes();
         ensureTeachingTaskSemesterColumn();
         ensureScheduleSemesterColumns();
+        ensureScheduleScoreDetailColumns();
         ensureScheduleRuleWeightUniqueIndex();
     }
 
@@ -130,6 +131,33 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
             log.info("Created unique index uk_rule_weight_semester_strategy_rule on schedule_rule_weight");
         } catch (Exception e) {
             log.warn("Failed to create unique index on schedule_rule_weight: {}", e.getMessage());
+        }
+    }
+
+    private void ensureScheduleScoreDetailColumns() {
+        try {
+            Integer tableExists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLES " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_score_detail'",
+                Integer.class);
+            if (tableExists == null || tableExists == 0) {
+                return;
+            }
+
+            Integer ruleTypeCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_score_detail' " +
+                "AND COLUMN_NAME = 'rule_type'",
+                Integer.class);
+            if (ruleTypeCount != null && ruleTypeCount == 0) {
+                jdbcTemplate.execute(
+                    "ALTER TABLE schedule_score_detail " +
+                    "ADD COLUMN rule_type VARCHAR(20) NOT NULL DEFAULT 'SOFT' COMMENT '规则类型：HARD硬约束、SOFT软约束' " +
+                    "AFTER rule_code");
+                log.info("Added rule_type column to schedule_score_detail");
+            }
+        } catch (Exception e) {
+            log.warn("Failed to add rule_type to schedule_score_detail: {}", e.getMessage());
         }
     }
 }

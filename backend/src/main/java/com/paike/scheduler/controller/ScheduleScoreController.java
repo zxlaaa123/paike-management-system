@@ -53,7 +53,7 @@ public class ScheduleScoreController {
     public Result<Map<String, Object>> rescore(@PathVariable Long planId) {
         SchedulePlan plan = planService.getById(planId);
         scoreService.rescore(plan);
-        BigDecimal totalScore = scoreService.getScoreSummary(planId);
+        BigDecimal totalScore = plan.getTotalScore();
         return Result.success(Map.of(
                 "planId", planId,
                 "totalScore", totalScore,
