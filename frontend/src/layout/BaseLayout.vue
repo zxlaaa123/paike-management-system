@@ -1,25 +1,72 @@
 <script setup lang="ts">
-import { House, DataLine, Calendar, Reading, PieChart } from '@element-plus/icons-vue'
+import { ref, onMounted } from 'vue'
+import { House, DataLine, Calendar, Reading, PieChart, School, ArrowDown, Warning, Loading } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
+import { getCurrentSemester, setCurrentSemester, getAllSemesters, type Semester } from '../api/semester'
 
 const router = useRouter()
 const authStore = useAuthStore()
+
+const currentSemester = ref<Semester | null>(null)
+const allSemesterList = ref<Semester[]>([])
+const semesterLoading = ref(false)
+
+async function fetchCurrentSemester() {
+  semesterLoading.value = true
+  try {
+    currentSemester.value = await getCurrentSemester()
+  } catch (_e) {
+    currentSemester.value = null
+  } finally {
+    semesterLoading.value = false
+  }
+}
+
+async function fetchAllSemesters() {
+  try {
+    allSemesterList.value = await getAllSemesters()
+  } catch (_e) {
+    allSemesterList.value = []
+  }
+}
+
+async function handleSemesterChange(semesterId: number) {
+  if (semesterId === currentSemester.value?.id) return
+  try {
+    await setCurrentSemester(semesterId)
+    await fetchCurrentSemester()
+    await fetchAllSemesters()
+    ElMessage.success('已切换当前学期')
+  } catch (_e) {
+    console.error(_e)
+  }
+}
 
 async function handleLogout() {
   await authStore.logout()
   router.push('/login')
 }
+
+onMounted(() => {
+  fetchCurrentSemester()
+  fetchAllSemesters()
+})
 </script>
 
 <template>
   <el-container class="app-layout">
     <el-aside width="220px" class="app-aside">
       <div class="logo">高校排课管理系统</div>
-      <el-menu router default-active="/dashboard">
+      <el-menu router :default-active="router.currentRoute.value.path">
         <el-menu-item index="/dashboard">
           <el-icon><House /></el-icon>
           <span>首页</span>
+        </el-menu-item>
+        <el-menu-item index="/semesters">
+          <el-icon><School /></el-icon>
+          <span>学期管理</span>
         </el-menu-item>
         <el-sub-menu index="basic-data">
           <template #title>
@@ -65,7 +112,40 @@ async function handleLogout() {
 
     <el-container>
       <el-header class="app-header">
-        <span>当前登录：{{ authStore.userInfo?.realName || '管理员' }}</span>
+        <div class="header-left">
+          <span>当前登录：{{ authStore.userInfo?.realName || '管理员' }}</span>
+          <span class="header-divider">|</span>
+          <span v-if="semesterLoading" class="semester-info">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            加载学期中...
+          </span>
+          <span v-else-if="currentSemester" class="semester-info">
+            当前学期：
+            <el-dropdown trigger="click" @command="handleSemesterChange">
+              <span class="semester-select">
+                {{ currentSemester.name }}
+                <el-icon><ArrowDown /></el-icon>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item
+                    v-for="s in allSemesterList"
+                    :key="s.id"
+                    :command="s.id"
+                    :disabled="s.id === currentSemester?.id"
+                  >
+                    {{ s.name }}
+                    <el-tag v-if="s.isCurrent === 1" type="success" size="small" style="margin-left: 8px">当前</el-tag>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </span>
+          <span v-else class="semester-info semester-warning">
+            <el-icon><Warning /></el-icon>
+            当前未设置学期，请先在「学期管理」中设置
+          </span>
+        </div>
         <el-button type="danger" plain @click="handleLogout">退出登录</el-button>
       </el-header>
       <el-main class="app-main">
@@ -99,6 +179,36 @@ async function handleLogout() {
   justify-content: space-between;
   border-bottom: 1px solid #ebeef5;
   background: #fff;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-divider {
+  color: #dcdfe6;
+}
+
+.semester-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  color: #606266;
+}
+
+.semester-select {
+  cursor: pointer;
+  color: #409eff;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.semester-warning {
+  color: #e6a23c;
 }
 
 .app-main {

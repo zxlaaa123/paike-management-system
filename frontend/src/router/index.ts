@@ -45,6 +45,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/teachingTask/TeachingTaskView.vue'),
       },
       {
+        path: 'semesters',
+        name: 'Semesters',
+        component: () => import('../views/semester/SemesterView.vue'),
+      },
+      {
         path: 'teacher-unavailable-times',
         name: 'TeacherUnavailableTimes',
         component: () => import('../views/teacher/TeacherUnavailableTimeView.vue'),
