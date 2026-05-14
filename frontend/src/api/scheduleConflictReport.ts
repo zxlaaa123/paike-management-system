@@ -24,7 +24,12 @@ export interface ScheduleConflictGenerateResult {
 
 export function generateScheduleConflictReport() {
   return request.post<ApiResponse<ScheduleConflictGenerateResult>>('/schedule-conflict-reports/generate', {})
-    .then((r) => r.data.data)
+    .then((r) => {
+      if (!r.data) {
+        throw new Error('响应数据为空')
+      }
+      return r.data.data
+    })
 }
 
 export function getScheduleConflictReportList(params: {
@@ -36,7 +41,12 @@ export function getScheduleConflictReportList(params: {
   size?: number
 }) {
   return request.get<ApiResponse<PageResult<ScheduleConflictReport>>>('/schedule-conflict-reports', { params })
-    .then((r) => r.data.data)
+    .then((r) => {
+      if (!r.data) {
+        throw new Error('响应数据为空')
+      }
+      return r.data.data
+    })
 }
 
 export function clearScheduleConflictReports(reportNo?: string) {

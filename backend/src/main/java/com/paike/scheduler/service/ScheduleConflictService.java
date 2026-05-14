@@ -1,12 +1,16 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.paike.scheduler.common.enums.CourseType;
+import com.paike.scheduler.common.enums.RoomType;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -68,11 +72,13 @@ public class ScheduleConflictService {
         }
 
         // 5. 实验课必须安排在实验室
-        if (course != null && "EXPERIMENT".equals(course.getCourseType()) && !"LAB".equals(classroom.getRoomType())) {
+        if (course != null && CourseType.EXPERIMENT.getCode().equals(course.getCourseType())
+                && !RoomType.LAB.getCode().equals(classroom.getRoomType())) {
             return "排课失败：实验课必须安排在实验室";
         }
         // 6. 机房课必须安排在机房
-        if (course != null && "COMPUTER".equals(course.getCourseType()) && !"COMPUTER".equals(classroom.getRoomType())) {
+        if (course != null && CourseType.COMPUTER.getCode().equals(course.getCourseType())
+                && !RoomType.COMPUTER.getCode().equals(classroom.getRoomType())) {
             return "排课失败：机房课必须安排在机房";
         }
 
@@ -91,12 +97,23 @@ public class ScheduleConflictService {
         Long teacherId = task.getTeacherId();
         Long classId = task.getClassId();
 
+        // 批量查询所有关联的教学任务，避免 N+1 查询
+        List<Long> existingTaskIds = existingSchedules.stream()
+            .map(Schedule::getTeachingTaskId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .collect(Collectors.toList());
+        Map<Long, TeachingTask> existingTaskMap = existingTaskIds.isEmpty() ? Map.of() :
+            teachingTaskMapper.selectBatchIds(existingTaskIds).stream()
+                .collect(Collectors.toMap(TeachingTask::getId, java.util.function.Function.identity(), (a, b) -> a));
+
         for (Schedule s : existingSchedules) {
             // 只检查同一时间段的冲突
             if (!s.getTimeSlotId().equals(timeSlotId)) continue;
 
+            TeachingTask existingTask = existingTaskMap.get(s.getTeachingTaskId());
+
             // 7. 同一教师同一时间不能有两门课
-            TeachingTask existingTask = teachingTaskMapper.selectById(s.getTeachingTaskId());
             if (existingTask != null && existingTask.getTeacherId().equals(teacherId)) {
                 return "排课失败：" + teacherName + "老师在" + timeLabel + "已有课程";
             }

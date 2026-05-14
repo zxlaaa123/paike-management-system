@@ -26,6 +26,8 @@ public class UnscheduledTaskService {
 
     public Page<UnscheduledTask> list(Long batchId, String courseName, String teacherName,
                                        String className, String reasonType, int page, int size) {
+        // courseName/teacherName/className 需要通过关联表过滤，先查全量再内存过滤
+        // 但 batchId 和 reasonType 可以在数据库层面过滤
         LambdaQueryWrapper<UnscheduledTask> wrapper = new LambdaQueryWrapper<>();
         if (batchId != null) {
             wrapper.eq(UnscheduledTask::getBatchId, batchId);
@@ -34,10 +36,21 @@ public class UnscheduledTaskService {
             wrapper.eq(UnscheduledTask::getReasonType, reasonType);
         }
         wrapper.orderByDesc(UnscheduledTask::getCreateTime);
-        // 查询全部记录（不分页）
-        List<UnscheduledTask> allRecords = unscheduledTaskMapper.selectList(wrapper);
 
-        // 先填充关联字段，再进行内存过滤
+        // 当没有关联表过滤条件时，使用数据库分页
+        boolean hasRelationFilter = (courseName != null && !courseName.isBlank())
+            || (teacherName != null && !teacherName.isBlank())
+            || (className != null && !className.isBlank());
+
+        if (!hasRelationFilter) {
+            // 无关联过滤条件，直接数据库分页
+            Page<UnscheduledTask> pageResult = unscheduledTaskMapper.selectPage(new Page<>(page, size), wrapper);
+            fillRelationFields(pageResult.getRecords());
+            return pageResult;
+        }
+
+        // 有关联过滤条件，需要内存过滤（待排任务数据量通常不大）
+        List<UnscheduledTask> allRecords = unscheduledTaskMapper.selectList(wrapper);
         fillRelationFields(allRecords);
 
         List<UnscheduledTask> filtered = allRecords;
@@ -57,7 +70,6 @@ public class UnscheduledTaskService {
                     .collect(Collectors.toList());
         }
 
-        // 手动分页
         int total = filtered.size();
         int fromIndex = (page - 1) * size;
         int toIndex = Math.min(fromIndex + size, total);

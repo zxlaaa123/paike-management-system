@@ -1,4 +1,4 @@
-package com.paike.scheduler.controller;
+package com.paike.scheduler.controller.vo;
 
 import lombok.Data;
 

@@ -2,6 +2,8 @@ package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.paike.scheduler.common.enums.CourseType;
+import com.paike.scheduler.common.enums.RoomType;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import lombok.Data;
@@ -334,8 +336,8 @@ public class ScheduleScoreReportService {
     }
 
     private boolean isRoomTypeMismatch(Course course, Classroom classroom) {
-        if ("EXPERIMENT".equals(course.getCourseType()) && !"LAB".equals(classroom.getRoomType())) return true;
-        return "COMPUTER".equals(course.getCourseType()) && !"COMPUTER".equals(classroom.getRoomType());
+        if (CourseType.EXPERIMENT.getCode().equals(course.getCourseType()) && !RoomType.LAB.getCode().equals(classroom.getRoomType())) return true;
+        return CourseType.COMPUTER.getCode().equals(course.getCourseType()) && !RoomType.COMPUTER.getCode().equals(classroom.getRoomType());
     }
 
     private int calculateRequiredSlots(TeachingTask task) {

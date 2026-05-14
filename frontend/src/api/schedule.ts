@@ -37,15 +37,30 @@ export function getScheduleList(params: {
   page?: number
   size?: number
 }) {
-  return request.get<ApiResponse<PageResult<Schedule>>>('/schedules', { params }).then((r) => r.data.data)
+  return request.get<ApiResponse<PageResult<Schedule>>>('/schedules', { params }).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function getScheduleById(id: number) {
-  return request.get<ApiResponse<Schedule>>(`/schedules/${id}`).then((r) => r.data.data)
+  return request.get<ApiResponse<Schedule>>(`/schedules/${id}`).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function createSchedule(data: ScheduleForm) {
-  return request.post<ApiResponse<Schedule>>('/schedules', data).then((r) => r.data.data)
+  return request.post<ApiResponse<Schedule>>('/schedules', data).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function deleteSchedule(id: number) {
@@ -53,19 +68,39 @@ export function deleteSchedule(id: number) {
 }
 
 export function getSchedulesByClass(classId: number) {
-  return request.get<ApiResponse<Schedule[]>>(`/schedules/class/${classId}`).then((r) => r.data.data)
+  return request.get<ApiResponse<Schedule[]>>(`/schedules/class/${classId}`).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function getSchedulesByTeacher(teacherId: number) {
-  return request.get<ApiResponse<Schedule[]>>(`/schedules/teacher/${teacherId}`).then((r) => r.data.data)
+  return request.get<ApiResponse<Schedule[]>>(`/schedules/teacher/${teacherId}`).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function getSchedulesByClassroom(classroomId: number) {
-  return request.get<ApiResponse<Schedule[]>>(`/schedules/classroom/${classroomId}`).then((r) => r.data.data)
+  return request.get<ApiResponse<Schedule[]>>(`/schedules/classroom/${classroomId}`).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function checkConflict(data: ScheduleForm) {
   return request.post<
     ApiResponse<{ hasConflict: boolean; message: string }>
-  >('/schedules/check-conflict', data).then((r) => r.data.data)
+  >('/schedules/check-conflict', data).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }

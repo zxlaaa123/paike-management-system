@@ -30,19 +30,39 @@ export function getTeacherList(params: {
   page?: number
   size?: number
 }) {
-  return request.get<ApiResponse<PageResult<Teacher>>>('/teachers', { params }).then((r) => r.data.data)
+  return request.get<ApiResponse<PageResult<Teacher>>>('/teachers', { params }).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function getTeacherById(id: number) {
-  return request.get<ApiResponse<Teacher>>(`/teachers/${id}`).then((r) => r.data.data)
+  return request.get<ApiResponse<Teacher>>(`/teachers/${id}`).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function createTeacher(data: TeacherForm) {
-  return request.post<ApiResponse<Teacher>>('/teachers', data).then((r) => r.data.data)
+  return request.post<ApiResponse<Teacher>>('/teachers', data).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function updateTeacher(id: number, data: TeacherForm) {
-  return request.put<ApiResponse<Teacher>>(`/teachers/${id}`, data).then((r) => r.data.data)
+  return request.put<ApiResponse<Teacher>>(`/teachers/${id}`, data).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function deleteTeacher(id: number) {
@@ -54,5 +74,10 @@ export function updateTeacherStatus(id: number, status: number) {
 }
 
 export function getAllTeachers() {
-  return request.get<ApiResponse<Teacher[]>>('/teachers/all').then((r) => r.data.data)
+  return request.get<ApiResponse<Teacher[]>>('/teachers/all').then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }

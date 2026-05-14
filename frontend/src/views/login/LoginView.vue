@@ -33,8 +33,8 @@ async function handleLogin() {
     ElMessage.success('登录成功')
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard'
     router.push(redirect)
-  } catch (_error) {
-    // 请求拦截器会展示后端错误信息，这里不重复提示
+  } catch (_e) {
+    console.error(_e)
   } finally {
     loading.value = false
   }

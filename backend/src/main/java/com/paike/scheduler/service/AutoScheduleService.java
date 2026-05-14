@@ -1,6 +1,11 @@
 package com.paike.scheduler.service;
 
+import com.paike.scheduler.common.enums.CourseType;
+import com.paike.scheduler.common.enums.RoomType;
+import com.paike.scheduler.common.enums.ScheduleSourceType;
 import com.paike.scheduler.entity.*;
+import com.paike.scheduler.service.dto.AutoScheduleRequest;
+import com.paike.scheduler.service.dto.AutoScheduleResult;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.paike.scheduler.mapper.ClassInfoMapper;
 import com.paike.scheduler.mapper.ClassroomMapper;
@@ -45,7 +50,7 @@ public class AutoScheduleService {
             unscheduledTaskService.clearAll();
         } else if (request.isClearOldAutoSchedule()) {
             scheduleMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Schedule>()
-                    .eq(Schedule::getSourceType, "AUTO")
+                    .eq(Schedule::getSourceType, ScheduleSourceType.AUTO.getCode())
                     .eq(Schedule::getDeleted, 0));
             unscheduledTaskService.clearAll();
         }
@@ -245,8 +250,8 @@ public class AutoScheduleService {
             // 1. 实验课、机房课优先
             String typeA = getCourseType(a.getCourseId());
             String typeB = getCourseType(b.getCourseId());
-            int priorityA = ("EXPERIMENT".equals(typeA) || "COMPUTER".equals(typeA)) ? 0 : 1;
-            int priorityB = ("EXPERIMENT".equals(typeB) || "COMPUTER".equals(typeB)) ? 0 : 1;
+            int priorityA = (CourseType.EXPERIMENT.getCode().equals(typeA) || CourseType.COMPUTER.getCode().equals(typeA)) ? 0 : 1;
+            int priorityB = (CourseType.EXPERIMENT.getCode().equals(typeB) || CourseType.COMPUTER.getCode().equals(typeB)) ? 0 : 1;
             if (priorityA != priorityB) return priorityA - priorityB;
 
             // 2. 班级人数多的优先
@@ -284,8 +289,8 @@ public class AutoScheduleService {
     // ========== 辅助方法 ==========
 
     private boolean isRoomTypeMatched(String courseType, String roomType) {
-        if ("EXPERIMENT".equals(courseType)) return "LAB".equals(roomType);
-        if ("COMPUTER".equals(courseType)) return "COMPUTER".equals(roomType);
+        if (CourseType.EXPERIMENT.getCode().equals(courseType)) return RoomType.LAB.getCode().equals(roomType);
+        if (CourseType.COMPUTER.getCode().equals(courseType)) return RoomType.COMPUTER.getCode().equals(roomType);
         // 普通课和体育课不限
         return true;
     }
@@ -346,7 +351,7 @@ public class AutoScheduleService {
         schedule.setClassId(task.getClassId());
         schedule.setTimeSlotId(slot.getId());
         schedule.setClassroomId(room.getId());
-        schedule.setSourceType("AUTO");
+        schedule.setSourceType(ScheduleSourceType.AUTO.getCode());
         schedule.setBatchId(batchId);
         schedule.setDeleted(0);
         schedule.setCreateTime(LocalDateTime.now());
@@ -356,7 +361,7 @@ public class AutoScheduleService {
 
     private String getCourseType(Long courseId) {
         Course course = courseMapper.selectById(courseId);
-        return course != null ? course.getCourseType() : "NORMAL";
+        return course != null ? course.getCourseType() : CourseType.NORMAL.getCode();
     }
 
     private int getClassStudentCount(Long classId) {
@@ -384,24 +389,4 @@ public class AutoScheduleService {
         return "UNKNOWN";
     }
 
-    // ========== DTO / VO ==========
-
-    @Data
-    public static class AutoScheduleRequest {
-        private List<Long> taskIds;
-        private boolean clearOldAutoSchedule = true;
-        private boolean clearAllSchedule = false;
-    }
-
-    @Data
-    public static class AutoScheduleResult {
-        private Long batchId;
-        private String batchNo;
-        private int totalTaskCount;
-        private int successTaskCount;
-        private int failedTaskCount;
-        private int generatedScheduleCount;
-        private String status;
-        private String message;
-    }
 }

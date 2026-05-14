@@ -48,15 +48,30 @@ async function exportTimetable(url: string) {
 }
 
 export function getClassTimetable(classId: number) {
-  return request.get<ApiResponse<TimetableItem[]>>(`/timetables/classes/${classId}`).then((r) => r.data.data)
+  return request.get<ApiResponse<TimetableItem[]>>(`/timetables/classes/${classId}`).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function getTeacherTimetable(teacherId: number) {
-  return request.get<ApiResponse<TimetableItem[]>>(`/timetables/teachers/${teacherId}`).then((r) => r.data.data)
+  return request.get<ApiResponse<TimetableItem[]>>(`/timetables/teachers/${teacherId}`).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function getClassroomTimetable(classroomId: number) {
-  return request.get<ApiResponse<TimetableItem[]>>(`/timetables/classrooms/${classroomId}`).then((r) => r.data.data)
+  return request.get<ApiResponse<TimetableItem[]>>(`/timetables/classrooms/${classroomId}`).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function exportClassTimetable(classId: number) {

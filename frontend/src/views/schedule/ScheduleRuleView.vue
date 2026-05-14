@@ -65,7 +65,7 @@ async function handleSave() {
     ElMessage.success('保存成功')
     fetchRules()
   } catch (_e) {
-    // 错误由拦截器处理
+    console.error(_e)
   } finally {
     saving.value = false
   }
@@ -78,7 +78,7 @@ async function handleReset() {
     ElMessage.success('已恢复默认配置')
     fetchRules()
   } catch (_e) {
-    // 错误由拦截器处理
+    console.error(_e)
   }
 }
 

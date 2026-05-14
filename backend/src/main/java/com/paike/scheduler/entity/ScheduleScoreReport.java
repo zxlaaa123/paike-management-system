@@ -36,7 +36,5 @@ public class ScheduleScoreReport {
 
     private LocalDateTime createTime;
 
-    /** 关联字段 */
-    @TableField(exist = false)
     private String gradeName;
 }

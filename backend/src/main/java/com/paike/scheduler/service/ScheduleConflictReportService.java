@@ -2,6 +2,8 @@ package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.paike.scheduler.common.enums.CourseType;
+import com.paike.scheduler.common.enums.RoomType;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import lombok.Data;
@@ -519,10 +521,10 @@ public class ScheduleConflictReportService {
         if (course == null || classroom == null) {
             return null;
         }
-        if ("EXPERIMENT".equals(course.getCourseType()) && !"LAB".equals(classroom.getRoomType())) {
+        if (CourseType.EXPERIMENT.getCode().equals(course.getCourseType()) && !"LAB".equals(classroom.getRoomType())) {
             return course.getCourseName() + "为实验课，但当前安排在" + classroom.getRoomName() + "，该教室类型为" + roomTypeText(classroom.getRoomType());
         }
-        if ("COMPUTER".equals(course.getCourseType()) && !"COMPUTER".equals(classroom.getRoomType())) {
+        if (CourseType.COMPUTER.getCode().equals(course.getCourseType()) && !RoomType.COMPUTER.getCode().equals(classroom.getRoomType())) {
             return course.getCourseName() + "为机房课，但当前安排在" + classroom.getRoomName() + "，该教室类型为" + roomTypeText(classroom.getRoomType());
         }
         return null;
@@ -532,20 +534,20 @@ public class ScheduleConflictReportService {
         if (course == null) {
             return "建议将课程调整到与课程类型匹配的教室";
         }
-        if ("EXPERIMENT".equals(course.getCourseType())) {
+        if (CourseType.EXPERIMENT.getCode().equals(course.getCourseType())) {
             return "建议将实验课调整到实验室，并确认实验室设备满足课程需求";
         }
-        if ("COMPUTER".equals(course.getCourseType())) {
+        if (CourseType.COMPUTER.getCode().equals(course.getCourseType())) {
             return "建议将机房课调整到机房，并确认机位数量满足班级人数";
         }
         return "建议将课程调整到与课程类型匹配的教室";
     }
 
     private String roomTypeText(String roomType) {
-        if ("LAB".equals(roomType)) {
+        if (RoomType.LAB.getCode().equals(roomType)) {
             return "实验室";
         }
-        if ("COMPUTER".equals(roomType)) {
+        if (RoomType.COMPUTER.getCode().equals(roomType)) {
             return "机房";
         }
         if ("NORMAL".equals(roomType)) {

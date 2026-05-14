@@ -13,7 +13,12 @@ export interface ScheduleRuleConfig {
 }
 
 export function getScheduleRules() {
-  return request.get<ApiResponse<ScheduleRuleConfig[]>>('/schedule-rules').then((r) => r.data.data)
+  return request.get<ApiResponse<ScheduleRuleConfig[]>>('/schedule-rules').then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function updateScheduleRules(rules: { ruleKey: string; ruleValue: string; enabled: number }[]) {

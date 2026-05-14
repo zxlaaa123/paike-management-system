@@ -37,19 +37,39 @@ export function getTeachingTaskList(params: {
   page?: number
   size?: number
 }) {
-  return request.get<ApiResponse<PageResult<TeachingTask>>>('/teaching-tasks', { params }).then((r) => r.data.data)
+  return request.get<ApiResponse<PageResult<TeachingTask>>>('/teaching-tasks', { params }).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function getTeachingTaskById(id: number) {
-  return request.get<ApiResponse<TeachingTask>>(`/teaching-tasks/${id}`).then((r) => r.data.data)
+  return request.get<ApiResponse<TeachingTask>>(`/teaching-tasks/${id}`).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function createTeachingTask(data: TeachingTaskForm) {
-  return request.post<ApiResponse<TeachingTask>>('/teaching-tasks', data).then((r) => r.data.data)
+  return request.post<ApiResponse<TeachingTask>>('/teaching-tasks', data).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function updateTeachingTask(id: number, data: TeachingTaskForm) {
-  return request.put<ApiResponse<TeachingTask>>(`/teaching-tasks/${id}`, data).then((r) => r.data.data)
+  return request.put<ApiResponse<TeachingTask>>(`/teaching-tasks/${id}`, data).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function deleteTeachingTask(id: number) {
@@ -57,5 +77,10 @@ export function deleteTeachingTask(id: number) {
 }
 
 export function getAllTeachingTasks() {
-  return request.get<ApiResponse<TeachingTask[]>>('/teaching-tasks/all').then((r) => r.data.data)
+  return request.get<ApiResponse<TeachingTask[]>>('/teaching-tasks/all').then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }

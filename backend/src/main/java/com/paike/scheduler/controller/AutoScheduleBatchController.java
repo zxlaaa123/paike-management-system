@@ -5,7 +5,8 @@ import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.AutoScheduleBatch;
 import com.paike.scheduler.service.AutoScheduleBatchService;
 import com.paike.scheduler.service.AutoScheduleService;
-import lombok.Data;
+import com.paike.scheduler.service.dto.AutoScheduleRequest;
+import com.paike.scheduler.service.dto.AutoScheduleResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,12 +41,8 @@ public class AutoScheduleBatchController {
 
     /** 执行自动排课 */
     @PostMapping("/run")
-    public Result<AutoScheduleService.AutoScheduleResult> run(@RequestBody AutoScheduleRequest request) {
-        AutoScheduleService.AutoScheduleRequest serviceRequest = new AutoScheduleService.AutoScheduleRequest();
-        serviceRequest.setTaskIds(request.getTaskIds());
-        serviceRequest.setClearOldAutoSchedule(request.isClearOldAutoSchedule());
-        serviceRequest.setClearAllSchedule(request.isClearAllSchedule());
-        AutoScheduleService.AutoScheduleResult result = autoScheduleService.run(serviceRequest);
+    public Result<AutoScheduleResult> run(@RequestBody AutoScheduleRequest request) {
+        AutoScheduleResult result = autoScheduleService.run(request);
         return Result.success(result);
     }
 
@@ -54,12 +51,5 @@ public class AutoScheduleBatchController {
     public Result<Void> clearBatchSchedules(@PathVariable Long batchId) {
         batchService.deleteBatchSchedules(batchId);
         return Result.success("清空成功", null);
-    }
-
-    @Data
-    public static class AutoScheduleRequest {
-        private java.util.List<Long> taskIds;
-        private boolean clearOldAutoSchedule = true;
-        private boolean clearAllSchedule = false;
     }
 }

@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -109,9 +110,7 @@ public class CourseController {
         if (course == null || course.getDeleted() == 1) {
             return Result.fail(404, "课程不存在");
         }
-        course.setDeleted(1);
-        course.setUpdateTime(LocalDateTime.now());
-        courseMapper.updateById(course);
+        courseMapper.deleteById(id);
         return Result.success("删除成功", null);
     }
 
@@ -123,7 +122,7 @@ public class CourseController {
         return Result.success(list);
     }
 
-    @Data
+    @Getter
     public static class CourseForm {
         @NotBlank(message = "课程编号不能为空")
         private String courseNo;

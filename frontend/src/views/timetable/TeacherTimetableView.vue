@@ -19,7 +19,8 @@ const selectedTeacherName = computed(() => {
 onMounted(async () => {
   try {
     teacherList.value = await getAllTeachers()
-  } catch {
+  } catch (_e) {
+    console.error(_e)
     ElMessage.error('加载教师列表失败')
   }
 })
@@ -29,7 +30,8 @@ async function handleChange(teacherId: number) {
   loading.value = true
   try {
     timetable.value = await getTeacherTimetable(teacherId)
-  } catch {
+  } catch (_e) {
+    console.error(_e)
     ElMessage.error('加载课表失败')
   } finally {
     loading.value = false
@@ -44,8 +46,8 @@ async function handleExport() {
   exportLoading.value = true
   try {
     await exportTeacherTimetable(selectedTeacherId.value)
-  } catch {
-    // request 拦截器已统一提示错误，这里吞掉异常避免控制台未处理告警
+  } catch (_e) {
+    console.error(_e)
   } finally {
     exportLoading.value = false
   }

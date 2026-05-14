@@ -4,6 +4,7 @@ import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.ScheduleRuleConfig;
 import com.paike.scheduler.service.ScheduleRuleService;
 import lombok.Data;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,7 +41,7 @@ public class ScheduleRuleController {
         return Result.success("已恢复默认配置", null);
     }
 
-    @Data
+    @Getter
     public static class RuleUpdateForm {
         private String ruleKey;
         private String ruleValue;

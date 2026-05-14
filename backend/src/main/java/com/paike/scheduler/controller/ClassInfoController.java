@@ -8,7 +8,9 @@ import com.paike.scheduler.mapper.ClassInfoMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -113,14 +115,12 @@ public class ClassInfoController {
         if (classInfo == null || classInfo.getDeleted() == 1) {
             return Result.fail(404, "班级不存在");
         }
-        classInfo.setDeleted(1);
-        classInfo.setUpdateTime(LocalDateTime.now());
-        classInfoMapper.updateById(classInfo);
+        classInfoMapper.deleteById(id);
         return Result.success("删除成功", null);
     }
 
     @PutMapping("/{id}/status")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody StatusForm form) {
+    public Result<Void> updateStatus(@PathVariable Long id, @Valid @RequestBody StatusForm form) {
         ClassInfo classInfo = classInfoMapper.selectById(id);
         if (classInfo == null || classInfo.getDeleted() == 1) {
             return Result.fail(404, "班级不存在");
@@ -140,7 +140,7 @@ public class ClassInfoController {
         return Result.success(list);
     }
 
-    @Data
+    @Getter
     public static class ClassForm {
         @NotBlank(message = "班级名称不能为空")
         private String className;
@@ -155,6 +155,7 @@ public class ClassInfoController {
 
     @Data
     public static class StatusForm {
+        @NotNull(message = "状态不能为空")
         private Integer status;
     }
 }

@@ -135,7 +135,9 @@ async function handleClear() {
       latestReportNo.value = ''
     }
     await fetchReports()
-  } catch (_e) { /* 错误由拦截器处理 */ }
+  } catch (_e) {
+    console.error(_e)
+  }
 }
 
 function handleSizeChange() {

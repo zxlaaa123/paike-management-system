@@ -19,7 +19,8 @@ const selectedClassName = computed(() => {
 onMounted(async () => {
   try {
     classList.value = await getAllClasses()
-  } catch {
+  } catch (_e) {
+    console.error(_e)
     ElMessage.error('加载班级列表失败')
   }
 })
@@ -29,7 +30,8 @@ async function handleChange(classId: number) {
   loading.value = true
   try {
     timetable.value = await getClassTimetable(classId)
-  } catch {
+  } catch (_e) {
+    console.error(_e)
     ElMessage.error('加载课表失败')
   } finally {
     loading.value = false
@@ -44,8 +46,8 @@ async function handleExport() {
   exportLoading.value = true
   try {
     await exportClassTimetable(selectedClassId.value)
-  } catch {
-    // request 拦截器已统一提示错误，这里吞掉异常避免控制台未处理告警
+  } catch (_e) {
+    console.error(_e)
   } finally {
     exportLoading.value = false
   }
@@ -89,7 +91,8 @@ async function handleExport() {
       </template>
       <div v-loading="loading">
         <TimetableGrid v-if="timetable.length > 0" :items="timetable" highlight="class" />
-        <el-empty v-else-if="selectedClassId && !loading" description="该班级暂无排课数据" />
+        <el-empty v-else-if="loading" description="加载中..." />
+        <el-empty v-else-if="selectedClassId" description="该班级暂无排课数据" />
         <el-empty v-else description="请先选择班级" />
       </div>
     </el-card>

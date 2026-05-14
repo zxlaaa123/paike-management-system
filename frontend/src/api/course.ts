@@ -31,19 +31,39 @@ export function getCourseList(params: {
   page?: number
   size?: number
 }) {
-  return request.get<ApiResponse<PageResult<Course>>>('/courses', { params }).then((r) => r.data.data)
+  return request.get<ApiResponse<PageResult<Course>>>('/courses', { params }).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function getCourseById(id: number) {
-  return request.get<ApiResponse<Course>>(`/courses/${id}`).then((r) => r.data.data)
+  return request.get<ApiResponse<Course>>(`/courses/${id}`).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function createCourse(data: CourseForm) {
-  return request.post<ApiResponse<Course>>('/courses', data).then((r) => r.data.data)
+  return request.post<ApiResponse<Course>>('/courses', data).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function updateCourse(id: number, data: CourseForm) {
-  return request.put<ApiResponse<Course>>(`/courses/${id}`, data).then((r) => r.data.data)
+  return request.put<ApiResponse<Course>>(`/courses/${id}`, data).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function deleteCourse(id: number) {
@@ -51,5 +71,10 @@ export function deleteCourse(id: number) {
 }
 
 export function getAllCourses() {
-  return request.get<ApiResponse<Course[]>>('/courses/all').then((r) => r.data.data)
+  return request.get<ApiResponse<Course[]>>('/courses/all').then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }

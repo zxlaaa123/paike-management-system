@@ -19,7 +19,8 @@ const selectedRoomName = computed(() => {
 onMounted(async () => {
   try {
     roomList.value = await getAllClassrooms()
-  } catch {
+  } catch (_e) {
+    console.error(_e)
     ElMessage.error('加载教室列表失败')
   }
 })
@@ -29,7 +30,8 @@ async function handleChange(roomId: number) {
   loading.value = true
   try {
     timetable.value = await getClassroomTimetable(roomId)
-  } catch {
+  } catch (_e) {
+    console.error(_e)
     ElMessage.error('加载课表失败')
   } finally {
     loading.value = false
@@ -44,8 +46,8 @@ async function handleExport() {
   exportLoading.value = true
   try {
     await exportClassroomTimetable(selectedRoomId.value)
-  } catch {
-    // request 拦截器已统一提示错误，这里吞掉异常避免控制台未处理告警
+  } catch (_e) {
+    console.error(_e)
   } finally {
     exportLoading.value = false
   }

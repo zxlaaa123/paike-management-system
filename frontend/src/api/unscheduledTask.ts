@@ -29,7 +29,12 @@ export function getUnscheduledTaskList(params: {
   page?: number
   size?: number
 }) {
-  return request.get<ApiResponse<PageResult<UnscheduledTask>>>('/unscheduled-tasks', { params }).then((r) => r.data.data)
+  return request.get<ApiResponse<PageResult<UnscheduledTask>>>('/unscheduled-tasks', { params }).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function clearUnscheduledTasks(batchId?: number) {

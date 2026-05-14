@@ -31,12 +31,22 @@ export interface ScheduleScoreResult {
 
 export function generateScheduleScore() {
   return request.post<ApiResponse<ScheduleScoreResult>>('/schedule-score/generate', {})
-    .then((r) => r.data.data)
+    .then((r) => {
+      if (!r.data) {
+        throw new Error('响应数据为空')
+      }
+      return r.data.data
+    })
 }
 
 export function getLatestScheduleScore() {
   return request.get<ApiResponse<ScheduleScoreReport>>('/schedule-score/latest')
-    .then((r) => r.data.data)
+    .then((r) => {
+      if (!r.data) {
+        throw new Error('响应数据为空')
+      }
+      return r.data.data
+    })
 }
 
 export function getScheduleScoreHistory(params: {
@@ -47,5 +57,10 @@ export function getScheduleScoreHistory(params: {
   size?: number
 }) {
   return request.get<ApiResponse<PageResult<ScheduleScoreReport>>>('/schedule-score/reports', { params })
-    .then((r) => r.data.data)
+    .then((r) => {
+      if (!r.data) {
+        throw new Error('响应数据为空')
+      }
+      return r.data.data
+    })
 }

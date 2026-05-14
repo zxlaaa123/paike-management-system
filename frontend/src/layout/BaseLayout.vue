@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { House, DataLine, Calendar, Reading } from '@element-plus/icons-vue'
+import { House, DataLine, Calendar, Reading, PieChart } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
@@ -44,7 +44,7 @@ async function handleLogout() {
         </el-sub-menu>
         <el-sub-menu index="analysis">
           <template #title>
-            <el-icon><DataLine /></el-icon>
+            <el-icon><PieChart /></el-icon>
             <span>排课分析</span>
           </template>
           <el-menu-item index="/unscheduled-tasks">未排任务</el-menu-item>

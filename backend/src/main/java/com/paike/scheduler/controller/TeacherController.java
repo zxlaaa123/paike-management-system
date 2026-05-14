@@ -7,7 +7,9 @@ import com.paike.scheduler.entity.Teacher;
 import com.paike.scheduler.mapper.TeacherMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -110,14 +112,12 @@ public class TeacherController {
         if (teacher == null || teacher.getDeleted() == 1) {
             return Result.fail(404, "教师不存在");
         }
-        teacher.setDeleted(1);
-        teacher.setUpdateTime(LocalDateTime.now());
-        teacherMapper.updateById(teacher);
+        teacherMapper.deleteById(id);
         return Result.success("删除成功", null);
     }
 
     @PutMapping("/{id}/status")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody StatusForm form) {
+    public Result<Void> updateStatus(@PathVariable Long id, @Valid @RequestBody StatusForm form) {
         Teacher teacher = teacherMapper.selectById(id);
         if (teacher == null || teacher.getDeleted() == 1) {
             return Result.fail(404, "教师不存在");
@@ -137,7 +137,7 @@ public class TeacherController {
         return Result.success(list);
     }
 
-    @Data
+    @Getter
     public static class TeacherForm {
         @NotBlank(message = "教师编号不能为空")
         private String teacherNo;
@@ -151,6 +151,7 @@ public class TeacherController {
 
     @Data
     public static class StatusForm {
+        @NotNull(message = "状态不能为空")
         private Integer status;
     }
 }

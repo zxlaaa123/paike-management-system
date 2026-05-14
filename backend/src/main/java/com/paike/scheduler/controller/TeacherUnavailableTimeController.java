@@ -5,6 +5,7 @@ import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.TeacherUnavailableTime;
 import com.paike.scheduler.service.TeacherUnavailableTimeService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -48,13 +49,14 @@ public class TeacherUnavailableTimeController {
     }
 
     @PutMapping("/{id}/status")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody StatusForm form) {
+    public Result<Void> updateStatus(@PathVariable Long id, @Valid @RequestBody StatusForm form) {
         unavailableTimeService.updateStatus(id, form.getStatus());
         return Result.success("操作成功", null);
     }
 
     @Data
     public static class StatusForm {
+        @NotNull(message = "状态不能为空")
         private Integer status;
     }
 }

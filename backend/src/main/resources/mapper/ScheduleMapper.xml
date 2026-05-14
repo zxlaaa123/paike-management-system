@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.paike.scheduler.mapper.ScheduleMapper">
+
+    <select id="selectFilteredSchedulePage" resultType="com.paike.scheduler.entity.Schedule">
+        SELECT DISTINCT s.*
+        FROM schedule s
+        INNER JOIN teaching_task tt ON s.teaching_task_id = tt.id AND tt.deleted = 0
+        INNER JOIN course c ON s.course_id = c.id AND c.deleted = 0
+        INNER JOIN teacher t ON s.teacher_id = t.id AND t.deleted = 0
+        INNER JOIN class_info cl ON s.class_id = cl.id AND cl.deleted = 0
+        INNER JOIN classroom cr ON s.classroom_id = cr.id AND cr.deleted = 0
+        LEFT JOIN time_slot ts ON s.time_slot_id = ts.id
+        WHERE s.deleted = 0
+        <if test="courseName != null and courseName != ''">
+            AND c.course_name LIKE CONCAT('%', #{courseName}, '%')
+        </if>
+        <if test="teacherName != null and teacherName != ''">
+            AND t.name LIKE CONCAT('%', #{teacherName}, '%')
+        </if>
+        <if test="className != null and className != ''">
+            AND cl.class_name LIKE CONCAT('%', #{className}, '%')
+        </if>
+        <if test="roomName != null and roomName != ''">
+            AND cr.room_name LIKE CONCAT('%', #{roomName}, '%')
+        </if>
+        <if test="dayOfWeek != null">
+            AND ts.day_of_week = #{dayOfWeek}
+        </if>
+        ORDER BY s.create_time DESC
+    </select>
+
+</mapper>

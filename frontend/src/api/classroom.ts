@@ -30,19 +30,39 @@ export function getClassroomList(params: {
   page?: number
   size?: number
 }) {
-  return request.get<ApiResponse<PageResult<Classroom>>>('/classrooms', { params }).then((r) => r.data.data)
+  return request.get<ApiResponse<PageResult<Classroom>>>('/classrooms', { params }).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function getClassroomById(id: number) {
-  return request.get<ApiResponse<Classroom>>(`/classrooms/${id}`).then((r) => r.data.data)
+  return request.get<ApiResponse<Classroom>>(`/classrooms/${id}`).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function createClassroom(data: ClassroomForm) {
-  return request.post<ApiResponse<Classroom>>('/classrooms', data).then((r) => r.data.data)
+  return request.post<ApiResponse<Classroom>>('/classrooms', data).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function updateClassroom(id: number, data: ClassroomForm) {
-  return request.put<ApiResponse<Classroom>>(`/classrooms/${id}`, data).then((r) => r.data.data)
+  return request.put<ApiResponse<Classroom>>(`/classrooms/${id}`, data).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }
 
 export function deleteClassroom(id: number) {
@@ -54,5 +74,10 @@ export function updateClassroomStatus(id: number, status: number) {
 }
 
 export function getAllClassrooms() {
-  return request.get<ApiResponse<Classroom[]>>('/classrooms/all').then((r) => r.data.data)
+  return request.get<ApiResponse<Classroom[]>>('/classrooms/all').then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
 }

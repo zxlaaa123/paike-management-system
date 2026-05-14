@@ -10,6 +10,7 @@ import com.paike.scheduler.entity.Schedule;
 import com.paike.scheduler.entity.Teacher;
 import com.paike.scheduler.entity.TeachingTask;
 import com.paike.scheduler.entity.TimeSlot;
+import com.paike.scheduler.controller.vo.TimetableVo;
 import com.paike.scheduler.mapper.ClassInfoMapper;
 import com.paike.scheduler.mapper.ClassroomMapper;
 import com.paike.scheduler.mapper.CourseMapper;
@@ -122,23 +123,29 @@ public class TimetableController {
         exportWorkbook(response, buildFileName(classroom.getRoomName(), "教室占用表"), classroom.getRoomName() + "占用表", items, TimetableViewType.CLASSROOM);
     }
 
-    private List<Schedule> queryByClassId(Long classId) {
-        // 通过教学任务查询
-        List<TeachingTask> tasks = teachingTaskMapper.selectList(
-            new LambdaQueryWrapper<TeachingTask>()
-                .eq(TeachingTask::getClassId, classId)
-                .eq(TeachingTask::getDeleted, 0)
-        );
+    /**
+     * 通用查询：先按 schedule 表字段查，再通过 teaching_task 关联查，合并去重
+     */
+    private List<Schedule> querySchedulesByTaskField(
+            String taskField, Long fieldValue,
+            java.util.function.Function<LambdaQueryWrapper<Schedule>, LambdaQueryWrapper<Schedule>> scheduleFilter) {
+        // 通过 teaching_task 关联查询
+        LambdaQueryWrapper<TeachingTask> taskWrapper = new LambdaQueryWrapper<TeachingTask>()
+            .eq(TeachingTask::getDeleted, 0);
+        switch (taskField) {
+            case "classId" -> taskWrapper.eq(TeachingTask::getClassId, fieldValue);
+            case "teacherId" -> taskWrapper.eq(TeachingTask::getTeacherId, fieldValue);
+        }
+        List<TeachingTask> tasks = teachingTaskMapper.selectList(taskWrapper);
         List<Long> taskIds = tasks.stream().map(TeachingTask::getId).collect(Collectors.toList());
 
-        // 直接通过schedule表的class_id查询（补充边界情况）
-        List<Schedule> schedules = scheduleMapper.selectList(
-            new LambdaQueryWrapper<Schedule>()
-                .eq(Schedule::getClassId, classId)
-                .eq(Schedule::getDeleted, 0)
-        );
+        // 直接按 schedule 表字段查
+        LambdaQueryWrapper<Schedule> scheduleWrapper = new LambdaQueryWrapper<Schedule>()
+            .eq(Schedule::getDeleted, 0);
+        scheduleFilter.apply(scheduleWrapper);
+        List<Schedule> schedules = scheduleMapper.selectList(scheduleWrapper);
 
-        // 合并两种查询结果，去重
+        // 合并去重
         if (!taskIds.isEmpty()) {
             List<Schedule> taskSchedules = scheduleMapper.selectList(
                 new LambdaQueryWrapper<Schedule>()
@@ -155,37 +162,14 @@ public class TimetableController {
         return schedules;
     }
 
+    private List<Schedule> queryByClassId(Long classId) {
+        return querySchedulesByTaskField("classId", classId,
+            w -> w.eq(Schedule::getClassId, classId));
+    }
+
     private List<Schedule> queryByTeacherId(Long teacherId) {
-        // 通过教学任务查询
-        List<TeachingTask> tasks = teachingTaskMapper.selectList(
-            new LambdaQueryWrapper<TeachingTask>()
-                .eq(TeachingTask::getTeacherId, teacherId)
-                .eq(TeachingTask::getDeleted, 0)
-        );
-        List<Long> taskIds = tasks.stream().map(TeachingTask::getId).collect(Collectors.toList());
-
-        // 直接通过schedule表的teacher_id查询（补充边界情况）
-        List<Schedule> schedules = scheduleMapper.selectList(
-            new LambdaQueryWrapper<Schedule>()
-                .eq(Schedule::getTeacherId, teacherId)
-                .eq(Schedule::getDeleted, 0)
-        );
-
-        // 合并两种查询结果，去重
-        if (!taskIds.isEmpty()) {
-            List<Schedule> taskSchedules = scheduleMapper.selectList(
-                new LambdaQueryWrapper<Schedule>()
-                    .in(Schedule::getTeachingTaskId, taskIds)
-                    .eq(Schedule::getDeleted, 0)
-            );
-            Set<Long> existingIds = schedules.stream().map(Schedule::getId).collect(Collectors.toSet());
-            for (Schedule s : taskSchedules) {
-                if (!existingIds.contains(s.getId())) {
-                    schedules.add(s);
-                }
-            }
-        }
-        return schedules;
+        return querySchedulesByTaskField("teacherId", teacherId,
+            w -> w.eq(Schedule::getTeacherId, teacherId));
     }
 
     private List<Schedule> queryByClassroomId(Long classroomId) {

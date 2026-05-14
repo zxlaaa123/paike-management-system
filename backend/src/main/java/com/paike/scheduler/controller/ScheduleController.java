@@ -2,6 +2,7 @@ package com.paike.scheduler.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.paike.scheduler.common.enums.ScheduleSourceType;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
@@ -9,6 +10,7 @@ import com.paike.scheduler.service.ScheduleConflictService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -43,43 +45,16 @@ public class ScheduleController {
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "10") int size
     ) {
-        // 查询全部排课记录（不分页）
-        List<Schedule> allSchedules = scheduleMapper.selectList(
-            new LambdaQueryWrapper<Schedule>()
-                .eq(Schedule::getDeleted, 0)
-                .orderByDesc(Schedule::getCreateTime));
-        // 批量填充关联数据
-        fillRelations(allSchedules);
+        // 使用自定义 SQL 进行数据库层面过滤和分页
+        Page<Schedule> pageResult = scheduleMapper.selectFilteredSchedulePage(
+            courseName, teacherName, className, roomName, dayOfWeek,
+            new Page<>(page, size));
 
-        // 内存过滤
-        List<Schedule> filtered = allSchedules.stream().filter(s -> {
-            if (courseName != null && !courseName.isBlank()) {
-                if (s.getCourseName() == null || !s.getCourseName().contains(courseName)) return false;
-            }
-            if (teacherName != null && !teacherName.isBlank()) {
-                if (s.getTeacherName() == null || !s.getTeacherName().contains(teacherName)) return false;
-            }
-            if (className != null && !className.isBlank()) {
-                if (s.getClassName() == null || !s.getClassName().contains(className)) return false;
-            }
-            if (roomName != null && !roomName.isBlank()) {
-                if (s.getRoomName() == null || !s.getRoomName().contains(roomName)) return false;
-            }
-            if (dayOfWeek != null) {
-                if (s.getDayOfWeek() == null || !s.getDayOfWeek().equals(dayOfWeek)) return false;
-            }
-            return true;
-        }).collect(Collectors.toList());
+        if (pageResult.getRecords().isEmpty()) {
+            return Result.success(pageResult);
+        }
 
-        // 手动分页
-        int total = filtered.size();
-        int fromIndex = (page - 1) * size;
-        int toIndex = Math.min(fromIndex + size, total);
-        List<Schedule> pageRecords = fromIndex < total ? filtered.subList(fromIndex, toIndex) : List.of();
-
-        Page<Schedule> pageResult = new Page<>(page, size);
-        pageResult.setRecords(pageRecords);
-        pageResult.setTotal(total);
+        fillRelations(pageResult.getRecords());
         return Result.success(pageResult);
     }
 
@@ -111,7 +86,7 @@ public class ScheduleController {
         schedule.setClassId(task.getClassId());
         schedule.setTimeSlotId(form.getTimeSlotId());
         schedule.setClassroomId(form.getClassroomId());
-        schedule.setSourceType("MANUAL");
+        schedule.setSourceType(ScheduleSourceType.MANUAL.getCode());
         schedule.setDeleted(0);
         schedule.setCreateTime(LocalDateTime.now());
         schedule.setUpdateTime(LocalDateTime.now());
@@ -255,7 +230,7 @@ public class ScheduleController {
                 if (classInfo != null) s.setClassName(classInfo.getClassName());
             }
             if (s.getSourceType() != null) {
-                s.setSourceTypeName("AUTO".equals(s.getSourceType()) ? "自动排课" : "手动排课");
+                s.setSourceTypeName(ScheduleSourceType.AUTO.getCode().equals(s.getSourceType()) ? "自动排课" : "手动排课");
             } else {
                 s.setSourceTypeName("手动排课");
             }
@@ -267,43 +242,11 @@ public class ScheduleController {
     }
 
     private void fillRelation(Schedule s) {
-        // 时间段
-        TimeSlot timeSlot = timeSlotMapper.selectById(s.getTimeSlotId());
-        if (timeSlot != null) {
-            s.setTimeLabel(timeSlot.getTimeLabel());
-            s.setDayOfWeek(timeSlot.getDayOfWeek());
-            s.setPeriodNo(timeSlot.getPeriodNo());
-        }
-        // 教室
-        Classroom classroom = classroomMapper.selectById(s.getClassroomId());
-        if (classroom != null) {
-            s.setRoomName(classroom.getRoomName());
-            s.setBuilding(classroom.getBuilding());
-        }
-        // 教学任务 → 课程/教师/班级
-        TeachingTask task = teachingTaskMapper.selectById(s.getTeachingTaskId());
-        if (task != null) {
-            Course course = courseMapper.selectById(task.getCourseId());
-            if (course != null) s.setCourseName(course.getCourseName());
-            Teacher teacher = teacherMapper.selectById(task.getTeacherId());
-            if (teacher != null) s.setTeacherName(teacher.getName());
-            ClassInfo classInfo = classInfoMapper.selectById(task.getClassId());
-            if (classInfo != null) s.setClassName(classInfo.getClassName());
-        }
-        // 排课来源
-        if (s.getSourceType() != null) {
-            s.setSourceTypeName("AUTO".equals(s.getSourceType()) ? "自动排课" : "手动排课");
-        } else {
-            s.setSourceTypeName("手动排课");
-        }
-        // 自动排课批次
-        if (s.getBatchId() != null) {
-            AutoScheduleBatch batch = autoScheduleBatchMapper.selectById(s.getBatchId());
-            if (batch != null) s.setBatchNo(batch.getBatchNo());
-        }
+        // 批量查询所有关联数据（单条记录也走批量接口，统一逻辑）
+        fillRelations(List.of(s));
     }
 
-    @Data
+    @Getter
     public static class ScheduleForm {
         @NotNull(message = "教学任务不能为空")
         private Long teachingTaskId;

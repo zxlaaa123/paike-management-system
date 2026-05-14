@@ -8,7 +8,9 @@ import com.paike.scheduler.mapper.ClassroomMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -111,14 +113,12 @@ public class ClassroomController {
         if (classroom == null || classroom.getDeleted() == 1) {
             return Result.fail(404, "教室不存在");
         }
-        classroom.setDeleted(1);
-        classroom.setUpdateTime(LocalDateTime.now());
-        classroomMapper.updateById(classroom);
+        classroomMapper.deleteById(id);
         return Result.success("删除成功", null);
     }
 
     @PutMapping("/{id}/status")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody StatusForm form) {
+    public Result<Void> updateStatus(@PathVariable Long id, @Valid @RequestBody StatusForm form) {
         Classroom classroom = classroomMapper.selectById(id);
         if (classroom == null || classroom.getDeleted() == 1) {
             return Result.fail(404, "教室不存在");
@@ -138,7 +138,7 @@ public class ClassroomController {
         return Result.success(list);
     }
 
-    @Data
+    @Getter
     public static class ClassroomForm {
         @NotBlank(message = "教室名称不能为空")
         private String roomName;
@@ -152,6 +152,7 @@ public class ClassroomController {
 
     @Data
     public static class StatusForm {
+        @NotNull(message = "状态不能为空")
         private Integer status;
     }
 }
