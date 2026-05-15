@@ -203,9 +203,10 @@ onMounted(() => {
         <el-table-column label="生成时间" width="160">
           <template #default="{ row }">{{ row.generatedAt || '—' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="viewDetail(row)">详情</el-button>
+            <el-button type="success" link @click="router.push('/v3/schedule-compare')">对比</el-button>
             <el-button
               v-if="row.status === 'DRAFT'"
               type="danger"

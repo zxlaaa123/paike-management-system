@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getSchedulePlanById,
   getSchedulePlanItems,
@@ -14,6 +14,7 @@ import {
   rescore,
   type ScheduleScoreDetail,
 } from '../../api/scheduleScore'
+import { applySchedulePlan, rollbackSchedulePlan } from '../../api/schedulePlan'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,6 +23,7 @@ const planId = computed(() => Number(route.params.id))
 
 const loading = ref(false)
 const scoring = ref(false)
+const applying = ref(false)
 const plan = ref<SchedulePlan | null>(null)
 const items = ref<SchedulePlanItem[]>([])
 const scoreDetails = ref<ScheduleScoreDetail[]>([])
@@ -72,6 +74,69 @@ async function handleRescore() {
   }
 }
 
+async function handleApply() {
+  if (!plan.value) return
+  if (plan.value.status === 'ABANDONED') {
+    ElMessage.warning('已废弃方案不能应用')
+    return
+  }
+
+  const warnings: string[] = []
+  if (plan.value.unscheduledCount > 0) {
+    warnings.push(`存在 ${plan.value.unscheduledCount} 个未排任务`)
+  }
+  if (plan.value.conflictCount > 0) {
+    warnings.push(`存在 ${plan.value.conflictCount} 个冲突`)
+  }
+
+  let confirmMsg = `确定将「${plan.value.name}」应用为当前学期正式课表吗？`
+  if (warnings.length > 0) {
+    confirmMsg = `该方案${warnings.join('，')}，确定要继续应用吗？`
+  }
+
+  await ElMessageBox.confirm(confirmMsg, '应用方案', {
+    type: warnings.length > 0 ? 'warning' : 'info',
+    confirmButtonText: '确定应用',
+    cancelButtonText: '取消',
+  })
+
+  applying.value = true
+  try {
+    const result = await applySchedulePlan(planId.value)
+    ElMessage.success(`方案已应用，共写入 ${result.appliedCount} 条课表记录`)
+    await fetchData() // 刷新方案状态
+  } catch (e: any) {
+    ElMessage.error(e.message || '应用失败')
+  } finally {
+    applying.value = false
+  }
+}
+
+async function handleRollback() {
+  if (!plan.value) return
+  if (plan.value.status === 'ABANDONED') {
+    ElMessage.warning('已废弃方案不能回滚')
+    return
+  }
+
+  await ElMessageBox.confirm(
+    `确定回滚到「${plan.value.name}」吗？这将替换当前学期的正式课表。`,
+    '回滚方案',
+    { type: 'warning', confirmButtonText: '确定回滚', cancelButtonText: '取消' }
+  )
+
+  applying.value = true
+  try {
+    const result = await rollbackSchedulePlan(planId.value)
+    ElMessage.success(`已回滚到该方案，共写入 ${result.appliedCount} 条课表记录`)
+    await fetchData()
+  } catch (e: any) {
+    ElMessage.error(e.message || '回滚失败')
+  } finally {
+    applying.value = false
+  }
+}
+
 function statusText(status: string) {
   const map: Record<string, string> = { DRAFT: '草稿', APPLIED: '已应用', ABANDONED: '已废弃' }
   return map[status] || status
@@ -118,7 +183,23 @@ onMounted(() => {
         <template #header>
           <div class="card-header">
             <span>{{ plan.name }}</span>
-            <el-tag :type="statusTagType(plan.status)">{{ statusText(plan.status) }}</el-tag>
+            <div>
+              <el-tag :type="statusTagType(plan.status)" style="margin-right: 8px">{{ statusText(plan.status) }}</el-tag>
+              <el-button
+                v-if="plan.status === 'DRAFT'"
+                type="primary"
+                size="small"
+                :loading="applying"
+                @click="handleApply"
+              >应用方案</el-button>
+              <el-button
+                v-if="plan.status !== 'ABANDONED'"
+                type="warning"
+                size="small"
+                :loading="applying"
+                @click="handleRollback"
+              >{{ plan.status === 'APPLIED' ? '重新应用' : '回滚应用' }}</el-button>
+            </div>
           </div>
         </template>
         <el-descriptions :column="3" border>

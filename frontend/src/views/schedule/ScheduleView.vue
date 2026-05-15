@@ -13,6 +13,7 @@ import { getAllTeachingTasks, type TeachingTask } from '../../api/teachingTask'
 import { getAllTimeSlots, type TimeSlot } from '../../api/timeSlot'
 import { getAllClassrooms, type Classroom } from '../../api/classroom'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
+import { getSchedulePlanList, type SchedulePlan } from '../../api/schedulePlan'
 
 const loading = ref(false)
 const tableData = ref<Schedule[]>([])
@@ -50,6 +51,7 @@ const timeSlotList = ref<TimeSlot[]>([])
 const classroomList = ref<Classroom[]>([])
 const semesterList = ref<Semester[]>([])
 const currentSemester = ref<Semester | null>(null)
+const appliedPlan = ref<SchedulePlan | null>(null)
 
 const hasCurrentSemester = computed(() => currentSemester.value !== null)
 
@@ -94,6 +96,17 @@ async function fetchOptions() {
   currentSemester.value = current
   if (current) {
     searchForm.semesterId = current.id
+    // 加载当前学期的已应用方案
+    try {
+      const planRes = await getSchedulePlanList({ semesterId: current.id, status: 'APPLIED', size: 1 })
+      if (planRes.records.length > 0) {
+        appliedPlan.value = planRes.records[0]
+      } else {
+        appliedPlan.value = null
+      }
+    } catch (_e) {
+      appliedPlan.value = null
+    }
   }
 }
 
@@ -197,12 +210,21 @@ onMounted(() => {
     <!-- 当前学期信息条 -->
     <el-alert
       v-if="currentSemester"
-      :title="`当前学期：${currentSemester.name}`"
       type="info"
       show-icon
       :closable="false"
       style="margin-bottom: 16px"
-    />
+    >
+      <template #title>
+        <div style="display: flex; align-items: center; gap: 16px">
+          <span>当前学期：{{ currentSemester.name }}</span>
+          <span v-if="appliedPlan" style="color: #67c23a">
+            ✓ 课表来源方案：{{ appliedPlan.name }}（{{ appliedPlan.totalScore }}分）
+          </span>
+          <span v-else style="color: #909399">暂无已应用方案</span>
+        </div>
+      </template>
+    </el-alert>
 
     <el-card class="search-card" shadow="never">
       <el-form :inline="true" :model="searchForm">
@@ -262,10 +284,16 @@ onMounted(() => {
             <span v-if="row.building" style="color: #909399; margin-left: 4px">({{ row.building }})</span>
           </template>
         </el-table-column>
-        <el-table-column prop="sourceTypeName" label="排课来源" width="100" />
-        <el-table-column label="自动排课批次" min-width="160">
+        <el-table-column label="排课来源" width="120">
           <template #default="{ row }">
-            <span v-if="row.batchNo">{{ row.batchNo }}</span>
+            <span v-if="row.sourceType === 'PLAN'" style="color: #67c23a">方案应用</span>
+            <span v-else>{{ row.sourceTypeName || '手动排课' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="来源批次/方案" min-width="180">
+          <template #default="{ row }">
+            <span v-if="row.planId" style="color: #67c23a">方案 #{{ row.planId }}</span>
+            <span v-else-if="row.batchNo">{{ row.batchNo }}</span>
             <span v-else style="color: #c0c4cc">—</span>
           </template>
         </el-table-column>
@@ -281,7 +309,7 @@ onMounted(() => {
         :total="total"
         :page-sizes="[10, 20, 50]"
         layout="total, sizes, prev, pager, next, jumper"
-        style="margin-top: 16px; justify-content: flex-content: flex-end"
+        style="margin-top: 16px; justify-content: flex-end"
         @change="fetchData"
       />
     </el-card>
