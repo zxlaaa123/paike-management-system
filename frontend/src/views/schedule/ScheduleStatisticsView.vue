@@ -28,16 +28,9 @@ const searchForm = reactive({
 
 const hasCurrentSemester = computed(() => currentSemester.value !== null)
 
-// ==================== 方案总览 ====================
 const overview = ref<PlanOverview | null>(null)
-
-// ==================== 教师工作量 ====================
 const workloadData = ref<TeacherWorkloadItem[]>([])
-
-// ==================== 教室利用率 ====================
 const utilizationData = ref<ClassroomUtilizationItem[]>([])
-
-// ==================== 班级均衡度 ====================
 const balanceData = ref<ClassBalanceItem[]>([])
 
 async function fetchOptions() {
@@ -177,7 +170,7 @@ onMounted(async () => {
     <template v-else>
       <!-- 筛选栏 -->
       <el-card shadow="never" style="margin-bottom: 16px">
-        <el-alert :title="`当前学期：${currentSemester?.name || '—'}`" type="info" show-icon :closable="false" style="margin-bottom: 12px" />
+        <el-alert :title="'当前学期：' + (currentSemester?.name || '—')" type="info" show-icon :closable="false" style="margin-bottom: 12px" />
         <el-row :gutter="16">
           <el-col :span="6">
             <el-select v-model="searchForm.semesterId" placeholder="选择学期" style="width: 100%" @change="onSemesterChange">
@@ -225,7 +218,7 @@ onMounted(async () => {
 
             <el-divider />
 
-            <el-row :gutter="16" v-if="overview">
+            <el-row :gutter="16" v-if="overview" style="margin-bottom: 16px">
               <el-col :span="12">
                 <el-descriptions title="最优方案" :column="2" border>
                   <el-descriptions-item label="方案名称">{{ overview.bestPlanName || '—' }}</el-descriptions-item>
@@ -252,17 +245,17 @@ onMounted(async () => {
               <el-table-column prop="teacherName" label="教师" width="120" />
               <el-table-column prop="department" label="院系" width="120" />
               <el-table-column label="周总课时" width="100" align="center">
-                <template #default="{ row }">{{ row.totalPeriods }}节</template>
+                <template #default="{ row }"><span>{{ row.totalPeriods }}</span> 节</template>
               </el-table-column>
               <el-table-column label="日最大课时" width="100" align="center">
-                <template #default="{ row }}">{{ row.maxDailyPeriods }}节</template>
+                <template #default="{ row }"><span>{{ row.maxDailyPeriods }}</span> 节</template>
               </el-table-column>
               <el-table-column prop="courseCount" label="课程数" width="80" align="center" />
               <el-table-column prop="classCount" label="班级数" width="80" align="center" />
               <el-table-column label="周一至周五" min-width="200">
                 <template #default="{ row }">
                   <span v-for="day in [1,2,3,4,5]" :key="day" style="margin-right: 8px">
-                    周{{ day }}: {{ row.dailyPeriods?.[day] || 0 }}节
+                    周{{ day }}: <span>{{ row.dailyPeriods?.[day] || 0 }}</span> 节
                   </span>
                 </template>
               </el-table-column>
@@ -288,11 +281,11 @@ onMounted(async () => {
                 </template>
               </el-table-column>
               <el-table-column label="已用节次" width="100" align="center">
-                <template #default="{ row }">{{ row.usedPeriods }}节</template>
+                <template #default="{ row }"><span>{{ row.usedPeriods }}</span> 节</template>
               </el-table-column>
               <el-table-column label="利用率" width="120" align="center">
                 <template #default="{ row }">
-                  <el-tag :type="utilizationRateType(row.utilizationRate)" size="small">{{ row.utilizationRate }}%</el-tag>
+                  <el-tag :type="utilizationRateType(row.utilizationRate)" size="small"><span>{{ row.utilizationRate }}</span>%</el-tag>
                 </template>
               </el-table-column>
               <el-table-column label="评价" width="120" align="center">
@@ -311,22 +304,22 @@ onMounted(async () => {
               <el-table-column prop="className" label="班级" width="150" />
               <el-table-column prop="studentCount" label="人数" width="80" align="center" />
               <el-table-column label="周一" width="80" align="center">
-                <template #default="{ row }">{{ row.day1Periods || 0 }}节</template>
+                <template #default="{ row }"><span>{{ row.day1Periods || 0 }}</span> 节</template>
               </el-table-column>
               <el-table-column label="周二" width="80" align="center">
-                <template #default="{ row }">{{ row.day2Periods || 0 }}节</template>
+                <template #default="{ row }"><span>{{ row.day2Periods || 0 }}</span> 节</template>
               </el-table-column>
               <el-table-column label="周三" width="80" align="center">
-                <template #default="{ row }">{{ row.day3Periods || 0 }}节</template>
+                <template #default="{ row }"><span>{{ row.day3Periods || 0 }}</span> 节</template>
               </el-table-column>
               <el-table-column label="周四" width="80" align="center">
-                <template #default="{ row }">{{ row.day4Periods || 0 }}节</template>
+                <template #default="{ row }"><span>{{ row.day4Periods || 0 }}</span> 节</template>
               </el-table-column>
               <el-table-column label="周五" width="80" align="center">
-                <template #default="{ row }">{{ row.day5Periods || 0 }}节</template>
+                <template #default="{ row }"><span>{{ row.day5Periods || 0 }}</span> 节</template>
               </el-table-column>
               <el-table-column label="总课时" width="90" align="center">
-                <template #default="{ row }">{{ row.totalPeriods }}节</template>
+                <template #default="{ row }"><span>{{ row.totalPeriods }}</span> 节</template>
               </el-table-column>
               <el-table-column label="均衡分" width="100" align="center">
                 <template #default="{ row }">
