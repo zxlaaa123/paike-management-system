@@ -20,6 +20,7 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
         ensureScheduleSemesterColumns();
         ensureScheduleScoreDetailColumns();
         ensureScheduleRuleWeightUniqueIndex();
+        ensureStage7Tables();
     }
 
     private void ensureSemesterIndexes() {
@@ -158,6 +159,106 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
             }
         } catch (Exception e) {
             log.warn("Failed to add rule_type to schedule_score_detail: {}", e.getMessage());
+        }
+    }
+
+    private void ensureStage7Tables() {
+        ensureScheduleGenerateLogTable();
+        ensureScheduleUnassignedTaskTable();
+        ensureScheduleAdjustLogTable();
+    }
+
+    private void ensureScheduleGenerateLogTable() {
+        try {
+            jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS schedule_generate_log (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '生成日志ID',
+                    plan_id BIGINT NULL COMMENT '排课方案ID',
+                    semester_id BIGINT NOT NULL COMMENT '所属学期ID',
+                    teaching_task_id BIGINT NULL COMMENT '教学任务ID',
+                    log_level VARCHAR(20) NOT NULL DEFAULT 'INFO' COMMENT '日志级别',
+                    log_type VARCHAR(50) NOT NULL COMMENT '日志类型',
+                    message VARCHAR(1000) NOT NULL COMMENT '日志内容',
+                    step_no INT NULL COMMENT '步骤序号',
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+                ) COMMENT='排课生成日志表'
+                """);
+            ensureIndex("schedule_generate_log", "idx_generate_log_plan", "CREATE INDEX idx_generate_log_plan ON schedule_generate_log(plan_id)");
+            ensureIndex("schedule_generate_log", "idx_generate_log_semester", "CREATE INDEX idx_generate_log_semester ON schedule_generate_log(semester_id)");
+            ensureIndex("schedule_generate_log", "idx_generate_log_task", "CREATE INDEX idx_generate_log_task ON schedule_generate_log(teaching_task_id)");
+            ensureIndex("schedule_generate_log", "idx_generate_log_type", "CREATE INDEX idx_generate_log_type ON schedule_generate_log(log_type)");
+        } catch (Exception e) {
+            log.warn("Failed to ensure schedule_generate_log: {}", e.getMessage());
+        }
+    }
+
+    private void ensureScheduleUnassignedTaskTable() {
+        try {
+            jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS schedule_unassigned_task (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '未排任务ID',
+                    plan_id BIGINT NOT NULL COMMENT '排课方案ID',
+                    semester_id BIGINT NOT NULL COMMENT '所属学期ID',
+                    teaching_task_id BIGINT NOT NULL COMMENT '教学任务ID',
+                    reason_code VARCHAR(100) NOT NULL COMMENT '未排原因编码',
+                    reason_message VARCHAR(1000) NOT NULL COMMENT '未排原因说明',
+                    suggestion VARCHAR(1000) NULL COMMENT '处理建议',
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+                ) COMMENT='未排任务原因表'
+                """);
+            ensureIndex("schedule_unassigned_task", "idx_unassigned_plan", "CREATE INDEX idx_unassigned_plan ON schedule_unassigned_task(plan_id)");
+            ensureIndex("schedule_unassigned_task", "idx_unassigned_semester", "CREATE INDEX idx_unassigned_semester ON schedule_unassigned_task(semester_id)");
+            ensureIndex("schedule_unassigned_task", "idx_unassigned_task", "CREATE INDEX idx_unassigned_task ON schedule_unassigned_task(teaching_task_id)");
+            ensureIndex("schedule_unassigned_task", "idx_unassigned_reason", "CREATE INDEX idx_unassigned_reason ON schedule_unassigned_task(reason_code)");
+        } catch (Exception e) {
+            log.warn("Failed to ensure schedule_unassigned_task: {}", e.getMessage());
+        }
+    }
+
+    private void ensureScheduleAdjustLogTable() {
+        try {
+            jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS schedule_adjust_log (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '调整日志ID',
+                    plan_id BIGINT NULL COMMENT '排课方案ID',
+                    schedule_id BIGINT NULL COMMENT '正式课表ID',
+                    semester_id BIGINT NOT NULL COMMENT '所属学期ID',
+                    teaching_task_id BIGINT NOT NULL COMMENT '教学任务ID',
+                    old_classroom_id BIGINT NULL COMMENT '调整前教室ID',
+                    old_weekday INT NULL COMMENT '调整前星期',
+                    old_start_period INT NULL COMMENT '调整前开始节次',
+                    old_end_period INT NULL COMMENT '调整前结束节次',
+                    new_classroom_id BIGINT NULL COMMENT '调整后教室ID',
+                    new_weekday INT NULL COMMENT '调整后星期',
+                    new_start_period INT NULL COMMENT '调整后开始节次',
+                    new_end_period INT NULL COMMENT '调整后结束节次',
+                    before_score DECIMAL(6,2) NULL COMMENT '调整前总分',
+                    after_score DECIMAL(6,2) NULL COMMENT '调整后总分',
+                    conflict_flag TINYINT NOT NULL DEFAULT 0 COMMENT '调整后是否冲突',
+                    adjust_reason VARCHAR(500) NULL COMMENT '调整原因',
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+                ) COMMENT='手动调整日志表'
+                """);
+            ensureIndex("schedule_adjust_log", "idx_adjust_plan", "CREATE INDEX idx_adjust_plan ON schedule_adjust_log(plan_id)");
+            ensureIndex("schedule_adjust_log", "idx_adjust_schedule", "CREATE INDEX idx_adjust_schedule ON schedule_adjust_log(schedule_id)");
+            ensureIndex("schedule_adjust_log", "idx_adjust_semester", "CREATE INDEX idx_adjust_semester ON schedule_adjust_log(semester_id)");
+            ensureIndex("schedule_adjust_log", "idx_adjust_task", "CREATE INDEX idx_adjust_task ON schedule_adjust_log(teaching_task_id)");
+        } catch (Exception e) {
+            log.warn("Failed to ensure schedule_adjust_log: {}", e.getMessage());
+        }
+    }
+
+    private void ensureIndex(String tableName, String indexName, String createSql) {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + tableName + "' AND INDEX_NAME = '" + indexName + "'",
+                Integer.class);
+            if (count != null && count == 0) {
+                jdbcTemplate.execute(createSql);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to ensure index {} on {}: {}", indexName, tableName, e.getMessage());
         }
     }
 }

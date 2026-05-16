@@ -5,7 +5,10 @@ import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
+import com.paike.scheduler.entity.ScheduleGenerateLog;
+import com.paike.scheduler.entity.ScheduleUnassignedTask;
 import com.paike.scheduler.service.ScheduleCompareService;
+import com.paike.scheduler.service.SchedulePlanExplainService;
 import com.paike.scheduler.service.SchedulePlanService;
 import com.paike.scheduler.service.SemesterService;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +25,7 @@ public class SchedulePlanController {
     private final SchedulePlanService planService;
     private final SemesterService semesterService;
     private final ScheduleCompareService compareService;
+    private final SchedulePlanExplainService explainService;
 
     @GetMapping
     public Result<Page<SchedulePlan>> list(
@@ -96,5 +100,30 @@ public class SchedulePlanController {
     @PostMapping("/{id}/rollback")
     public Result<Map<String, Object>> rollback(@PathVariable Long id) {
         return Result.success("已回滚到该方案", planService.rollbackPlan(id));
+    }
+
+    @GetMapping("/{planId}/logs")
+    public Result<List<ScheduleGenerateLog>> getLogs(
+            @PathVariable Long planId,
+            @RequestParam(required = false) String logLevel,
+            @RequestParam(required = false) String logType,
+            @RequestParam(required = false) Long teachingTaskId
+    ) {
+        return Result.success(explainService.listPlanLogs(planId, logLevel, logType, teachingTaskId));
+    }
+
+    @GetMapping("/{planId}/tasks/{taskId}/logs")
+    public Result<List<ScheduleGenerateLog>> getTaskLogs(@PathVariable Long planId, @PathVariable Long taskId) {
+        return Result.success(explainService.listTaskLogs(planId, taskId));
+    }
+
+    @GetMapping("/{planId}/unassigned-tasks")
+    public Result<List<ScheduleUnassignedTask>> getUnassignedTasks(@PathVariable Long planId) {
+        return Result.success(explainService.listUnassignedTasks(planId));
+    }
+
+    @GetMapping("/{planId}/unassigned-summary")
+    public Result<List<Map<String, Object>>> getUnassignedSummary(@PathVariable Long planId) {
+        return Result.success(explainService.summarizeUnassignedTasks(planId));
     }
 }

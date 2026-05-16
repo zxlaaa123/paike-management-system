@@ -38,6 +38,7 @@ public class V3ScheduleGenerateService {
     private final CourseMapper courseMapper;
     private final ClassInfoMapper classInfoMapper;
     private final TeacherUnavailableTimeMapper unavailableTimeMapper;
+    private final SchedulePlanExplainService explainService;
 
     @Transactional(rollbackFor = Exception.class)
     public ScheduleGenerateResult generate(ScheduleGenerateRequest request) {
@@ -72,6 +73,7 @@ public class V3ScheduleGenerateService {
         plan.setCreatedAt(LocalDateTime.now());
         plan.setUpdatedAt(LocalDateTime.now());
         planMapper.insert(plan);
+        explainService.clearPlanArtifacts(plan.getId());
 
         GenerationContext context = new GenerationContext(
                 semesterId,
@@ -83,13 +85,47 @@ public class V3ScheduleGenerateService {
                 classrooms
         );
 
+        StepCounter stepCounter = new StepCounter();
+        explainService.appendGenerateLog(
+                plan.getId(),
+                semesterId,
+                null,
+                "INFO",
+                "START_GENERATE",
+                "开始生成" + plan.getName(),
+                stepCounter.next());
+        explainService.appendGenerateLog(
+                plan.getId(),
+                semesterId,
+                null,
+                "INFO",
+                "LOAD_TASK",
+                "读取当前学期教学任务，共 " + tasks.size() + " 条",
+                stepCounter.next());
+
         List<SchedulePlanItem> generatedItems = generatePlanItems(plan, tasks, context);
         for (SchedulePlanItem item : generatedItems) {
             planItemMapper.insert(item);
         }
 
         plan.setScheduledCount(generatedItems.size());
+        explainService.appendGenerateLog(
+                plan.getId(),
+                semesterId,
+                null,
+                "INFO",
+                "GENERATE_SCORE",
+                "开始生成评分，当前已排 " + plan.getScheduledCount() + " 条，未排 " + plan.getUnscheduledCount() + " 条",
+                stepCounter.next());
         scoreService.rescore(plan);
+        explainService.appendGenerateLog(
+                plan.getId(),
+                semesterId,
+                null,
+                "INFO",
+                "FINISH_GENERATE",
+                "方案生成完成，总分 " + plan.getTotalScore() + "，冲突数 " + plan.getConflictCount(),
+                stepCounter.next());
 
         return toResult(plan);
     }
@@ -160,6 +196,7 @@ public class V3ScheduleGenerateService {
         }
         for (SchedulePlan draft : existingDrafts) {
             planItemMapper.delete(new LambdaQueryWrapper<SchedulePlanItem>().eq(SchedulePlanItem::getPlanId, draft.getId()));
+            explainService.clearPlanArtifacts(draft.getId());
             planMapper.deleteById(draft.getId());
         }
     }
@@ -236,30 +273,73 @@ public class V3ScheduleGenerateService {
         List<TeachingTask> sortedTasks = sortTasks(tasks, context.unavailableCount());
         List<SchedulePlanItem> generatedItems = new ArrayList<>();
         int unscheduledCount = 0;
+        StepCounter stepCounter = new StepCounter(2);
 
         for (TeachingTask task : sortedTasks) {
             int requiredSlots = Math.max(1, (int) Math.ceil((task.getWeeklyHours() == null ? 0 : task.getWeeklyHours()) / 2.0));
             Set<Integer> usedDays = new HashSet<>();
             String courseType = getCourseType(task.getCourseId());
             int studentCount = getClassStudentCount(task.getClassId());
+            String taskLabel = taskLabel(task);
             List<Classroom> matchedRooms = context.classrooms().stream()
                     .filter(room -> room.getCapacity() != null && room.getCapacity() >= studentCount)
                     .filter(room -> isRoomTypeMatched(courseType, room.getRoomType()))
                     .sorted(Comparator.comparingInt(Classroom::getCapacity))
                     .toList();
 
+            explainService.appendGenerateLog(
+                    plan.getId(),
+                    plan.getSemesterId(),
+                    task.getId(),
+                    "INFO",
+                    "CHECK_CLASSROOM",
+                    "教学任务：" + taskLabel + " 可用候选教室 " + matchedRooms.size() + " 个",
+                    stepCounter.next());
+
             if (matchedRooms.isEmpty()) {
                 unscheduledCount += requiredSlots;
+                UnassignedReason reason = buildNoMatchedRoomReason(task, studentCount, courseType, context.classrooms());
+                explainService.saveUnassignedTask(plan.getId(), plan.getSemesterId(), task.getId(),
+                        reason.reasonCode(), reason.reasonMessage(), reason.suggestion());
+                explainService.appendGenerateLog(
+                        plan.getId(),
+                        plan.getSemesterId(),
+                        task.getId(),
+                        "ERROR",
+                        "ASSIGN_FAILED",
+                        "教学任务：" + taskLabel + " 排课失败，原因：" + reason.reasonMessage(),
+                        stepCounter.next());
                 continue;
             }
 
             for (int occurrence = 0; occurrence < requiredSlots; occurrence++) {
-                Candidate candidate = findBestCandidate(task, usedDays, matchedRooms, generatedItems, context);
+                Candidate candidate = findBestCandidate(plan, task, usedDays, matchedRooms, generatedItems, context, stepCounter);
                 if (candidate == null) {
                     unscheduledCount++;
+                    UnassignedReason reason = analyzeUnassignedReason(task, usedDays, matchedRooms, generatedItems, context);
+                    explainService.saveUnassignedTask(plan.getId(), plan.getSemesterId(), task.getId(),
+                            reason.reasonCode(), reason.reasonMessage(), reason.suggestion());
+                    explainService.appendGenerateLog(
+                            plan.getId(),
+                            plan.getSemesterId(),
+                            task.getId(),
+                            "ERROR",
+                            "ASSIGN_FAILED",
+                            "教学任务：" + taskLabel + " 排课失败，原因：" + reason.reasonMessage(),
+                            stepCounter.next());
                     continue;
                 }
 
+                explainService.appendGenerateLog(
+                        plan.getId(),
+                        plan.getSemesterId(),
+                        task.getId(),
+                        "INFO",
+                        "ASSIGN_SUCCESS",
+                        "教学任务：" + taskLabel + " 排课成功，安排至"
+                                + candidate.slot().getTimeLabel() + "，教室 " + candidate.room().getRoomName()
+                                + "，候选分 " + String.format(Locale.ROOT, "%.2f", candidate.score()),
+                        stepCounter.next());
                 generatedItems.add(toPlanItem(plan.getId(), task, candidate.slot(), candidate.room()));
                 usedDays.add(candidate.slot().getDayOfWeek());
             }
@@ -274,39 +354,57 @@ public class V3ScheduleGenerateService {
     }
 
     private Candidate findBestCandidate(
+            SchedulePlan plan,
             TeachingTask task,
             Set<Integer> usedDays,
             List<Classroom> matchedRooms,
             List<SchedulePlanItem> generatedItems,
-            GenerationContext context
+            GenerationContext context,
+            StepCounter stepCounter
     ) {
         int teacherMaxDailySlots = ruleService.getIntValue("TEACHER_MAX_DAILY_SLOTS");
         int classMaxDailySlots = ruleService.getIntValue("CLASS_MAX_DAILY_SLOTS");
         boolean allowSameCourseSameDay = ruleService.getBoolValue("ALLOW_SAME_COURSE_SAME_DAY");
 
         Candidate best = null;
+        String taskLabel = taskLabel(task);
         for (TimeSlot slot : context.timeSlots()) {
             if (context.unavailableKeySet().contains(task.getTeacherId() + "_" + slot.getId())) {
+                explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_TEACHER",
+                        "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，教师禁排", stepCounter.next());
                 continue;
             }
             if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), teacherMaxDailySlots, generatedItems)) {
+                explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_TEACHER",
+                        "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，教师日排课上限", stepCounter.next());
                 continue;
             }
             if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), classMaxDailySlots, generatedItems)) {
+                explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_CLASS",
+                        "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，班级日排课上限", stepCounter.next());
                 continue;
             }
             if (!allowSameCourseSameDay && usedDays.contains(slot.getDayOfWeek())) {
+                explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_CLASS",
+                        "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，同任务已占用同一天", stepCounter.next());
                 continue;
             }
             if (!allowSameCourseSameDay && hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), generatedItems)) {
+                explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_CLASS",
+                        "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，同班同课程同日限制", stepCounter.next());
                 continue;
             }
 
             for (Classroom room : matchedRooms) {
                 if (hasConflict(task, slot, room, generatedItems)) {
+                    explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_CLASSROOM",
+                            "教学任务：" + taskLabel + " 跳过候选 " + slot.getTimeLabel() + " / " + room.getRoomName() + "，资源冲突", stepCounter.next());
                     continue;
                 }
                 double score = scoreCandidate(task, slot, room, generatedItems, context);
+                explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "INFO", "CALCULATE_SCORE",
+                        "候选位置：" + slot.getTimeLabel() + "，教室 " + room.getRoomName() + "，得分 " + String.format(Locale.ROOT, "%.2f", score),
+                        stepCounter.next());
                 if (best == null || score > best.score()) {
                     best = new Candidate(slot, room, score);
                 }
@@ -525,5 +623,140 @@ public class V3ScheduleGenerateService {
     }
 
     private record Candidate(TimeSlot slot, Classroom room, double score) {
+    }
+
+    private record UnassignedReason(String reasonCode, String reasonMessage, String suggestion) {
+    }
+
+    private static final class StepCounter {
+        private int value;
+
+        private StepCounter() {
+            this(0);
+        }
+
+        private StepCounter(int start) {
+            this.value = start;
+        }
+
+        private int next() {
+            value += 1;
+            return value;
+        }
+    }
+
+    private UnassignedReason buildNoMatchedRoomReason(TeachingTask task, int studentCount, String courseType, List<Classroom> allRooms) {
+        boolean hasCourseTypeRoom = allRooms.stream().anyMatch(room -> isRoomTypeMatched(courseType, room.getRoomType()));
+        if (!hasCourseTypeRoom) {
+            return new UnassignedReason(
+                    "CLASSROOM_TYPE_MISMATCH",
+                    "当前学期没有满足课程类型要求的教室资源",
+                    "请补充匹配类型教室，或调整课程的教室类型要求");
+        }
+        return new UnassignedReason(
+                "CLASSROOM_CAPACITY_NOT_ENOUGH",
+                "满足课程类型的教室容量不足，班级人数为 " + studentCount,
+                "请调整到更大容量教室，或拆分教学班");
+    }
+
+    private UnassignedReason analyzeUnassignedReason(
+            TeachingTask task,
+            Set<Integer> usedDays,
+            List<Classroom> matchedRooms,
+            List<SchedulePlanItem> generatedItems,
+            GenerationContext context
+    ) {
+        int teacherMaxDailySlots = ruleService.getIntValue("TEACHER_MAX_DAILY_SLOTS");
+        int classMaxDailySlots = ruleService.getIntValue("CLASS_MAX_DAILY_SLOTS");
+        boolean allowSameCourseSameDay = ruleService.getBoolValue("ALLOW_SAME_COURSE_SAME_DAY");
+
+        boolean teacherUnavailable = false;
+        boolean teacherConflict = false;
+        boolean classConflict = false;
+        boolean roomConflict = false;
+        boolean classDayLimited = false;
+
+        for (TimeSlot slot : context.timeSlots()) {
+            if (context.unavailableKeySet().contains(task.getTeacherId() + "_" + slot.getId())) {
+                teacherUnavailable = true;
+                continue;
+            }
+            if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), teacherMaxDailySlots, generatedItems)) {
+                teacherConflict = true;
+                continue;
+            }
+            if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), classMaxDailySlots, generatedItems)) {
+                classDayLimited = true;
+                continue;
+            }
+            if (!allowSameCourseSameDay && usedDays.contains(slot.getDayOfWeek())) {
+                classConflict = true;
+                continue;
+            }
+            if (!allowSameCourseSameDay && hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), generatedItems)) {
+                classConflict = true;
+                continue;
+            }
+
+            boolean anyRoomAvailable = false;
+            for (Classroom room : matchedRooms) {
+                if (!hasConflict(task, slot, room, generatedItems)) {
+                    anyRoomAvailable = true;
+                    break;
+                }
+                roomConflict = true;
+                teacherConflict = teacherConflict || generatedItems.stream().anyMatch(item ->
+                        Objects.equals(item.getTeacherId(), task.getTeacherId())
+                                && Objects.equals(item.getWeekday(), slot.getDayOfWeek())
+                                && Objects.equals(item.getStartPeriod(), slotToStartPeriod(slot)));
+                classConflict = classConflict || generatedItems.stream().anyMatch(item ->
+                        Objects.equals(item.getClassId(), task.getClassId())
+                                && Objects.equals(item.getWeekday(), slot.getDayOfWeek())
+                                && Objects.equals(item.getStartPeriod(), slotToStartPeriod(slot)));
+            }
+            if (anyRoomAvailable) {
+                return new UnassignedReason(
+                        "UNKNOWN_REASON",
+                        "存在候选位置但未成功写入，请检查排课过程日志",
+                        "查看该教学任务的生成日志，确认具体筛选步骤");
+            }
+        }
+
+        if (teacherUnavailable) {
+            return new UnassignedReason(
+                    "TEACHER_UNAVAILABLE",
+                    "教师可用时间被禁排规则完全覆盖",
+                    "请减少教师禁排时间，或调整任课教师");
+        }
+        if (teacherConflict) {
+            return new UnassignedReason(
+                    "TEACHER_TIME_CONFLICT",
+                    "教师候选时间均被已有排课占用或超过日上限",
+                    "请调整教师已有课程，或放宽教师每日排课限制");
+        }
+        if (classConflict || classDayLimited) {
+            return new UnassignedReason(
+                    "CLASS_TIME_CONFLICT",
+                    "班级候选时间均被已有课程占用，或超过班级日排课限制",
+                    "请调整班级已有课表，或放宽班级每日排课限制");
+        }
+        if (roomConflict) {
+            return new UnassignedReason(
+                    "NO_AVAILABLE_CLASSROOM",
+                    "候选时间段内没有空闲教室可供安排",
+                    "请释放教室资源，或增加同类型教室");
+        }
+        return new UnassignedReason(
+                "PERIOD_NOT_ENOUGH",
+                "当前可用节次不足以安排该教学任务",
+                "请新增时间段，或降低同课程同日/日排课限制");
+    }
+
+    private String taskLabel(TeachingTask task) {
+        Course course = courseMapper.selectById(task.getCourseId());
+        ClassInfo classInfo = classInfoMapper.selectById(task.getClassId());
+        String courseName = course != null ? course.getCourseName() : "未知课程";
+        String className = classInfo != null ? classInfo.getClassName() : "未知班级";
+        return courseName + "-" + className;
     }
 }
