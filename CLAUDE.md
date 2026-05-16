@@ -1,3 +1,27 @@
+# Global PowerShell Rules (Windows + pwsh 7+)
+
+## Shell Preference
+- **禁止调用 Bash Tool。** 需要执行 shell 命令时，只能使用 PowerShell Tool（pwsh.exe）。这是工具层的硬约束，不是命令风格偏好。
+- 不要把 Unix 惯用语法（`ls | head`、`grep`、`curl`、`find`、`cat`）作为选 Bash Tool 的理由——改用对应的 PowerShell cmdlet（`Get-ChildItem | Select-Object -First N`、`Select-String`、`Invoke-WebRequest`、`Get-ChildItem -Recurse`、`Get-Content`）。
+- 列文件用 Glob，读文件用 Read，搜内容用 Grep——dedicated tool 优先级仍然高于 shell。
+- 只有用户明确说"用 bash"或"sh"时，才可以考虑 Bash Tool；即便如此也优先 PowerShell 等价写法。
+- 路径一律使用 Windows 原生风格（C:\ 或 $env:USERPROFILE），避免 / 路径。
+
+## PowerShell 编码规范
+- 函数/命令动词必须来自 Get-Verb（Get-、Set-、New-、Remove- 等）。
+- 函数名/类名用 PascalCase，变量/参数用 camelCase。
+- 优先使用 Write-Verbose / Write-Debug / Write-Information，**严禁随意使用 Write-Host**（除非必须格式化控制台输出）。
+- 模块结构严格遵循：src/Public、src/Private、src/Classes + 静态 dot-source + Export-ModuleMember。
+- 所有脚本必须加上 #Requires -Version 7.0。
+- 错误处理统一使用 try/catch + ErrorAction Stop + Write-Error。
+- 测试必须用 Pester，静态检查用 PSScriptAnalyzer。
+
+## 常用指令
+- 每次生成代码后自动运行 PSScriptAnalyzer 检查。
+- 优先使用原生 cmdlet（Get-Command、Invoke-WebRequest、ConvertFrom-Json 等），不要自己造轮子。
+
+---
+
 # CLAUDE.md
 
 ## 0. 行为准则
@@ -87,4 +111,3 @@
 - 用 `browser_run_code_unsafe` 执行 `page.$$eval()` 检查元素结构和文本
 - 下拉列表有多个同名选项时，用搜索过滤或 `.first()` 选中
 - 前端测试每个页面操作后需要足够 wait 时间（500ms-1000ms）
-

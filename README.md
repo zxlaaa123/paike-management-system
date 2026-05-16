@@ -2,7 +2,63 @@
 
 基于 `Spring Boot 3 + Vue 3` 的高校排课管理系统。
 
-当前仓库已经完成 `V1`、`V2` 两个阶段的主线功能，以及 `V3` 阶段 1-6 的开发。覆盖基础数据维护、教学任务管理、手动排课、自动排课、未排任务追踪、冲突报告、课表评分与课表导出、学期管理、多策略排课计划、计划对比与应用回滚等核心流程。
+当前仓库已经完成 `V1`、`V2` 两个阶段的主线功能，以及 `V3` 阶段 1-7 的开发。覆盖基础数据维护、教学任务管理、手动排课、自动排课、未排任务追踪、冲突报告、课表评分与课表导出、学期管理、多策略排课计划、计划对比与应用回滚、排课生成日志、未排原因分析、方案明细手动调整等核心流程。
+
+## 新开窗口快速接手
+
+如果你是新开一个 AI / 开发窗口，建议先看这一节。
+
+### 当前状态
+
+- `V1`、`V2` 已完成
+- `V3` 阶段 `1-7` 已完成
+- 当前 V3 主链路已经包括：
+
+```text
+学期管理
+-> 多策略生成排课方案
+-> 方案评分 / 对比
+-> 方案应用 / 回滚
+-> 排课生成日志 / 未排原因
+-> 方案明细手动调整 / 调整记录 / 调整后重评分
+```
+
+### 推荐阅读顺序
+
+1. 本 README
+2. [docs/v3/07_V3开发阶段任务.md](docs/v3/07_V3开发阶段任务.md)
+3. [docs/v3/04_V3接口设计.md](docs/v3/04_V3接口设计.md)
+4. [docs/v3/03_V3数据库设计.md](docs/v3/03_V3数据库设计.md)
+5. [docs/v3/08_V3测试与验收清单.md](docs/v3/08_V3测试与验收清单.md)
+
+### 关键代码入口
+
+- 后端：
+  - `backend/src/main/java/com/paike/scheduler/service/V3ScheduleGenerateService.java`
+  - `backend/src/main/java/com/paike/scheduler/service/SchedulePlanService.java`
+  - `backend/src/main/java/com/paike/scheduler/service/ScheduleScoreService.java`
+- 前端：
+  - `frontend/src/views/schedule/ScheduleGenerateView.vue`
+  - `frontend/src/views/schedule/SchedulePlanView.vue`
+  - `frontend/src/views/schedule/SchedulePlanDetailView.vue`
+  - `frontend/src/views/schedule/ScheduleCompareView.vue`
+
+### 本地启动最短路径
+
+```bash
+# backend
+cd backend
+mvn spring-boot:run
+
+# frontend
+cd frontend
+npm install
+npm run dev
+```
+
+- 后端：`http://127.0.0.1:8090`
+- 前端：`http://127.0.0.1:5173`
+- 默认账号：`admin / 123456`
 
 ## 项目概览
 
@@ -17,6 +73,8 @@
 -> 冲突检测与未排任务追踪
 -> 课表查询与导出
 -> 课表评分与优化建议
+-> 学期下多策略方案生成 / 对比 / 应用 / 回滚
+-> 排课日志、未排原因与手动调整
 ```
 
 ## 阶段状态
@@ -45,9 +103,9 @@
 - 课表评分报告
 - Excel 课表导出
 
-### V3 阶段 1-6 已完成
+### V3 阶段 1-7 已完成
 
-`V3` 在 V2 基础上引入"多策略排课计划"能力，阶段 1-6 已完成：
+`V3` 在 V2 基础上引入“多策略排课计划 + 可解释排课 + 可手动调整”能力，阶段 1-7 已完成：
 
 - 学期管理：学期 CRUD、当前学期切换、数据按学期隔离
 - 排课计划：一次生成多个策略方案，支持查看、对比、应用、回滚
@@ -55,8 +113,11 @@
 - 评分详情：12 项指标（6 硬约束 + 6 软约束）逐项展示扣分明细
 - 计划对比：多方案横向对比表格，推荐最优方案
 - 计划应用/回滚：将计划写入正式排课表、支持回滚（阶段 6，含 E2E 测试）
+- 排课日志：记录开始生成、候选筛选、评分计算、成功/失败等关键步骤
+- 未排原因：记录 `reason_code`、`reason_message`、`suggestion`
+- 手动调整：支持方案明细调整、冲突重检、重新评分、调整日志落库
 
-### V2 算法定位
+### 自动排课算法定位
 
 当前自动排课采用的是`规则驱动 + 启发式排序`方案，目标是先满足业务可用性和解释性，而不是引入复杂求解器。
 
@@ -238,7 +299,7 @@ POST /api/v3/schedule-generate/generate
 │  │  │  ├─ SecurityConfig.java               # Spring Security 配置
 │  │  │  ├─ SemesterSchemaInitializer.java    # V3 数据库迁移初始化
 │  │  │  └─ WebMvcConfig.java                 # Web MVC 配置
-│  │  ├─ controller/                          # REST 控制器（21 个 + vo/）
+│  │  ├─ controller/                          # REST 控制器（含 V1/V2/V3）
 │  │  │  ├─ AuthController                    # 登录/登出/当前用户
 │  │  │  ├─ HealthController                  # 健康检查
 │  │  │  ├─ TeacherController                 # 教师管理
@@ -255,9 +316,11 @@ POST /api/v3/schedule-generate/generate
 │  │  │  ├─ ScheduleConflictReportController  # V2 冲突报告
 │  │  │  ├─ ScheduleScoreReportController     # V2 评分报告
 │  │  │  ├─ TimetableController               # 课表查询 + Excel 导出
-│  │  │  ├─ SemesterController               # V3 学期管理
+│  │  │  ├─ SemesterController                # V3 学期管理
 │  │  │  ├─ SchedulePlanController            # V3 排课计划 CRUD、对比、应用、回滚
 │  │  │  ├─ ScheduleGenerateController        # V3 排课生成
+│  │  │  ├─ SchedulePlanItemController        # V3 方案明细调整
+│  │  │  ├─ ScheduleAdjustLogController       # V3 手动调整日志
 │  │  │  ├─ ScheduleRuleWeightController      # V3 规则权重管理
 │  │  │  └─ ScheduleScoreController           # V3 评分详情
 │  │  ├─ entity/                              # 实体模型（20 个）
@@ -415,7 +478,7 @@ POST /api/v3/schedule-generate/generate
 | `/schedule-score` | 课表评分 | V2 评分报告 |
 | `/v3/schedule-generate` | 排课生成 | V3 多策略方案生成 |
 | `/v3/schedule-plans` | 排课计划 | V3 计划列表 |
-| `/v3/schedule-plans/:id` | 计划详情 | V3 计划明细 + 评分 |
+| `/v3/schedule-plans/:id` | 计划详情 | V3 计划明细 + 评分 + 生成日志 + 未排任务 + 调整记录 |
 | `/v3/schedule-rules` | 规则权重 | V3 策略权重配置 |
 | `/v3/schedule-compare` | 计划对比 | V3 多方案对比 |
 | `/timetable/class` | 班级课表 | 班级视角课表 |
@@ -446,10 +509,14 @@ POST /api/v3/schedule-generate/generate
 | CRUD | `/api/v3/schedule-plans` | V3 排课计划管理 |
 | POST | `/api/v3/schedule-generate/generate` | V3 多策略排课生成 |
 | CRUD | `/api/v3/schedule-rule-weights` | V3 规则权重管理 |
-| GET | `/api/v3/schedule-score` | V3 评分详情 |
+| GET | `/api/v3/schedule-plans/{id}/score-*` | V3 评分详情 / 摘要 |
 | POST | `/api/v3/schedule-plans/compare` | V3 计划对比 |
 | POST | `/api/v3/schedule-plans/{id}/apply` | V3 应用计划 |
 | POST | `/api/v3/schedule-plans/{id}/rollback` | V3 回滚计划 |
+| GET | `/api/v3/schedule-plans/{id}/logs` | V3 方案生成日志 |
+| GET | `/api/v3/schedule-plans/{id}/unassigned-tasks` | V3 未排任务与原因 |
+| PUT | `/api/v3/schedule-plan-items/{itemId}/adjust` | V3 方案明细手动调整 |
+| GET | `/api/v3/schedule-adjust-logs` | V3 调整日志列表 |
 
 ## 环境要求
 
@@ -587,12 +654,22 @@ npx playwright test
 
 **运行测试前确保**：后端已启动（`:8090`），前端已启动（`:5173`），数据库已初始化。
 
+> 说明：`tests/stage6/stage7/stage9` 的文件名是历史测试命名，不等同于当前 `V3` 阶段编号。
+
 ## 文档导航
 
 如果你想按阶段理解项目，建议优先阅读：
 
 - [docs/v1/V1_README.md](docs/v1/V1_README.md) — V1 阶段总览
 - [docs/v2/V2_README.md](docs/v2/V2_README.md) — V2 阶段总览
+- [docs/v3/07_V3开发阶段任务.md](docs/v3/07_V3开发阶段任务.md) — V3 当前开发主线
+
+### 当前继续开发 V3 的推荐阅读顺序
+
+1. [docs/v3/07_V3开发阶段任务.md](docs/v3/07_V3开发阶段任务.md)
+2. [docs/v3/04_V3接口设计.md](docs/v3/04_V3接口设计.md)
+3. [docs/v3/03_V3数据库设计.md](docs/v3/03_V3数据库设计.md)
+4. [docs/v3/08_V3测试与验收清单.md](docs/v3/08_V3测试与验收清单.md)
 
 ### V1 文档（`docs/v1/`）
 
