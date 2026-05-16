@@ -117,7 +117,7 @@ public class ScheduleStatisticsService {
                         .eq(Classroom::getStatus, 1)
                         .eq(Classroom::getDeleted, 0));
 
-        List<Map<String, Object>> result = new LinkedHashMap<>();
+        List<Map<String, Object>> result = new ArrayList<>();
         for (Classroom room : allRooms) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("roomId", room.getId());
@@ -193,6 +193,7 @@ public class ScheduleStatisticsService {
 
             Map<String, Object> row = classMap.get(classId);
             row.put("totalPeriods", (int) row.get("totalPeriods") + periods);
+            @SuppressWarnings("unchecked")
             Map<Integer, Long> dailyPeriods = (Map<Integer, Long>) row.get("dailyPeriods");
             dailyPeriods.merge(weekday, (long) periods, Long::sum);
         }
@@ -202,13 +203,13 @@ public class ScheduleStatisticsService {
             Long classId = entry.getKey();
             Map<String, Object> row = entry.getValue();
 
-            ClassInfo classInfo = classCache.computeIfAbsent(classId, id -> classMapper.selectById(id));
+            ClassInfo classInfo = classCache.computeIfAbsent(classId, id -> classInfoMapper.selectById(id));
             row.put("className", classInfo != null ? classInfo.getClassName() : "未知");
             row.put("studentCount", classInfo != null ? classInfo.getStudentCount() : 0);
 
+            @SuppressWarnings("unchecked")
             Map<Integer, Long> dailyPeriods = (Map<Integer, Long>) row.get("dailyPeriods");
             int total = (int) row.get("totalPeriods");
-            double avgDays = dailyPeriods.isEmpty() ? 0 : (double) total / dailyPeriods.size();
 
             // 均衡分 = 1 - (标准差 / 平均)，越接近 1 越均衡
             double balanceScore = calculateBalanceScore(dailyPeriods, total);
