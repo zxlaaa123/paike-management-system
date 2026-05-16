@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { compareSchedulePlans, applySchedulePlan, getSchedulePlanList, type SchedulePlan } from '../../api/schedulePlan'
@@ -19,18 +19,6 @@ const selectedPlanIds = ref<number[]>([])
 const compareResult = ref<any>(null)
 
 const hasCurrentSemester = computed(() => currentSemester.value !== null)
-
-// 对比表格列定义
-const compareColumns = [
-  { prop: 'planName', label: '方案名称', minWidth: 160 },
-  { prop: 'strategyName', label: '策略', width: 100 },
-  { prop: 'totalScore', label: '总分', width: 80 },
-  { prop: 'scheduledCount', label: '已排', width: 70 },
-  { prop: 'unscheduledCount', label: '未排', width: 70 },
-  { prop: 'conflictCount', label: '冲突', width: 70 },
-  { prop: 'hardViolationCount', label: '硬约束违规', width: 100 },
-  { prop: 'softViolationCount', label: '软约束扣分', width: 100 },
-]
 
 // 过滤可选方案（排除已废弃的）
 const availablePlans = computed(() =>

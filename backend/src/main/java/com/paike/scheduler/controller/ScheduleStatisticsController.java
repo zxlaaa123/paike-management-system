@@ -2,6 +2,7 @@ package com.paike.scheduler.controller;
 
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.common.response.Result;
+import com.paike.scheduler.entity.Semester;
 import com.paike.scheduler.service.ScheduleStatisticsService;
 import com.paike.scheduler.service.SemesterService;
 import lombok.RequiredArgsConstructor;
@@ -88,6 +89,10 @@ public class ScheduleStatisticsController {
         if (semesterId != null) {
             return semesterId;
         }
-        return semesterService.getCurrentSemester().getId();
+        Semester semester = semesterService.getCurrentSemester();
+        if (semester == null) {
+            throw new BusinessException("当前未设置学期");
+        }
+        return semester.getId();
     }
 }

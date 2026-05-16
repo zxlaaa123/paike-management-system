@@ -43,6 +43,8 @@ public class ScheduleStatisticsService {
             Long courseId = getCourseId(obj);
             Long classId = getClassId(obj);
             int periods = getPeriodCount(obj);
+            int weekday = getWeekday(obj);
+            if (weekday <= 0 || weekday > 7) continue;
 
             teacherMap.computeIfAbsent(teacherId, k -> {
                 Map<String, Object> row = new LinkedHashMap<>();
@@ -62,7 +64,6 @@ public class ScheduleStatisticsService {
             ((Set<Long>) row.get("courseCount")).add(courseId);
             ((Set<Long>) row.get("classCount")).add(classId);
 
-            int weekday = getWeekday(obj);
             Map<Integer, Long> dailyPeriods = (Map<Integer, Long>) row.get("dailyPeriods");
             dailyPeriods.merge(weekday, (long) periods, Long::sum);
         }
@@ -182,6 +183,7 @@ public class ScheduleStatisticsService {
             Long classId = getClassId(obj);
             int weekday = getWeekday(obj);
             int periods = getPeriodCount(obj);
+            if (weekday <= 0 || weekday > 7) continue;
 
             classMap.computeIfAbsent(classId, k -> {
                 Map<String, Object> row = new LinkedHashMap<>();

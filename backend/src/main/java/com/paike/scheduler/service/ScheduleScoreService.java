@@ -77,6 +77,12 @@ public class ScheduleScoreService {
         }
 
         plan.setTotalScore(normalizeTotalScore(FULL_SCORE.add(totalPenalty)));
+        plan.setConflictCount(context.teacherConflictCount()
+                + context.classConflictCount()
+                + context.roomConflictCount()
+                + context.teacherUnavailableCount()
+                + context.capacityViolationCount()
+                + context.roomTypeMismatchCount());
         planMapper.updateById(plan);
     }
 

@@ -27,6 +27,7 @@ export function getScoreSummary(planId: number) {
     totalScore: number
     hardViolationCount: number
     softViolationCount: number
+    conflictCount: number
     scoreLevel: string
   }>>(`/v3/schedule-plans/${planId}/score-summary`).then((r) => {
     if (!r.data) throw new Error('响应数据为空')
@@ -38,6 +39,7 @@ export function rescore(planId: number) {
   return request.post<ApiResponse<{
     planId: number
     totalScore: number
+    conflictCount: number
     scoreLevel: string
   }>>(`/v3/schedule-plans/${planId}/rescore`).then((r) => {
     if (!r.data) throw new Error('响应数据为空')

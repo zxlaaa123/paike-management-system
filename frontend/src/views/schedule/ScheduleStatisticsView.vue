@@ -118,7 +118,7 @@ function handleTabChange(tab: string) {
 }
 
 function onSemesterChange() {
-  searchForm.planId = undefined
+  searchForm.planId = null
   fetchPlans()
   handleTabChange(activeTab.value)
 }
@@ -179,7 +179,7 @@ onMounted(async () => {
           </el-col>
           <el-col :span="6">
             <el-select v-model="searchForm.planId" placeholder="正式课表（默认）" clearable style="width: 100%" @change="onPlanChange">
-              <el-option label="正式课表" :value="undefined" />
+              <el-option label="正式课表" :value="null" />
               <el-option v-for="p in planList" :key="p.id" :label="p.name" :value="p.id" />
             </el-select>
           </el-col>

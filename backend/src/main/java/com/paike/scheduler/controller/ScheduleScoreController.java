@@ -52,11 +52,14 @@ public class ScheduleScoreController {
     @PostMapping("/{planId}/rescore")
     public Result<Map<String, Object>> rescore(@PathVariable Long planId) {
         SchedulePlan plan = planService.getById(planId);
+        planService.refreshPlanConflictState(planId);
         scoreService.rescore(plan);
-        BigDecimal totalScore = plan.getTotalScore();
+        SchedulePlan refreshed = planService.getById(planId);
+        BigDecimal totalScore = refreshed.getTotalScore();
         return Result.success(Map.of(
                 "planId", planId,
                 "totalScore", totalScore,
+                "conflictCount", refreshed.getConflictCount(),
                 "scoreLevel", getScoreLevel(totalScore)
         ));
     }
