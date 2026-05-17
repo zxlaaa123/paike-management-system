@@ -185,16 +185,14 @@ public class TeacherUnavailableTimeService {
     }
 
     /**
-     * 删除采用逻辑删除，历史数据仍可用于审计和问题排查。
+     * 删除采用逻辑删除（通过 @TableLogic 自动处理），历史数据仍可用于审计和问题排查。
      */
     public void delete(Long id) {
         TeacherUnavailableTime existing = unavailableTimeMapper.selectById(id);
-        if (existing == null || existing.getDeleted() == 1) {
+        if (existing == null) {
             throw new BusinessException("禁排时间记录不存在");
         }
-        existing.setDeleted(1);
-        existing.setUpdateTime(LocalDateTime.now());
-        unavailableTimeMapper.updateById(existing);
+        unavailableTimeMapper.deleteById(id);
     }
 
     /**

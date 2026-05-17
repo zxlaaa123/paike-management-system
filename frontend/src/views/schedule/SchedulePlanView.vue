@@ -219,7 +219,7 @@ onMounted(() => {
         :page-sizes="[10, 20, 50]"
         layout="total, sizes, prev, pager, next, jumper"
         style="margin-top: 16px; justify-content: flex-end"
-        @change="fetchData"
+        @current-change="fetchData" @size-change="fetchData"
       />
     </el-card>
   </div>

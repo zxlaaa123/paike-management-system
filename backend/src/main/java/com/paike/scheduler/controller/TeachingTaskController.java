@@ -72,7 +72,7 @@ public class TeachingTaskController {
     public Result<TeachingTask> getById(@PathVariable Long id) {
         TeachingTask task = teachingTaskMapper.selectById(id);
         if (task == null || task.getDeleted() == 1) {
-            return Result.fail(404, "教学任务不存在");
+            throw new BusinessException(404, "教学任务不存在");
         }
         fillTaskRelations(List.of(task));
         return Result.success(task);
@@ -83,23 +83,23 @@ public class TeachingTaskController {
         // 校验课程是否存在
         Course course = courseMapper.selectById(form.getCourseId());
         if (course == null || course.getDeleted() == 1) {
-            return Result.fail(400, "所选课程不存在");
+            throw new BusinessException(400, "所选课程不存在");
         }
         // 校验教师是否存在且启用
         Teacher teacher = teacherMapper.selectById(form.getTeacherId());
         if (teacher == null || teacher.getDeleted() == 1) {
-            return Result.fail(400, "所选教师不存在");
+            throw new BusinessException(400, "所选教师不存在");
         }
         if (teacher.getStatus() != 1) {
-            return Result.fail(400, "所选教师已停用，无法创建教学任务");
+            throw new BusinessException(400, "所选教师已停用，无法创建教学任务");
         }
         // 校验班级是否存在且启用
         ClassInfo classInfo = classInfoMapper.selectById(form.getClassId());
         if (classInfo == null || classInfo.getDeleted() == 1) {
-            return Result.fail(400, "所选班级不存在");
+            throw new BusinessException(400, "所选班级不存在");
         }
         if (classInfo.getStatus() != 1) {
-            return Result.fail(400, "所选班级已停用，无法创建教学任务");
+            throw new BusinessException(400, "所选班级已停用，无法创建教学任务");
         }
 
         TeachingTask task = new TeachingTask();
@@ -127,28 +127,28 @@ public class TeachingTaskController {
     public Result<TeachingTask> update(@PathVariable Long id, @Valid @RequestBody TaskForm form) {
         TeachingTask task = teachingTaskMapper.selectById(id);
         if (task == null || task.getDeleted() == 1) {
-            return Result.fail(404, "教学任务不存在");
+            throw new BusinessException(404, "教学任务不存在");
         }
         // 校验课程是否存在
         Course course = courseMapper.selectById(form.getCourseId());
         if (course == null || course.getDeleted() == 1) {
-            return Result.fail(400, "所选课程不存在");
+            throw new BusinessException(400, "所选课程不存在");
         }
         // 校验教师是否存在且启用
         Teacher teacher = teacherMapper.selectById(form.getTeacherId());
         if (teacher == null || teacher.getDeleted() == 1) {
-            return Result.fail(400, "所选教师不存在");
+            throw new BusinessException(400, "所选教师不存在");
         }
         if (teacher.getStatus() != 1) {
-            return Result.fail(400, "所选教师已停用，无法创建教学任务");
+            throw new BusinessException(400, "所选教师已停用，无法创建教学任务");
         }
         // 校验班级是否存在且启用
         ClassInfo classInfo = classInfoMapper.selectById(form.getClassId());
         if (classInfo == null || classInfo.getDeleted() == 1) {
-            return Result.fail(400, "所选班级不存在");
+            throw new BusinessException(400, "所选班级不存在");
         }
         if (classInfo.getStatus() != 1) {
-            return Result.fail(400, "所选班级已停用，无法创建教学任务");
+            throw new BusinessException(400, "所选班级已停用，无法创建教学任务");
         }
 
         task.setCourseId(form.getCourseId());
@@ -176,7 +176,7 @@ public class TeachingTaskController {
     public Result<Void> delete(@PathVariable Long id) {
         TeachingTask task = teachingTaskMapper.selectById(id);
         if (task == null || task.getDeleted() == 1) {
-            return Result.fail(404, "教学任务不存在");
+            throw new BusinessException(404, "教学任务不存在");
         }
         teachingTaskMapper.deleteById(id);
         return Result.success("删除成功", null);

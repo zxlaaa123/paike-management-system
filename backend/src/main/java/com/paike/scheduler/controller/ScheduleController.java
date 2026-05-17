@@ -76,7 +76,7 @@ public class ScheduleController {
     public Result<Schedule> getById(@PathVariable Long id) {
         Schedule schedule = scheduleMapper.selectById(id);
         if (schedule == null || schedule.getDeleted() == 1) {
-            return Result.fail(404, "排课记录不存在");
+            throw new BusinessException(404, "排课记录不存在");
         }
         fillRelation(schedule);
         return Result.success(schedule);
@@ -115,7 +115,7 @@ public class ScheduleController {
     public Result<Void> delete(@PathVariable Long id) {
         Schedule schedule = scheduleMapper.selectById(id);
         if (schedule == null || schedule.getDeleted() == 1) {
-            return Result.fail(404, "排课记录不存在");
+            throw new BusinessException(404, "排课记录不存在");
         }
         scheduleMapper.deleteById(id);
         return Result.success("删除成功", null);

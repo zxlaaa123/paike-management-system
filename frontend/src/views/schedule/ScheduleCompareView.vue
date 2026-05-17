@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
-import { compareSchedulePlans, applySchedulePlan, getSchedulePlanList, type SchedulePlan } from '../../api/schedulePlan'
+import { compareSchedulePlans, applySchedulePlan, getSchedulePlanList, type ComparePlan, type CompareResult, type SchedulePlan } from '../../api/schedulePlan'
 import { getCurrentSemester, getAllSemesters, type Semester } from '../../api/semester'
 import { strategyText } from '../../utils/status'
 
@@ -17,7 +17,7 @@ const semesterList = ref<Semester[]>([])
 const allPlans = ref<SchedulePlan[]>([])
 
 const selectedPlanIds = ref<number[]>([])
-const compareResult = ref<any>(null)
+const compareResult = ref<CompareResult | null>(null)
 
 const hasCurrentSemester = computed(() => currentSemester.value !== null)
 
@@ -66,7 +66,7 @@ async function handleCompare() {
   }
 }
 
-async function handleApply(row: any) {
+async function handleApply(row: ComparePlan) {
   if (row.status === 'ABANDONED') {
     ElMessage.warning('已废弃方案不能应用')
     return
@@ -104,11 +104,11 @@ async function handleApply(row: any) {
   }
 }
 
-function isBest(row: any): boolean {
+function isBest(row: ComparePlan): boolean {
   return compareResult.value?.bestPlanId === row.planId
 }
 
-function rowClass({ row }: { row: any }): string {
+function rowClass({ row }: { row: ComparePlan }): string {
   if (isBest(row)) return 'row-best'
   if (row.conflictCount > 0) return 'row-conflict'
   if (row.unscheduledCount > 0) return 'row-warning'

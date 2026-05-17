@@ -3,6 +3,8 @@ package com.paike.scheduler.common.exception;
 import com.paike.scheduler.common.response.Result;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
@@ -17,43 +19,45 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
-    public Result<Void> handleBusinessException(BusinessException ex) {
-        return Result.fail(ex.getCode(), ex.getMessage());
+    public ResponseEntity<Result<Void>> handleBusinessException(BusinessException ex) {
+        HttpStatus status = HttpStatus.resolve(ex.getCode());
+        if (status == null) status = HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(status).body(Result.fail(ex.getCode(), ex.getMessage()));
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
-    public Result<Void> handleValidationException(Exception ex) {
+    public ResponseEntity<Result<Void>> handleValidationException(Exception ex) {
+        String message;
         if (ex instanceof MethodArgumentNotValidException validEx) {
-            String message = validEx.getBindingResult().getFieldErrors()
+            message = validEx.getBindingResult().getFieldErrors()
                 .stream()
                 .map(this::formatFieldError)
                 .collect(Collectors.joining("; "));
-            return Result.fail(400, message);
-        }
-        if (ex instanceof BindException bindEx) {
-            String message = bindEx.getBindingResult().getFieldErrors()
+        } else if (ex instanceof BindException bindEx) {
+            message = bindEx.getBindingResult().getFieldErrors()
                 .stream()
                 .map(this::formatFieldError)
                 .collect(Collectors.joining("; "));
-            return Result.fail(400, message);
+        } else {
+            message = "参数校验失败";
         }
-        return Result.fail(400, "参数校验失败");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Result.fail(400, message));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public Result<Void> handleConstraintViolationException(ConstraintViolationException ex) {
-        return Result.fail(400, ex.getMessage());
+    public ResponseEntity<Result<Void>> handleConstraintViolationException(ConstraintViolationException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Result.fail(400, ex.getMessage()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public Result<Void> handleHttpMessageNotReadableException() {
-        return Result.fail(400, "请求体格式错误");
+    public ResponseEntity<Result<Void>> handleHttpMessageNotReadableException() {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Result.fail(400, "请求体格式错误"));
     }
 
     @ExceptionHandler(Exception.class)
-    public Result<Void> handleException(Exception ex) {
+    public ResponseEntity<Result<Void>> handleException(Exception ex) {
         log.error("系统异常", ex);
-        return Result.fail(500, "系统异常，请联系管理员");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Result.fail(500, "系统异常，请联系管理员"));
     }
 
     private String formatFieldError(FieldError error) {

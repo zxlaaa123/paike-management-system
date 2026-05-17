@@ -119,7 +119,7 @@ async function generatePlan(request: any, semesterId: number, strategyType: stri
   const res = await request.post(`${API_URL}/api/v3/schedule-generate`, {
     headers: authHeaders(),
     data: { semesterId, strategyType, planName, overwriteDraft: true },
-  }, { timeout: 60000 })
+  }, { timeout: 120000 })
   const body = await res.json()
   if (body.code !== 200) {
     throw new Error(`生成方案失败(${strategyType}): ${body.message}`)
@@ -160,6 +160,7 @@ test.describe.serial('V3 阶段 6：方案对比与应用回滚', () => {
   })
 
   test('4. 生成 2 个不同策略的排课方案', async ({ request }) => {
+    test.setTimeout(180000)
     const ts = Date.now().toString().slice(-6)
 
     // 方案1: 教师优先

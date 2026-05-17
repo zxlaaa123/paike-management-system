@@ -139,29 +139,33 @@ export function abandonSchedulePlan(id: number) {
   return request.put(`/v3/schedule-plans/${id}/abandon`)
 }
 
+export interface ComparePlan {
+  planId: number
+  planName: string
+  strategyType: string
+  strategyName: string
+  status: string
+  totalScore: number
+  scheduledCount: number
+  unscheduledCount: number
+  conflictCount: number
+  hardViolationCount: number
+  softViolationCount: number
+  generatedAt: string | null
+}
+
+export interface CompareResult {
+  semesterId: number
+  plans: ComparePlan[]
+  bestPlanId: number
+  summary: string
+}
+
 export function compareSchedulePlans(data: {
   semesterId?: number
   planIds: number[]
 }) {
-  return request.post<ApiResponse<{
-    semesterId: number
-    plans: Array<{
-      planId: number
-      planName: string
-      strategyType: string
-      strategyName: string
-      status: string
-      totalScore: number
-      scheduledCount: number
-      unscheduledCount: number
-      conflictCount: number
-      hardViolationCount: number
-      softViolationCount: number
-      generatedAt: string | null
-    }>
-    bestPlanId: number
-    summary: string
-  }>>('/v3/schedule-plans/compare', data).then((r) => {
+  return request.post<ApiResponse<CompareResult>>('/v3/schedule-plans/compare', data).then((r) => {
     if (!r.data) throw new Error('响应数据为空')
     return r.data.data
   })

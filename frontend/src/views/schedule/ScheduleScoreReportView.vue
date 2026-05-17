@@ -80,12 +80,12 @@ async function fetchLatest() {
 async function fetchHistory() {
   historyLoading.value = true
   try {
-    const params: Record<string, unknown> = {
+    const params = {
       page: pagination.page,
       size: pagination.size,
+      grade: historySearch.grade || undefined,
     }
-    if (historySearch.grade) params.grade = historySearch.grade
-    const res = await getScheduleScoreHistory(params as any)
+    const res = await getScheduleScoreHistory(params)
     historyList.value = res.records
     historyTotal.value = res.total
   } finally {

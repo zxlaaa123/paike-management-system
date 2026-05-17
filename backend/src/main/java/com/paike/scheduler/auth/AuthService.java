@@ -18,8 +18,14 @@ public class AuthService {
     private final SysUserMapper sysUserMapper;
     private final JwtService jwtService;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final RateLimiterService rateLimiterService;
 
     public LoginResponse login(LoginRequest request) {
+        // 登录限流：同一用户名每分钟最多 5 次尝试
+        if (rateLimiterService.isRateLimited("login:" + request.getUsername(), 5, 60_000)) {
+            throw new BusinessException(429, "登录尝试过于频繁，请 1 分钟后再试");
+        }
+
         SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
             .eq(SysUser::getUsername, request.getUsername()));
 

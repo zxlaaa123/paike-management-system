@@ -22,7 +22,7 @@ import {
   type ScheduleUnassignedTask,
   type UnassignedSummaryItem,
 } from '../../api/schedulePlan'
-import { getScoreDetails, getScoreSummary, rescore, type ScheduleScoreDetail } from '../../api/scheduleScore'
+import { getScoreDetails, getScoreSummary, rescore, type ScheduleScoreDetail, type ScoreSummary } from '../../api/scheduleScore'
 import { strategyText } from '../../utils/status'
 
 const route = useRoute()
@@ -40,7 +40,7 @@ const taskLogLoading = ref(false)
 const plan = ref<SchedulePlan | null>(null)
 const items = ref<SchedulePlanItem[]>([])
 const scoreDetails = ref<ScheduleScoreDetail[]>([])
-const scoreSummary = ref<any>(null)
+const scoreSummary = ref<ScoreSummary | null>(null)
 const generateLogs = ref<ScheduleGenerateLog[]>([])
 const unassignedTasks = ref<ScheduleUnassignedTask[]>([])
 const unassignedSummary = ref<UnassignedSummaryItem[]>([])

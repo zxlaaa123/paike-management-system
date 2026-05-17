@@ -1,3 +1,25 @@
+/**
+ * 通用 CRUD 表单 Composable
+ *
+ * 使用示例（以 TeacherView 为例）：
+ * ```
+ * const { loading, tableData, total, currentPage, pageSize,
+ *         searchForm, dialogVisible, dialogTitle, formRef, editingId, form,
+ *         handleSearch, handleReset, openAdd, openEdit, handleSubmit, handleDelete } =
+ *   useCrudForm<Teacher, TeacherForm>({
+ *     fetchList: (q) => getTeacherList(q as Parameters<typeof getTeacherList>[0]),
+ *     createItem: createTeacher,
+ *     updateItem: updateTeacher,
+ *     deleteItem: deleteTeacher,
+ *     searchDefaults: { name: '', teacherNo: '', department: '', status: undefined },
+ *     formDefaults: { teacherNo: '', name: '', department: '', phone: '', status: 1, remark: '' },
+ *     entityName: '教师',
+ *   })
+ * ```
+ * 现有 7 个 CRUD View 暂未迁移到此 composable，仅提取了共享工具函数，
+ * 后续可按需逐页面迁移以减少重复代码。
+ */
+
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { PageResult } from '../api/types'

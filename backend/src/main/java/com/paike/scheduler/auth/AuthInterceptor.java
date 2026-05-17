@@ -5,12 +5,12 @@ import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.SysUser;
 import com.paike.scheduler.mapper.SysUserMapper;
 import io.jsonwebtoken.Claims;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
-
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
 @Component
 @RequiredArgsConstructor
@@ -22,12 +22,30 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+        // 仅对状态变更请求（POST/PUT/DELETE）做 CSRF 校验
+        String method = request.getMethod();
+        if ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method) || "DELETE".equalsIgnoreCase(method)) {
+            String csrfHeader = request.getHeader("X-CSRF-Token");
+            String csrfCookie = getCookieValue(request, "XSRF-TOKEN");
+            // CSRF Cookie 存在时要求请求头与之匹配
+            if (csrfCookie != null && !csrfCookie.isBlank() && csrfHeader != null && !csrfCookie.equals(csrfHeader)) {
+                throw new BusinessException(403, "CSRF 校验失败");
+            }
+        }
+
+        // 优先从 httpOnly Cookie 读取 token，其次从 Authorization 头
+        String token = getCookieValue(request, "paike_token");
+        if (token == null || token.isBlank()) {
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
+                token = authHeader.substring(BEARER_PREFIX.length()).trim();
+            }
+        }
+
+        if (token == null || token.isBlank()) {
             throw new BusinessException(401, "未登录或登录已过期");
         }
 
-        String token = authHeader.substring(BEARER_PREFIX.length()).trim();
         try {
             Claims claims = jwtService.parseToken(token);
             Long userId = Long.parseLong(claims.getSubject());
@@ -43,6 +61,15 @@ public class AuthInterceptor implements HandlerInterceptor {
         } catch (Exception ex) {
             throw new BusinessException(401, "未登录或登录已过期");
         }
+    }
+
+    private static String getCookieValue(HttpServletRequest request, String name) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) return null;
+        for (Cookie c : cookies) {
+            if (name.equals(c.getName())) return c.getValue();
+        }
+        return null;
     }
 
     @Override

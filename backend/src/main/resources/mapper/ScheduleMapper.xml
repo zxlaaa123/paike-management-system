@@ -34,4 +34,17 @@
         ORDER BY s.create_time DESC
     </select>
 
+    <select id="selectDailyConflictCounts" resultType="java.util.HashMap">
+        SELECT
+            CAST(COALESCE(SUM(CASE WHEN s.teacher_id = #{teacherId} THEN 1 ELSE 0 END), 0) AS SIGNED INTEGER) AS teacherDaily,
+            CAST(COALESCE(SUM(CASE WHEN s.class_id = #{classId} THEN 1 ELSE 0 END), 0) AS SIGNED INTEGER) AS classDaily,
+            CAST(COALESCE(SUM(CASE WHEN s.class_id = #{classId} AND s.course_id = #{courseId} THEN 1 ELSE 0 END), 0) AS SIGNED INTEGER) AS sameCourse
+        FROM schedule s
+        WHERE s.deleted = 0
+          AND s.time_slot_id IN
+          <foreach collection="daySlotIds" item="id" open="(" separator="," close=")">
+              #{id}
+          </foreach>
+    </select>
+
 </mapper>

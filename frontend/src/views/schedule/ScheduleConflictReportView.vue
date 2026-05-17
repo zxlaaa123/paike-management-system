@@ -77,16 +77,16 @@ function objectTypeText(type?: string) {
 async function fetchReports() {
   loading.value = true
   try {
-    const params: Record<string, unknown> = {
+    const params = {
       page: pagination.page,
       size: pagination.size,
+      reportNo: searchForm.reportNo.trim() || undefined,
+      conflictType: searchForm.conflictType || undefined,
+      objectType: searchForm.objectType || undefined,
+      objectName: searchForm.objectName.trim() || undefined,
     }
-    if (searchForm.reportNo.trim()) params.reportNo = searchForm.reportNo.trim()
-    if (searchForm.conflictType) params.conflictType = searchForm.conflictType
-    if (searchForm.objectType) params.objectType = searchForm.objectType
-    if (searchForm.objectName.trim()) params.objectName = searchForm.objectName.trim()
 
-    const res = await getScheduleConflictReportList(params as any)
+    const res = await getScheduleConflictReportList(params)
     reportList.value = res.records
     total.value = res.total
   } finally {

@@ -67,17 +67,17 @@ function reasonTypeTagType(type: string) {
 async function fetchTasks() {
   loading.value = true
   try {
-    const params: Record<string, unknown> = {
+    const params = {
       page: pagination.page,
       size: pagination.size,
+      batchId: searchForm.batchId || undefined,
+      courseName: searchForm.courseName.trim() || undefined,
+      teacherName: searchForm.teacherName.trim() || undefined,
+      className: searchForm.className.trim() || undefined,
+      reasonType: searchForm.reasonType || undefined,
     }
-    if (searchForm.batchId) params.batchId = searchForm.batchId
-    if (searchForm.courseName.trim()) params.courseName = searchForm.courseName.trim()
-    if (searchForm.teacherName.trim()) params.teacherName = searchForm.teacherName.trim()
-    if (searchForm.className.trim()) params.className = searchForm.className.trim()
-    if (searchForm.reasonType) params.reasonType = searchForm.reasonType
 
-    const res = await getUnscheduledTaskList(params as any)
+    const res = await getUnscheduledTaskList(params)
     taskList.value = res.records
     total.value = res.total
   } finally {

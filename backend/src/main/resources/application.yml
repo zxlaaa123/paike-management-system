@@ -9,10 +9,12 @@ spring:
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: false
   sql:
     init:
       mode: always
-      schema-locations: classpath:db/schema.sql,classpath:db/v2_schema.sql,classpath:db/v3_semester.sql,classpath:db/v3_semester_data_bind.sql,classpath:db/v3_schedule_plan.sql,classpath:db/v3_score.sql
+      schema-locations: classpath:db/schema.sql,classpath:db/v2_schema.sql,classpath:db/v2_alter_schedule.sql,classpath:db/v2_alter_score_report.sql,classpath:db/v3_semester.sql,classpath:db/v3_semester_data_bind.sql,classpath:db/v3_schedule_plan.sql,classpath:db/v3_score.sql
       continue-on-error: true
 
 mybatis-plus:

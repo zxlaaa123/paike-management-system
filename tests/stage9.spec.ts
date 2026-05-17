@@ -43,13 +43,13 @@ test.describe.serial('阶段 9：课表查询', () => {
     const tk = await (await request.post(`${API_URL}/api/teaching-tasks`, { headers: h, data: { courseId: ids.course, teacherId: ids.teacher, classId: ids.class, weeklyHours: 4, needContinuous: 0, status: 1 } })).json()
     expect(tk.code).toBe(200); ids.task = tk.data.id
 
-    // 创建2个时间段的数据 (周一1-2节, 周一3-4节)
+    // 创建2个时间段的数据（用不同天避免 ALLOW_SAME_COURSE_SAME_DAY=false 冲突）
     const slots = (await (await request.get(`${API_URL}/api/time-slots`, { headers: h })).json()).data
 
     const s1 = await (await request.post(`${API_URL}/api/schedules`, { headers: h, data: { teachingTaskId: ids.task, timeSlotId: slots[0].id, classroomId: ids.room } })).json()
     expect(s1.code).toBe(200)
 
-    const s2 = await (await request.post(`${API_URL}/api/schedules`, { headers: h, data: { teachingTaskId: ids.task, timeSlotId: slots[1].id, classroomId: ids.room } })).json()
+    const s2 = await (await request.post(`${API_URL}/api/schedules`, { headers: h, data: { teachingTaskId: ids.task, timeSlotId: slots[4].id, classroomId: ids.room } })).json()
     expect(s2.code).toBe(200)
   })
 
@@ -96,9 +96,9 @@ test.describe.serial('阶段 9：课表查询', () => {
     await page.waitForURL('**/dashboard', { timeout: 15000 })
 
     // 展开课表查询子菜单
-    await page.click('text=课表查询')
+    await page.locator('.el-sub-menu__title').filter({ hasText: '课表查询' }).click()
     await page.waitForTimeout(500)
-    await page.click('text=班级课表')
+    await page.locator('.el-menu-item').filter({ hasText: '班级课表' }).click()
     await page.waitForURL('**/timetable/class', { timeout: 15000 })
 
     // 验证页面加载
@@ -124,9 +124,9 @@ test.describe.serial('阶段 9：课表查询', () => {
     await page.click('button:has-text("登录")')
     await page.waitForURL('**/dashboard', { timeout: 15000 })
 
-    await page.click('text=课表查询')
+    await page.locator('.el-sub-menu__title').filter({ hasText: '课表查询' }).click()
     await page.waitForTimeout(500)
-    await page.click('text=教师课表')
+    await page.locator('.el-menu-item').filter({ hasText: '教师课表' }).click()
     await page.waitForURL('**/timetable/teacher', { timeout: 15000 })
 
     await expect(page.locator('label:has-text("选择教师")')).toBeVisible()
@@ -152,9 +152,9 @@ test.describe.serial('阶段 9：课表查询', () => {
     await page.click('button:has-text("登录")')
     await page.waitForURL('**/dashboard', { timeout: 15000 })
 
-    await page.click('text=课表查询')
+    await page.locator('.el-sub-menu__title').filter({ hasText: '课表查询' }).click()
     await page.waitForTimeout(500)
-    await page.click('text=教室课表')
+    await page.locator('.el-menu-item').filter({ hasText: '教室课表' }).click()
     await page.waitForURL('**/timetable/classroom', { timeout: 15000 })
 
     await expect(page.locator('label:has-text("选择教室")')).toBeVisible()

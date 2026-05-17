@@ -12,8 +12,3 @@ body {
     'Microsoft YaHei',
     sans-serif;
 }
-
-.el-select__selected-item,
-.el-select__placeholder {
-  pointer-events: none;
-}

@@ -21,15 +21,17 @@ export function getScoreDetails(planId: number) {
   })
 }
 
+export interface ScoreSummary {
+  planId: number
+  totalScore: number
+  hardViolationCount: number
+  softViolationCount: number
+  conflictCount: number
+  scoreLevel: string
+}
+
 export function getScoreSummary(planId: number) {
-  return request.get<ApiResponse<{
-    planId: number
-    totalScore: number
-    hardViolationCount: number
-    softViolationCount: number
-    conflictCount: number
-    scoreLevel: string
-  }>>(`/v3/schedule-plans/${planId}/score-summary`).then((r) => {
+  return request.get<ApiResponse<ScoreSummary>>(`/v3/schedule-plans/${planId}/score-summary`).then((r) => {
     if (!r.data) throw new Error('响应数据为空')
     return r.data.data
   })

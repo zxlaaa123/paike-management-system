@@ -261,7 +261,7 @@ onMounted(() => {
       </el-table>
       <el-pagination v-model:current-page="batchPage" v-model:page-size="batchSize" :total="batchTotal"
         :page-sizes="[10, 20]" layout="total, sizes, prev, pager, next"
-        style="margin-top: 16px; justify-content: flex-end" @change="fetchBatches" />
+        style="margin-top: 16px; justify-content: flex-end" @current-change="fetchBatches" @size-change="fetchBatches" />
     </el-card>
   </div>
 </template>

@@ -9,6 +9,12 @@ interface ApiResponse<T = unknown> {
   data: T
 }
 
+/** 从浏览器 Cookie 中读取指定名称的值 */
+function getCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'))
+  return match ? decodeURIComponent(match[1]) : null
+}
+
 const request = axios.create({
   baseURL: '/api',
   timeout: 10000,
@@ -42,6 +48,14 @@ async function parseJsonBlob(data: Blob): Promise<Partial<ApiResponse> | null> {
 
 request.interceptors.request.use(
   (config) => {
+    // CSRF 防护：状态变更请求携带 X-CSRF-Token 头
+    if (config.method && ['post', 'put', 'delete'].includes(config.method.toLowerCase())) {
+      const csrfToken = getCookie('XSRF-TOKEN')
+      if (csrfToken) {
+        config.headers['X-CSRF-Token'] = csrfToken
+      }
+    }
+    // 兼容旧版：如果 localStorage 中有 token，仍作为 Bearer 头发送（向后兼容未迁移的服务）
     const token = localStorage.getItem(TOKEN_KEY)
     if (token) {
       config.headers.Authorization = `Bearer ${token}`

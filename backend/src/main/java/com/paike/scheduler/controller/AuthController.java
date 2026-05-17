@@ -5,8 +5,12 @@ import com.paike.scheduler.auth.dto.LoginRequest;
 import com.paike.scheduler.auth.vo.LoginResponse;
 import com.paike.scheduler.auth.vo.UserInfoVo;
 import com.paike.scheduler.common.response.Result;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseCookie;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -22,9 +27,35 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @Value("${app.jwt.expiration-ms:86400000}")
+    private long expirationMs;
+
     @PostMapping("/login")
-    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        return Result.success(authService.login(request));
+    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+        LoginResponse loginResponse = authService.login(request);
+
+        // 设置 httpOnly JWT Cookie（防 XSS 窃取）
+        ResponseCookie jwtCookie = ResponseCookie.from("paike_token", loginResponse.getToken())
+                .httpOnly(true)
+                .secure(false) // 开发环境用 HTTP，生产环境应设为 true
+                .path("/api")
+                .maxAge(expirationMs / 1000)
+                .sameSite("Strict")
+                .build();
+        response.addHeader("Set-Cookie", jwtCookie.toString());
+
+        // 设置可读 CSRF Cookie（前端读取后放入 X-CSRF-Token 请求头）
+        String csrfToken = UUID.randomUUID().toString();
+        ResponseCookie csrfCookie = ResponseCookie.from("XSRF-TOKEN", csrfToken)
+                .httpOnly(false)
+                .secure(false)
+                .path("/")
+                .maxAge(expirationMs / 1000)
+                .sameSite("Strict")
+                .build();
+        response.addHeader("Set-Cookie", csrfCookie.toString());
+
+        return Result.success(loginResponse);
     }
 
     @GetMapping("/me")
@@ -33,7 +64,19 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public Result<Map<String, Object>> logout() {
+    public Result<Map<String, Object>> logout(HttpServletResponse response) {
+        // 清除认证 Cookie
+        Cookie clearJwt = new Cookie("paike_token", "");
+        clearJwt.setHttpOnly(true);
+        clearJwt.setPath("/api");
+        clearJwt.setMaxAge(0);
+        response.addCookie(clearJwt);
+
+        Cookie clearCsrf = new Cookie("XSRF-TOKEN", "");
+        clearCsrf.setPath("/");
+        clearCsrf.setMaxAge(0);
+        response.addCookie(clearCsrf);
+
         return Result.success(Map.of("success", true));
     }
 }
