@@ -10,6 +10,7 @@ import {
   type Classroom,
   type ClassroomForm,
 } from '../../api/classroom'
+import { statusText, statusTagType } from '../../utils/status'
 
 const loading = ref(false)
 const tableData = ref<Classroom[]>([])
@@ -138,14 +139,6 @@ async function handleStatusChange(row: Classroom) {
   await updateClassroomStatus(row.id, newStatus)
   ElMessage.success(`${action}成功`)
   fetchData()
-}
-
-function statusText(status: number) {
-  return status === 1 ? '启用' : '停用'
-}
-
-function statusTagType(status: number) {
-  return status === 1 ? 'success' : 'danger'
 }
 
 onMounted(fetchData)

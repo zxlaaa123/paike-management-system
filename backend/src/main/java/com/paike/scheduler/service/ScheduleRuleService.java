@@ -9,12 +9,17 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
 public class ScheduleRuleService {
 
     private final ScheduleRuleConfigMapper ruleConfigMapper;
+
+    /** 规则值缓存，updateRules / resetToDefault 时清除 */
+    private final Map<String, String> ruleCache = new ConcurrentHashMap<>();
 
     public List<ScheduleRuleConfig> listAll() {
         return ruleConfigMapper.selectList(new LambdaQueryWrapper<ScheduleRuleConfig>()
@@ -43,6 +48,7 @@ public class ScheduleRuleService {
                 ruleConfigMapper.updateById(existing);
             }
         }
+        ruleCache.clear();
     }
 
     public void resetToDefault() {
@@ -68,6 +74,7 @@ public class ScheduleRuleService {
                 ruleConfigMapper.insert(rule);
             }
         }
+        ruleCache.clear();
     }
 
     private ScheduleRuleConfig createRule(String key, String value, String name, String desc, int enabled) {
@@ -81,16 +88,22 @@ public class ScheduleRuleService {
     }
 
     public int getIntValue(String ruleKey) {
+        String cached = ruleCache.get(ruleKey);
+        if (cached != null) return parseInt(cached, ruleKey);
         ScheduleRuleConfig rule = ruleConfigMapper.selectOne(new LambdaQueryWrapper<ScheduleRuleConfig>()
                 .eq(ScheduleRuleConfig::getRuleKey, ruleKey));
         if (rule == null) return 0;
+        ruleCache.put(ruleKey, rule.getRuleValue());
         return parseInt(rule.getRuleValue(), ruleKey);
     }
 
     public boolean getBoolValue(String ruleKey) {
+        String cached = ruleCache.get(ruleKey);
+        if (cached != null) return Boolean.parseBoolean(cached);
         ScheduleRuleConfig rule = ruleConfigMapper.selectOne(new LambdaQueryWrapper<ScheduleRuleConfig>()
                 .eq(ScheduleRuleConfig::getRuleKey, ruleKey));
         if (rule == null) return false;
+        ruleCache.put(ruleKey, rule.getRuleValue());
         return Boolean.parseBoolean(rule.getRuleValue());
     }
 

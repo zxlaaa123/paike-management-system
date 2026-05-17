@@ -1,8 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getCurrentUserApi, loginApi, logoutApi, type UserInfo } from '../api/auth'
-
-const TOKEN_KEY = 'paike_admin_token'
+import { TOKEN_KEY } from '../utils/constants'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string>(localStorage.getItem(TOKEN_KEY) || '')

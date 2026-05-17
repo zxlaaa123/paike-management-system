@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import type { ApiResponse } from './types'
 
 export interface LoginRequest {
   username: string
@@ -14,12 +15,6 @@ export interface UserInfo {
 export interface LoginResponse {
   token: string
   userInfo: UserInfo
-}
-
-interface ApiResponse<T> {
-  code: number
-  message: string
-  data: T
 }
 
 export async function loginApi(payload: LoginRequest) {

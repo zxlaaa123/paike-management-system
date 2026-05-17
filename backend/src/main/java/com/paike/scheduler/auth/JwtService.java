@@ -16,10 +16,16 @@ public class JwtService {
     private final SecretKey secretKey;
     private final long expirationMs;
 
+    private static final String DEFAULT_SECRET = "replace_with_a_strong_secret_key_for_stage3_v1_auth";
+
     public JwtService(
         @Value("${app.jwt.secret}") String secret,
         @Value("${app.jwt.expiration-ms}") long expirationMs
     ) {
+        if (DEFAULT_SECRET.equals(secret)) {
+            throw new IllegalStateException(
+                "JWT_SECRET 未配置！请设置环境变量 JWT_SECRET 为一个强密钥，禁止使用代码中的默认值。");
+        }
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMs = expirationMs;
     }

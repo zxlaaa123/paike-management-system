@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { generateMultipleSchedulePlans, generateSchedulePlan, type ScheduleGenerateResult } from '../../api/scheduleGenerate'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
+import { strategyText } from '../../utils/status'
 
 const router = useRouter()
 const loading = ref(false)
@@ -95,10 +96,6 @@ async function handleGenerateMultiple() {
   } finally {
     generating.value = false
   }
-}
-
-function strategyText(value: string) {
-  return strategyOptions.find((item) => item.value === value)?.label || value
 }
 
 onMounted(fetchSemesters)

@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { compareSchedulePlans, applySchedulePlan, getSchedulePlanList, type SchedulePlan } from '../../api/schedulePlan'
 import { getCurrentSemester, getAllSemesters, type Semester } from '../../api/semester'
+import { strategyText } from '../../utils/status'
 
 const router = useRouter()
 
@@ -112,17 +113,6 @@ function rowClass({ row }: { row: any }): string {
   if (row.conflictCount > 0) return 'row-conflict'
   if (row.unscheduledCount > 0) return 'row-warning'
   return ''
-}
-
-function strategyText(type: string) {
-  const map: Record<string, string> = {
-    TEACHER_PRIORITY: '教师优先',
-    CLASS_BALANCE: '班级均衡',
-    CLASSROOM_UTILIZATION: '教室利用率',
-    COMPREHENSIVE: '综合最优',
-    CUSTOM: '自定义',
-  }
-  return map[type] || type
 }
 
 function goBack() {

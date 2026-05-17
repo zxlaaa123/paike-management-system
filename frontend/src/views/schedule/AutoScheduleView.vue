@@ -9,6 +9,7 @@ import {
   type AutoScheduleBatch,
 } from '../../api/autoSchedule'
 import { getAllTeachingTasks, type TeachingTask } from '../../api/teachingTask'
+import { batchStatusText, batchStatusTagType } from '../../utils/status'
 
 const router = useRouter()
 const loading = ref(false)
@@ -125,26 +126,6 @@ function gotoTimetable() {
   router.push('/timetable/class')
 }
 
-function statusTagType(status: string) {
-  const map: Record<string, string> = {
-    RUNNING: 'warning',
-    SUCCESS: 'success',
-    PARTIAL: 'warning',
-    FAILED: 'danger',
-  }
-  return map[status] || 'info'
-}
-
-function statusText(status: string) {
-  const map: Record<string, string> = {
-    RUNNING: '执行中',
-    SUCCESS: '完成',
-    PARTIAL: '部分成功',
-    FAILED: '失败',
-  }
-  return map[status] || status
-}
-
 onMounted(() => {
   fetchBatches()
   fetchTeachingTasks()
@@ -164,7 +145,7 @@ onMounted(() => {
       <el-descriptions :column="2" border>
         <el-descriptions-item label="批次号">{{ latestBatch.batchNo }}</el-descriptions-item>
         <el-descriptions-item label="状态">
-          <el-tag :type="statusTagType(latestBatch.status)">{{ statusText(latestBatch.status) }}</el-tag>
+          <el-tag :type="batchStatusTagType(latestBatch.status)">{{ batchStatusText(latestBatch.status) }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="参与任务">{{ latestBatch.totalTaskCount }}</el-descriptions-item>
         <el-descriptions-item label="成功任务">{{ latestBatch.successTaskCount }}</el-descriptions-item>
@@ -267,7 +248,7 @@ onMounted(() => {
         <el-table-column prop="generatedScheduleCount" label="生成记录" width="90" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)">{{ statusText(row.status) }}</el-tag>
+            <el-tag :type="batchStatusTagType(row.status)">{{ batchStatusText(row.status) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="startTime" label="开始时间" width="170" />

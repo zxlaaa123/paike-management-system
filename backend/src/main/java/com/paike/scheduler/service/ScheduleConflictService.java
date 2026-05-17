@@ -86,9 +86,10 @@ public class ScheduleConflictService {
             return "排课失败：机房课必须安排在机房";
         }
 
-        // 编辑已有排课记录时，需要把自己排除掉，否则会把原记录误判成冲突。
+        // 只查询同一时间段的排课记录，避免全表扫描
         LambdaQueryWrapper<Schedule> baseWrapper = new LambdaQueryWrapper<Schedule>()
-                .eq(Schedule::getDeleted, 0);
+                .eq(Schedule::getDeleted, 0)
+                .eq(Schedule::getTimeSlotId, timeSlotId);
         if (excludeScheduleId != null) {
             baseWrapper.ne(Schedule::getId, excludeScheduleId);
         }
@@ -112,9 +113,6 @@ public class ScheduleConflictService {
                 .collect(Collectors.toMap(TeachingTask::getId, java.util.function.Function.identity(), (a, b) -> a));
 
         for (Schedule s : existingSchedules) {
-            // 只检查同一时间段的冲突
-            if (!s.getTimeSlotId().equals(timeSlotId)) continue;
-
             TeachingTask existingTask = existingTaskMap.get(s.getTeachingTaskId());
 
             // 7. 同一教师同一时间不能有两门课
@@ -148,47 +146,41 @@ public class ScheduleConflictService {
         }
 
         // 11. 读取软规则。前面的资源占用、容量、类型属于硬约束，这里的每日上限和同课同日属于配置化约束。
-        int teacherMaxDailySlots = ruleService.getIntValue("TEACHER_MAX_DAILY_SLOTS");
-        int classMaxDailySlots = ruleService.getIntValue("CLASS_MAX_DAILY_SLOTS");
-        boolean allowSameCourseSameDay = ruleService.getBoolValue("ALLOW_SAME_COURSE_SAME_DAY");
+        int teacherMaxDailySlots = ruleService.getIntValue(“TEACHER_MAX_DAILY_SLOTS”);
+        int classMaxDailySlots = ruleService.getIntValue(“CLASS_MAX_DAILY_SLOTS”);
+        boolean allowSameCourseSameDay = ruleService.getBoolValue(“ALLOW_SAME_COURSE_SAME_DAY”);
+
+        // 预加载当天所有时间段 ID，供三条软规则复用
+        List<Long> daySlotIds = timeSlotMapper.selectList(
+                new LambdaQueryWrapper<TimeSlot>()
+                        .eq(TimeSlot::getDayOfWeek, timeSlot.getDayOfWeek()))
+                .stream().map(TimeSlot::getId).collect(Collectors.toList());
 
         if (teacherMaxDailySlots > 0) {
             // 这里用 >=，因为当前待插入的大节尚未入库；一旦已达到上限，本次排课就必须拒绝。
-            List<TimeSlot> daySlots = timeSlotMapper.selectList(
-                    new LambdaQueryWrapper<TimeSlot>()
-                            .eq(TimeSlot::getDayOfWeek, timeSlot.getDayOfWeek()));
-            List<Long> daySlotIds = daySlots.stream().map(TimeSlot::getId).collect(Collectors.toList());
             long teacherDailyCount = scheduleMapper.selectCount(
                     new LambdaQueryWrapper<Schedule>()
                             .eq(Schedule::getTeacherId, teacherId)
                             .eq(Schedule::getDeleted, 0)
                             .in(Schedule::getTimeSlotId, daySlotIds));
             if (teacherDailyCount >= teacherMaxDailySlots) {
-                return "排课失败：" + teacherName + "老师每天最多" + teacherMaxDailySlots + "个大节，当前已排" + teacherDailyCount + "个";
+                return “排课失败：” + teacherName + “老师每天最多” + teacherMaxDailySlots + “个大节，当前已排” + teacherDailyCount + “个”;
             }
         }
 
         if (classMaxDailySlots > 0) {
-            List<TimeSlot> daySlots = timeSlotMapper.selectList(
-                    new LambdaQueryWrapper<TimeSlot>()
-                            .eq(TimeSlot::getDayOfWeek, timeSlot.getDayOfWeek()));
-            List<Long> daySlotIds = daySlots.stream().map(TimeSlot::getId).collect(Collectors.toList());
             long classDailyCount = scheduleMapper.selectCount(
                     new LambdaQueryWrapper<Schedule>()
                             .eq(Schedule::getClassId, classId)
                             .eq(Schedule::getDeleted, 0)
                             .in(Schedule::getTimeSlotId, daySlotIds));
             if (classDailyCount >= classMaxDailySlots) {
-                return "排课失败：" + className + "每天最多" + classMaxDailySlots + "个大节，当前已排" + classDailyCount + "个";
+                return “排课失败：” + className + “每天最多” + classMaxDailySlots + “个大节，当前已排” + classDailyCount + “个”;
             }
         }
 
         if (!allowSameCourseSameDay) {
-            // 这里约束的是“同一班级 + 同一课程 + 同一天”，不是简单按教师或时间段去重。
-            List<TimeSlot> daySlots = timeSlotMapper.selectList(
-                    new LambdaQueryWrapper<TimeSlot>()
-                            .eq(TimeSlot::getDayOfWeek, timeSlot.getDayOfWeek()));
-            List<Long> daySlotIds = daySlots.stream().map(TimeSlot::getId).collect(Collectors.toList());
+            // 这里约束的是”同一班级 + 同一课程 + 同一天”，不是简单按教师或时间段去重。
             long sameCourseCount = scheduleMapper.selectCount(
                     new LambdaQueryWrapper<Schedule>()
                             .eq(Schedule::getClassId, classId)
@@ -196,7 +188,7 @@ public class ScheduleConflictService {
                             .eq(Schedule::getDeleted, 0)
                             .in(Schedule::getTimeSlotId, daySlotIds));
             if (sameCourseCount > 0) {
-                return "排课失败：同一课程同一天不允许重复";
+                return “排课失败：同一课程同一天不允许重复”;
             }
         }
 

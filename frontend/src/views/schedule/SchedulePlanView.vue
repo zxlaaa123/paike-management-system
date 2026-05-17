@@ -9,6 +9,7 @@ import {
   type SchedulePlan,
 } from '../../api/schedulePlan'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
+import { strategyText } from '../../utils/status'
 
 const router = useRouter()
 
@@ -100,17 +101,6 @@ function statusTagType(status: string) {
 function statusText(status: string) {
   const map: Record<string, string> = { DRAFT: '草稿', APPLIED: '已应用', ABANDONED: '已废弃' }
   return map[status] || status
-}
-
-function strategyText(type: string) {
-  const map: Record<string, string> = {
-    TEACHER_PRIORITY: '教师优先',
-    CLASS_BALANCE: '班级均衡',
-    CLASSROOM_UTILIZATION: '教室利用率',
-    COMPREHENSIVE: '综合最优',
-    CUSTOM: '自定义',
-  }
-  return map[type] || type
 }
 
 function rowClass({ row }: { row: SchedulePlan }): string {

@@ -12,6 +12,7 @@ import {
 } from '../../api/teacherUnavailableTime'
 import { getAllTeachers, type Teacher } from '../../api/teacher'
 import { getAllTimeSlots, type TimeSlot } from '../../api/timeSlot'
+import { statusText, statusTagType } from '../../utils/status'
 
 const loading = ref(false)
 const tableData = ref<TeacherUnavailableTime[]>([])
@@ -139,14 +140,6 @@ async function handleStatusChange(row: TeacherUnavailableTime) {
   await updateUnavailableTimeStatus(row.id, newStatus)
   ElMessage.success(`${action}成功`)
   fetchData()
-}
-
-function statusText(status: number) {
-  return status === 1 ? '启用' : '停用'
-}
-
-function statusTagType(status: number) {
-  return status === 1 ? 'success' : 'danger'
 }
 
 onMounted(() => {

@@ -1,14 +1,13 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '../router'
+import { TOKEN_KEY } from './constants'
 
 interface ApiResponse<T = unknown> {
   code: number
   message: string
   data: T
 }
-
-const TOKEN_KEY = 'paike_admin_token'
 
 const request = axios.create({
   baseURL: '/api',

@@ -23,6 +23,7 @@ import {
   type UnassignedSummaryItem,
 } from '../../api/schedulePlan'
 import { getScoreDetails, getScoreSummary, rescore, type ScheduleScoreDetail } from '../../api/scheduleScore'
+import { strategyText } from '../../utils/status'
 
 const route = useRoute()
 const router = useRouter()
@@ -290,17 +291,6 @@ function statusText(status: string) {
 function statusTagType(status: string) {
   const map: Record<string, string> = { DRAFT: 'primary', APPLIED: 'success', ABANDONED: 'info' }
   return map[status] || 'info'
-}
-
-function strategyText(type: string) {
-  const map: Record<string, string> = {
-    TEACHER_PRIORITY: '教师优先',
-    CLASS_BALANCE: '班级均衡',
-    CLASSROOM_UTILIZATION: '教室利用率',
-    COMPREHENSIVE: '综合最优',
-    CUSTOM: '自定义',
-  }
-  return map[type] || type
 }
 
 function scoreLevelType(level: string) {

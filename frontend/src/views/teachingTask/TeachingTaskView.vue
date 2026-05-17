@@ -13,6 +13,7 @@ import { getAllCourses, type Course } from '../../api/course'
 import { getAllTeachers, type Teacher } from '../../api/teacher'
 import { getAllClasses, type ClassInfo } from '../../api/classInfo'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
+import { statusText, statusTagType } from '../../utils/status'
 
 const loading = ref(false)
 const tableData = ref<TeachingTask[]>([])
@@ -163,14 +164,6 @@ async function handleDelete(row: TeachingTask) {
   await deleteTeachingTask(row.id)
   ElMessage.success('删除成功')
   fetchData()
-}
-
-function statusText(status: number) {
-  return status === 1 ? '启用' : '停用'
-}
-
-function statusTagType(status: number) {
-  return status === 1 ? 'success' : 'danger'
 }
 
 function needContinuousText(val: number) {
