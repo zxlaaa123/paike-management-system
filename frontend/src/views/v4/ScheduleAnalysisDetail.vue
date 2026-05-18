@@ -149,6 +149,7 @@ onMounted(fetchData)
         <el-button type="primary" plain @click="router.push(`/v4/schedule-analysis/${planId}/score`)">评分详情解释</el-button>
         <el-button type="warning" plain @click="router.push(`/v4/schedule-analysis/${planId}/risks`)">风险诊断中心</el-button>
         <el-button type="success" plain @click="router.push(`/v4/schedule-analysis/${planId}/charts`)">图表分析</el-button>
+        <el-button type="info" plain @click="router.push(`/v4/schedule-analysis/${planId}/locks`)">课程锁定管理</el-button>
       </div>
       <div class="safe-note">当前阶段所有数据均来自只读分析接口，不会修改正式课表或方案明细。</div>
     </el-card>

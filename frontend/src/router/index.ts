@@ -140,6 +140,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/v4/ScheduleCharts.vue'),
       },
       {
+        path: 'v4/schedule-analysis/:planId/locks',
+        name: 'V4ScheduleLocks',
+        component: () => import('../views/v4/ScheduleLockManage.vue'),
+      },
+      {
         path: 'timetable/class',
         name: 'ClassTimetable',
         component: () => import('../views/timetable/ClassTimetableView.vue'),

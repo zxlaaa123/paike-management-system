@@ -369,6 +369,9 @@ onMounted(async () => {
           <el-button type="warning" plain @click="router.push(`/v4/schedule-analysis/${plan.id}`)">
             进入 V4 质量分析
           </el-button>
+          <el-button type="info" plain @click="router.push(`/v4/schedule-analysis/${plan.id}/locks`)">
+            课程锁定管理
+          </el-button>
         </div>
       </el-card>
 

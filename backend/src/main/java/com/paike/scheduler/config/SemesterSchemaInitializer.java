@@ -166,6 +166,7 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
         ensureScheduleGenerateLogTable();
         ensureScheduleUnassignedTaskTable();
         ensureScheduleAdjustLogTable();
+        ensureScheduleLockedItemTable();
     }
 
     private void ensureScheduleGenerateLogTable() {
@@ -245,6 +246,31 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
             ensureIndex("schedule_adjust_log", "idx_adjust_task", "CREATE INDEX idx_adjust_task ON schedule_adjust_log(teaching_task_id)");
         } catch (Exception e) {
             log.warn("Failed to ensure schedule_adjust_log: {}", e.getMessage());
+        }
+    }
+
+    private void ensureScheduleLockedItemTable() {
+        try {
+            jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS schedule_locked_item (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '锁定记录ID',
+                    target_type VARCHAR(20) NOT NULL COMMENT '锁定目标类型：PLAN/SCHEDULE',
+                    plan_id BIGINT NULL COMMENT '排课方案ID',
+                    plan_item_id BIGINT NULL COMMENT '方案明细ID',
+                    schedule_id BIGINT NULL COMMENT '正式课表ID',
+                    lock_reason VARCHAR(500) NOT NULL COMMENT '锁定原因',
+                    active_flag TINYINT NOT NULL DEFAULT 1 COMMENT '是否当前生效',
+                    unlocked_at DATETIME NULL COMMENT '取消锁定时间',
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+                ) COMMENT='课程锁定记录表'
+                """);
+            ensureIndex("schedule_locked_item", "idx_locked_plan", "CREATE INDEX idx_locked_plan ON schedule_locked_item(plan_id)");
+            ensureIndex("schedule_locked_item", "idx_locked_plan_item", "CREATE INDEX idx_locked_plan_item ON schedule_locked_item(plan_item_id)");
+            ensureIndex("schedule_locked_item", "idx_locked_schedule", "CREATE INDEX idx_locked_schedule ON schedule_locked_item(schedule_id)");
+            ensureIndex("schedule_locked_item", "idx_locked_active", "CREATE INDEX idx_locked_active ON schedule_locked_item(active_flag)");
+        } catch (Exception e) {
+            log.warn("Failed to ensure schedule_locked_item: {}", e.getMessage());
         }
     }
 
