@@ -75,6 +75,10 @@ function viewDetail(row: SchedulePlan) {
   router.push(`/v3/schedule-plans/${row.id}`)
 }
 
+function viewV4Analysis(row: SchedulePlan) {
+  router.push(`/v4/schedule-analysis/${row.id}`)
+}
+
 async function handleDelete(row: SchedulePlan) {
   if (row.status !== 'DRAFT') {
     ElMessage.warning('只能删除草稿方案')
@@ -193,9 +197,10 @@ onMounted(() => {
         <el-table-column label="生成时间" width="160">
           <template #default="{ row }">{{ row.generatedAt || '—' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="260" fixed="right">
+        <el-table-column label="操作" width="320" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="viewDetail(row)">详情</el-button>
+            <el-button type="warning" link @click="viewV4Analysis(row)">V4分析</el-button>
             <el-button type="success" link @click="router.push('/v3/schedule-compare')">对比</el-button>
             <el-button
               v-if="row.status === 'DRAFT'"

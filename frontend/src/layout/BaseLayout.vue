@@ -100,6 +100,13 @@ onMounted(() => {
           <el-menu-item index="/v3/schedule-rules">规则权重配置</el-menu-item>
           <el-menu-item index="/v3/statistics">统计分析</el-menu-item>
         </el-sub-menu>
+        <el-sub-menu index="v4-analysis">
+          <template #title>
+            <el-icon><Calendar /></el-icon>
+            <span>V4 质量分析</span>
+          </template>
+          <el-menu-item index="/v4/schedule-analysis">分析总览</el-menu-item>
+        </el-sub-menu>
         <el-sub-menu index="analysis">
           <template #title>
             <el-icon><PieChart /></el-icon>

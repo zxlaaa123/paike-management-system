@@ -115,6 +115,16 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/schedule/ScheduleStatisticsView.vue'),
       },
       {
+        path: 'v4/schedule-analysis',
+        name: 'V4ScheduleAnalysisOverview',
+        component: () => import('../views/v4/ScheduleAnalysisOverview.vue'),
+      },
+      {
+        path: 'v4/schedule-analysis/:planId',
+        name: 'V4ScheduleAnalysisDetail',
+        component: () => import('../views/v4/ScheduleAnalysisDetail.vue'),
+      },
+      {
         path: 'timetable/class',
         name: 'ClassTimetable',
         component: () => import('../views/timetable/ClassTimetableView.vue'),

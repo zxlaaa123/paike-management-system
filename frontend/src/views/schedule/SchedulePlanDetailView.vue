@@ -394,6 +394,11 @@ onMounted(async () => {
           <el-descriptions-item label="应用时间">{{ plan.appliedAt || '—' }}</el-descriptions-item>
           <el-descriptions-item label="方案说明" :span="3">{{ plan.description || '—' }}</el-descriptions-item>
         </el-descriptions>
+        <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap">
+          <el-button type="warning" plain @click="router.push(`/v4/schedule-analysis/${plan.id}`)">
+            进入 V4 质量分析
+          </el-button>
+        </div>
       </el-card>
 
       <el-card shadow="never" style="margin-top: 16px">
