@@ -86,6 +86,67 @@ export interface ScheduleRiskList {
   risks: ScheduleRiskIssue[]
 }
 
+export interface ScheduleTeacherHoursChartItem {
+  teacherId: number
+  teacherName: string
+  totalHours: number
+  courseCount: number
+}
+
+export interface ScheduleTeacherHoursChart {
+  planId: number
+  items: ScheduleTeacherHoursChartItem[]
+}
+
+export interface ScheduleRoomUtilizationChartItem {
+  roomId: number
+  roomName: string
+  roomType: string
+  capacity: number | null
+  usedPeriods: number
+  totalPeriods: number
+  utilizationRate: number
+}
+
+export interface ScheduleRoomUtilizationChart {
+  planId: number
+  items: ScheduleRoomUtilizationChartItem[]
+}
+
+export interface ScheduleClassDailyLoadChartItem {
+  classId: number
+  className: string
+  weekDay: number
+  lessonCount: number
+}
+
+export interface ScheduleClassDailyLoadChart {
+  planId: number
+  items: ScheduleClassDailyLoadChartItem[]
+}
+
+export interface ScheduleTimeDensityChartItem {
+  weekDay: number
+  period: number
+  courseCount: number
+}
+
+export interface ScheduleTimeDensityChart {
+  planId: number
+  items: ScheduleTimeDensityChartItem[]
+}
+
+export interface ScheduleScoreRadarChartItem {
+  name: string
+  value: number
+  description: string
+}
+
+export interface ScheduleScoreRadarChart {
+  planId: number
+  items: ScheduleScoreRadarChartItem[]
+}
+
 export function getScheduleAnalysisSummary(planId: number) {
   return request.get<ApiResponse<ScheduleAnalysisSummary>>(`/v4/schedule-analysis/plans/${planId}/summary`).then((r) => {
     if (!r.data) throw new Error('响应数据为空')
@@ -123,6 +184,41 @@ export function getScheduleRiskList(
 
 export function refreshScheduleRiskList(planId: number) {
   return request.post<ApiResponse<{ planId: number; riskCount: number; message: string }>>(`/v4/schedule-risks/plans/${planId}/refresh`).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
+}
+
+export function getScheduleTeacherHoursChart(planId: number) {
+  return request.get<ApiResponse<ScheduleTeacherHoursChart>>(`/v4/schedule-charts/plans/${planId}/teacher-hours`).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
+}
+
+export function getScheduleRoomUtilizationChart(planId: number) {
+  return request.get<ApiResponse<ScheduleRoomUtilizationChart>>(`/v4/schedule-charts/plans/${planId}/room-utilization`).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
+}
+
+export function getScheduleClassDailyLoadChart(planId: number) {
+  return request.get<ApiResponse<ScheduleClassDailyLoadChart>>(`/v4/schedule-charts/plans/${planId}/class-daily-load`).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
+}
+
+export function getScheduleTimeDensityChart(planId: number) {
+  return request.get<ApiResponse<ScheduleTimeDensityChart>>(`/v4/schedule-charts/plans/${planId}/time-density`).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
+}
+
+export function getScheduleScoreRadarChart(planId: number) {
+  return request.get<ApiResponse<ScheduleScoreRadarChart>>(`/v4/schedule-charts/plans/${planId}/score-radar`).then((r) => {
     if (!r.data) throw new Error('响应数据为空')
     return r.data.data
   })

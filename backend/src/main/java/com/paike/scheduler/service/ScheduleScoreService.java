@@ -45,6 +45,28 @@ public class ScheduleScoreService {
         return normalizeTotalScore(plan.getTotalScore());
     }
 
+    public List<ScheduleScoreDetail> previewScoreDetails(Long planId) {
+        SchedulePlan plan = planMapper.selectById(planId);
+        if (plan == null) {
+            return List.of();
+        }
+        List<ScheduleRuleWeight> rules = ruleWeightService.list(plan.getSemesterId(), plan.getStrategyType(), null);
+        if (rules.isEmpty()) {
+            return List.of();
+        }
+        List<SchedulePlanItem> items = planItemMapper.selectList(
+                new LambdaQueryWrapper<SchedulePlanItem>().eq(SchedulePlanItem::getPlanId, plan.getId()));
+        ScoreContext context = buildScoreContext(plan, items);
+        List<ScheduleScoreDetail> details = new ArrayList<>();
+        for (ScheduleRuleWeight rule : rules) {
+            if (rule.getEnabled() == null || rule.getEnabled() == 0) {
+                continue;
+            }
+            details.add(buildDetail(plan, rule, context));
+        }
+        return details;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public void rescore(SchedulePlan plan) {
         scoreDetailMapper.delete(

@@ -148,7 +148,7 @@ onMounted(fetchData)
         <el-button @click="router.push(`/v3/schedule-plans/${planId}`)">查看 V3 方案详情</el-button>
         <el-button type="primary" plain @click="router.push(`/v4/schedule-analysis/${planId}/score`)">评分详情解释</el-button>
         <el-button type="warning" plain @click="router.push(`/v4/schedule-analysis/${planId}/risks`)">风险诊断中心</el-button>
-        <el-button disabled>图表分析（阶段 4）</el-button>
+        <el-button type="success" plain @click="router.push(`/v4/schedule-analysis/${planId}/charts`)">图表分析</el-button>
       </div>
       <div class="safe-note">当前阶段所有数据均来自只读分析接口，不会修改正式课表或方案明细。</div>
     </el-card>

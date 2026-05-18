@@ -134,7 +134,7 @@ onMounted(fetchData)
         <div class="hero-actions">
           <el-button type="primary" plain :loading="refreshing" @click="handleRefresh">刷新风险</el-button>
           <el-button @click="router.push(`/v4/schedule-analysis/${planId}`)">回到质量分析</el-button>
-          <el-button disabled>图表分析（阶段 4）</el-button>
+          <el-button type="success" plain @click="router.push(`/v4/schedule-analysis/${planId}/charts`)">查看图表分析</el-button>
         </div>
       </div>
     </el-card>

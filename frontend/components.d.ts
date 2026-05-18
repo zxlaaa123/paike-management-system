@@ -7,6 +7,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    EChartPanel: typeof import('./src/components/v4/EChartPanel.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAside: typeof import('element-plus/es')['ElAside']
     ElButton: typeof import('element-plus/es')['ElButton']
@@ -20,6 +21,7 @@ declare module 'vue' {
     ElDescriptionsItem: typeof import('element-plus/es')['ElDescriptionsItem']
     ElDialog: typeof import('element-plus/es')['ElDialog']
     ElDivider: typeof import('element-plus/es')['ElDivider']
+    ElDrawer: typeof import('element-plus/es')['ElDrawer']
     ElDropdown: typeof import('element-plus/es')['ElDropdown']
     ElDropdownItem: typeof import('element-plus/es')['ElDropdownItem']
     ElDropdownMenu: typeof import('element-plus/es')['ElDropdownMenu']
