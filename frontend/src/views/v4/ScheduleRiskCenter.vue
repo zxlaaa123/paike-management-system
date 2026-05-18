@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import ScheduleAdjustDialog from '../../components/v4/ScheduleAdjustDialog.vue'
 import { getSchedulePlanById, type SchedulePlan } from '../../api/schedulePlan'
 import {
   getScheduleRiskList,
@@ -9,6 +10,7 @@ import {
   type ScheduleRiskIssue,
   type ScheduleRiskList,
 } from '../../api/v4ScheduleAnalysisApi'
+import type { ScheduleAdjustmentApplyResult } from '../../api/v4ScheduleAdjustmentApi'
 import { strategyText } from '../../utils/status'
 
 const route = useRoute()
@@ -21,6 +23,8 @@ const plan = ref<SchedulePlan | null>(null)
 const riskData = ref<ScheduleRiskList | null>(null)
 const selectedRisk = ref<ScheduleRiskIssue | null>(null)
 const detailVisible = ref(false)
+const adjustVisible = ref(false)
+const adjustingRisk = ref<ScheduleRiskIssue | null>(null)
 
 const filters = ref({
   riskType: '',
@@ -116,6 +120,41 @@ function openDetail(risk: ScheduleRiskIssue) {
   selectedRisk.value = risk
   detailVisible.value = true
 }
+
+function canAdjust(risk: ScheduleRiskIssue) {
+  return !!risk.relatedItemIds?.length
+}
+
+function openAdjust(risk: ScheduleRiskIssue) {
+  if (!canAdjust(risk)) {
+    ElMessage.warning('当前风险没有可定位的方案明细，暂时无法直接调整')
+    return
+  }
+  adjustingRisk.value = risk
+  adjustVisible.value = true
+}
+
+async function handleAdjustSuccess(_result: ScheduleAdjustmentApplyResult) {
+  adjustVisible.value = false
+  detailVisible.value = false
+  await fetchData()
+}
+
+const adjustContext = computed(() => {
+  if (!adjustingRisk.value) return null
+  return {
+    targetType: 'PLAN_ITEM' as const,
+    planId: planId.value,
+    planItemId: adjustingRisk.value.relatedItemIds[0] ?? null,
+    courseName: adjustingRisk.value.relatedCourseName,
+    teacherName: adjustingRisk.value.relatedTeacherName,
+    className: adjustingRisk.value.relatedClassName,
+    currentRoomName: adjustingRisk.value.relatedRoomName,
+    currentTimeLabel: adjustingRisk.value.weekDay
+      ? `周${adjustingRisk.value.weekDay} ${adjustingRisk.value.period || ''}`
+      : adjustingRisk.value.period || '—',
+  }
+})
 
 onMounted(fetchData)
 </script>
@@ -215,9 +254,10 @@ onMounted(fetchData)
         </el-table-column>
         <el-table-column prop="description" label="说明" min-width="240" show-overflow-tooltip />
         <el-table-column prop="suggestion" label="建议" min-width="240" show-overflow-tooltip />
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" width="170" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">查看详情</el-button>
+            <el-button v-if="canAdjust(row)" link type="warning" @click="openAdjust(row)">尝试调整</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -249,8 +289,14 @@ onMounted(fetchData)
             <li v-for="line in selectedRisk.detailLines" :key="line">{{ line }}</li>
           </ul>
         </el-card>
+
+        <div v-if="canAdjust(selectedRisk)" class="drawer-actions">
+          <el-button type="warning" plain @click="openAdjust(selectedRisk)">尝试局部调整</el-button>
+        </div>
       </div>
     </el-drawer>
+
+    <ScheduleAdjustDialog v-model="adjustVisible" :context="adjustContext" @success="handleAdjustSuccess" />
   </div>
 </template>
 
@@ -379,6 +425,11 @@ onMounted(fetchData)
   padding-left: 18px;
   color: #475467;
   line-height: 1.9;
+}
+
+.drawer-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 @media (max-width: 960px) {

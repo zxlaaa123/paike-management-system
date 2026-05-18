@@ -53,6 +53,7 @@ declare module 'vue' {
     ElTag: typeof import('element-plus/es')['ElTag']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    ScheduleAdjustDialog: typeof import('./src/components/v4/ScheduleAdjustDialog.vue')['default']
     TimetableGrid: typeof import('./src/components/TimetableGrid.vue')['default']
   }
   export interface ComponentCustomProperties {

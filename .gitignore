@@ -44,3 +44,7 @@ out/
 # Local artifacts
 output/
 test_result.json
+
+# Codex local files
+.codex/
+AGENTS.md

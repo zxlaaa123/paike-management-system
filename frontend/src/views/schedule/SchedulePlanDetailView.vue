@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import ScheduleAdjustDialog from '../../components/v4/ScheduleAdjustDialog.vue'
 import { getAllClassrooms, type Classroom } from '../../api/classroom'
 import { getAllTimeSlots, type TimeSlot } from '../../api/timeSlot'
 import {
-  adjustSchedulePlanItem,
   applySchedulePlan,
   getScheduleAdjustLogs,
   getSchedulePlanById,
@@ -22,6 +22,7 @@ import {
   type ScheduleUnassignedTask,
   type UnassignedSummaryItem,
 } from '../../api/schedulePlan'
+import type { ScheduleAdjustmentApplyResult } from '../../api/v4ScheduleAdjustmentApi'
 import { getScoreDetails, getScoreSummary, rescore, type ScheduleScoreDetail, type ScoreSummary } from '../../api/scheduleScore'
 import { strategyText } from '../../utils/status'
 
@@ -32,7 +33,6 @@ const planId = computed(() => Number(route.params.id))
 const loading = ref(false)
 const scoring = ref(false)
 const applying = ref(false)
-const adjusting = ref(false)
 const logLoading = ref(false)
 const unassignedLoading = ref(false)
 const adjustLogLoading = ref(false)
@@ -59,11 +59,6 @@ const currentTaskId = ref<number | null>(null)
 
 const adjustDialogVisible = ref(false)
 const adjustingItem = ref<SchedulePlanItem | null>(null)
-const adjustForm = reactive({
-  classroomId: '',
-  timeSlotId: '',
-  adjustReason: '',
-})
 
 async function fetchData() {
   loading.value = true
@@ -238,48 +233,14 @@ async function openTaskLogs(item: SchedulePlanItem) {
 
 function openAdjustDialog(item: SchedulePlanItem) {
   adjustingItem.value = item
-  adjustForm.classroomId = String(item.classroomId)
-  const slot = timeSlotOptions.value.find((slotItem) => slotItem.dayOfWeek === item.weekday && slotItem.periodNo === (item.startPeriod + 1) / 2)
-  adjustForm.timeSlotId = slot ? String(slot.id) : ''
-  adjustForm.adjustReason = ''
   adjustDialogVisible.value = true
 }
 
-async function submitAdjust() {
-  if (!adjustingItem.value) return
-  const classroomId = Number(adjustForm.classroomId)
-  const timeSlotId = Number(adjustForm.timeSlotId)
-  if (!classroomId || !timeSlotId) {
-    ElMessage.warning('请选择教室和时间段')
-    return
-  }
-  const slot = timeSlotOptions.value.find((item) => item.id === timeSlotId)
-  if (!slot) {
-    ElMessage.warning('所选时间段无效')
-    return
-  }
-
-  adjusting.value = true
-  try {
-    const result = await adjustSchedulePlanItem(adjustingItem.value.id, {
-      classroomId,
-      weekday: slot.dayOfWeek,
-      startPeriod: slot.periodNo * 2 - 1,
-      endPeriod: slot.periodNo * 2,
-      adjustReason: adjustForm.adjustReason.trim(),
-    })
-    ElMessage.success(
-      `${result.message}，分数 ${result.beforeScore ?? '—'} -> ${result.afterScore ?? '—'}，${result.conflictFlag === 1 ? '已标记冲突' : '无冲突'}`
-    )
-    adjustDialogVisible.value = false
-    await Promise.all([fetchData(), fetchScoreData(), loadExplainData()])
-    if (taskLogDialogVisible.value && currentTaskId.value) {
-      currentTaskLogs.value = await getSchedulePlanTaskLogs(planId.value, currentTaskId.value)
-    }
-  } catch (e: any) {
-    ElMessage.error(e.message || '调整失败')
-  } finally {
-    adjusting.value = false
+async function handleAdjustSuccess(_result: ScheduleAdjustmentApplyResult) {
+  adjustDialogVisible.value = false
+  await Promise.all([fetchData(), fetchScoreData(), loadExplainData()])
+  if (taskLogDialogVisible.value && currentTaskId.value) {
+    currentTaskLogs.value = await getSchedulePlanTaskLogs(planId.value, currentTaskId.value)
   }
 }
 
@@ -319,18 +280,28 @@ function logTypeText(type: string) {
   return map[type] || type
 }
 
-function weekdayText(day: number) {
-  return `周${day}`
-}
-
-function timeSlotText(slot: TimeSlot) {
-  return `${weekdayText(slot.dayOfWeek)} 第${slot.periodNo}大节`
-}
-
 function handleAdjustLogPageChange(page: number) {
   adjustLogPageNum.value = page
   loadAdjustLogs()
 }
+
+const adjustContext = computed(() => {
+  if (!adjustingItem.value) return null
+  return {
+    targetType: 'PLAN_ITEM' as const,
+    planId: planId.value,
+    planItemId: adjustingItem.value.id,
+    courseName: adjustingItem.value.courseName,
+    teacherName: adjustingItem.value.teacherName,
+    className: adjustingItem.value.className,
+    currentRoomId: adjustingItem.value.classroomId,
+    currentRoomName: adjustingItem.value.roomName,
+    currentWeekDay: adjustingItem.value.weekday,
+    currentPeriodStart: adjustingItem.value.startPeriod,
+    currentPeriodEnd: adjustingItem.value.endPeriod,
+    currentTimeLabel: adjustingItem.value.timeLabel,
+  }
+})
 
 function goBack() {
   router.push('/v3/schedule-plans')
@@ -563,44 +534,7 @@ onMounted(async () => {
       </el-table>
     </el-dialog>
 
-    <el-dialog v-model="adjustDialogVisible" :title="`调整方案明细${plan?.status === 'APPLIED' ? '（将同步正式课表）' : ''}`" width="680px" destroy-on-close>
-      <el-alert
-        v-if="plan?.status === 'APPLIED'"
-        title="当前方案已应用，保存后会同步更新正式课表。"
-        type="warning"
-        :closable="false"
-        style="margin-bottom: 16px"
-      />
-      <el-form label-width="110px">
-        <el-form-item label="教室">
-          <el-select v-model="adjustForm.classroomId" filterable placeholder="请选择教室" style="width: 100%">
-            <el-option
-              v-for="room in classroomOptions"
-              :key="room.id"
-              :label="`${room.roomName}（${room.capacity}）`"
-              :value="String(room.id)"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="时间段">
-          <el-select v-model="adjustForm.timeSlotId" filterable placeholder="请选择时间段" style="width: 100%">
-            <el-option
-              v-for="slot in timeSlotOptions"
-              :key="slot.id"
-              :label="timeSlotText(slot)"
-              :value="String(slot.id)"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="调整原因">
-          <el-input v-model="adjustForm.adjustReason" type="textarea" :rows="3" placeholder="填写调整原因" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="adjustDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="adjusting" @click="submitAdjust">保存调整</el-button>
-      </template>
-    </el-dialog>
+    <ScheduleAdjustDialog v-model="adjustDialogVisible" :context="adjustContext" @success="handleAdjustSuccess" />
   </div>
 </template>
 

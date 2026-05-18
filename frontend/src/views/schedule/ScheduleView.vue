@@ -2,6 +2,7 @@
 import { reactive, ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
+import ScheduleAdjustDialog from '../../components/v4/ScheduleAdjustDialog.vue'
 import {
   getScheduleList,
   createSchedule,
@@ -12,6 +13,7 @@ import {
   type ScheduleCurrentSource,
   type ScheduleForm,
 } from '../../api/schedule'
+import type { ScheduleAdjustmentApplyResult } from '../../api/v4ScheduleAdjustmentApi'
 import { getAllTeachingTasks, type TeachingTask } from '../../api/teachingTask'
 import { getAllTimeSlots, type TimeSlot } from '../../api/timeSlot'
 import { getAllClassrooms, type Classroom } from '../../api/classroom'
@@ -55,6 +57,8 @@ const classroomList = ref<Classroom[]>([])
 const semesterList = ref<Semester[]>([])
 const currentSemester = ref<Semester | null>(null)
 const currentSource = ref<ScheduleCurrentSource | null>(null)
+const adjustVisible = ref(false)
+const adjustingSchedule = ref<Schedule | null>(null)
 
 const hasCurrentSemester = computed(() => currentSemester.value !== null)
 
@@ -163,6 +167,19 @@ async function handleDelete(row: Schedule) {
   fetchData()
 }
 
+function openAdjust(row: Schedule) {
+  adjustingSchedule.value = row
+  adjustVisible.value = true
+}
+
+async function handleAdjustSuccess(_result: ScheduleAdjustmentApplyResult) {
+  adjustVisible.value = false
+  await fetchData()
+  if (currentSemester.value) {
+    currentSource.value = await getCurrentScheduleSource(currentSemester.value.id).catch(() => currentSource.value)
+  }
+}
+
 function getTaskLabel(task: TeachingTask) {
   const requiredSlots = Math.ceil((task.weeklyHours || 0) / 2)
   const scheduledSlots = task.scheduledSlots || 0
@@ -200,6 +217,26 @@ function goSourceRisk() {
 
 onMounted(() => {
   fetchOptions().then(fetchData)
+})
+
+const adjustContext = computed(() => {
+  if (!adjustingSchedule.value) return null
+  const startPeriod = adjustingSchedule.value.periodNo ? adjustingSchedule.value.periodNo * 2 - 1 : null
+  const endPeriod = startPeriod ? startPeriod + 1 : null
+  return {
+    targetType: 'SCHEDULE' as const,
+    planId: adjustingSchedule.value.planId ?? null,
+    scheduleId: adjustingSchedule.value.id,
+    courseName: adjustingSchedule.value.courseName,
+    teacherName: adjustingSchedule.value.teacherName,
+    className: adjustingSchedule.value.className,
+    currentRoomId: adjustingSchedule.value.classroomId,
+    currentRoomName: adjustingSchedule.value.roomName,
+    currentWeekDay: adjustingSchedule.value.dayOfWeek,
+    currentPeriodStart: startPeriod,
+    currentPeriodEnd: endPeriod,
+    currentTimeLabel: adjustingSchedule.value.timeLabel,
+  }
 })
 </script>
 
@@ -329,8 +366,9 @@ onMounted(() => {
             <span v-else style="color: #c0c4cc">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
+            <el-button type="primary" link @click="openAdjust(row)">调整</el-button>
             <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -387,6 +425,8 @@ onMounted(() => {
         <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <ScheduleAdjustDialog v-model="adjustVisible" :context="adjustContext" @success="handleAdjustSuccess" />
   </div>
 </template>
 
