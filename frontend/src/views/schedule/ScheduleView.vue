@@ -1,20 +1,23 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 import {
   getScheduleList,
   createSchedule,
   deleteSchedule,
   checkConflict,
+  getCurrentScheduleSource,
   type Schedule,
+  type ScheduleCurrentSource,
   type ScheduleForm,
 } from '../../api/schedule'
 import { getAllTeachingTasks, type TeachingTask } from '../../api/teachingTask'
 import { getAllTimeSlots, type TimeSlot } from '../../api/timeSlot'
 import { getAllClassrooms, type Classroom } from '../../api/classroom'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
-import { getSchedulePlanList, type SchedulePlan } from '../../api/schedulePlan'
 
+const router = useRouter()
 const loading = ref(false)
 const tableData = ref<Schedule[]>([])
 const total = ref(0)
@@ -51,7 +54,7 @@ const timeSlotList = ref<TimeSlot[]>([])
 const classroomList = ref<Classroom[]>([])
 const semesterList = ref<Semester[]>([])
 const currentSemester = ref<Semester | null>(null)
-const appliedPlan = ref<SchedulePlan | null>(null)
+const currentSource = ref<ScheduleCurrentSource | null>(null)
 
 const hasCurrentSemester = computed(() => currentSemester.value !== null)
 
@@ -96,17 +99,7 @@ async function fetchOptions() {
   currentSemester.value = current
   if (current) {
     searchForm.semesterId = current.id
-    // 加载当前学期的已应用方案
-    try {
-      const planRes = await getSchedulePlanList({ semesterId: current.id, status: 'APPLIED', size: 1 })
-      if (planRes.records.length > 0) {
-        appliedPlan.value = planRes.records[0]
-      } else {
-        appliedPlan.value = null
-      }
-    } catch (_e) {
-      appliedPlan.value = null
-    }
+    currentSource.value = await getCurrentScheduleSource(current.id).catch(() => null)
   }
 }
 
@@ -190,6 +183,21 @@ function roomTypeText(type: string) {
   return map[type] || type
 }
 
+function goSourcePlanDetail() {
+  if (!currentSource.value?.sourcePlanId) return
+  router.push(`/v3/schedule-plans/${currentSource.value.sourcePlanId}`)
+}
+
+function goSourceAnalysis() {
+  if (!currentSource.value?.sourcePlanId) return
+  router.push(`/v4/schedule-analysis/${currentSource.value.sourcePlanId}`)
+}
+
+function goSourceRisk() {
+  if (!currentSource.value?.sourcePlanId) return
+  router.push(`/v4/schedule-analysis/${currentSource.value.sourcePlanId}/risks`)
+}
+
 onMounted(() => {
   fetchOptions().then(fetchData)
 })
@@ -208,23 +216,47 @@ onMounted(() => {
     />
 
     <!-- 当前学期信息条 -->
-    <el-alert
-      v-if="currentSemester"
-      type="info"
-      show-icon
-      :closable="false"
-      style="margin-bottom: 16px"
-    >
-      <template #title>
-        <div style="display: flex; align-items: center; gap: 16px">
-          <span>当前学期：{{ currentSemester.name }}</span>
-          <span v-if="appliedPlan" style="color: #67c23a">
-            ✓ 课表来源方案：{{ appliedPlan.name }}（{{ appliedPlan.totalScore }}分）
-          </span>
-          <span v-else style="color: #909399">暂无已应用方案</span>
+    <el-card v-if="currentSemester" shadow="never" class="source-card">
+      <div class="source-top">
+        <div>
+          <div class="source-title">当前正式课表来源</div>
+          <div class="source-subtitle">当前学期：{{ currentSemester.name }}</div>
         </div>
-      </template>
-    </el-alert>
+        <div class="source-actions">
+          <el-button :disabled="!currentSource?.sourcePlanId" @click="goSourcePlanDetail">查看来源方案</el-button>
+          <el-button type="primary" plain :disabled="!currentSource?.sourcePlanId" @click="goSourceAnalysis">查看质量分析</el-button>
+          <el-button type="warning" plain :disabled="!currentSource?.sourcePlanId" @click="goSourceRisk">查看风险诊断</el-button>
+        </div>
+      </div>
+      <el-descriptions :column="4" border>
+        <el-descriptions-item label="来源方案">
+          {{ currentSource?.sourcePlanName || '暂无来源方案' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="方案编号">
+          {{ currentSource?.sourcePlanId ?? '—' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="应用时间">
+          {{ currentSource?.appliedAt || '—' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="方案得分">
+          {{ currentSource?.totalScore ?? '—' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="策略编码">
+          {{ currentSource?.strategyCode || '—' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="是否人工调整">
+          <el-tag :type="currentSource?.hasManualAdjustments ? 'warning' : 'success'">
+            {{ currentSource?.hasManualAdjustments ? '已人工调整' : '未人工调整' }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="人工调整次数">
+          {{ currentSource?.manualAdjustmentCount ?? 0 }}
+        </el-descriptions-item>
+        <el-descriptions-item label="说明">
+          {{ currentSource?.sourcePlanId ? '当前正式课表由已应用方案生成，可继续查看 V4 分析链路。' : '旧数据或手动录入课表可能没有来源方案。' }}
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-card>
 
     <el-card class="search-card" shadow="never">
       <el-form :inline="true" :model="searchForm">
@@ -371,5 +403,34 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.source-card {
+  border-radius: 18px;
+}
+
+.source-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.source-title {
+  color: #223047;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.source-subtitle {
+  margin-top: 6px;
+  color: #667085;
+}
+
+.source-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 </style>

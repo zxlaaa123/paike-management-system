@@ -16,10 +16,23 @@ export interface Schedule {
   building: string
   sourceType?: string
   sourceTypeName?: string
+  planId?: number
   batchId?: number
   batchNo?: string
   createTime: string
   updateTime: string
+}
+
+export interface ScheduleCurrentSource {
+  termId: number
+  termName: string
+  sourcePlanId: number | null
+  sourcePlanName: string | null
+  strategyCode: string | null
+  totalScore: number | null
+  appliedAt: string | null
+  hasManualAdjustments: boolean
+  manualAdjustmentCount: number
 }
 
 export interface ScheduleForm {
@@ -99,6 +112,15 @@ export function checkConflict(data: ScheduleForm) {
   return request.post<
     ApiResponse<{ hasConflict: boolean; message: string }>
   >('/schedules/check-conflict', data).then((r) => {
+    if (!r.data) {
+      throw new Error('响应数据为空')
+    }
+    return r.data.data
+  })
+}
+
+export function getCurrentScheduleSource(termId?: number) {
+  return request.get<ApiResponse<ScheduleCurrentSource>>('/v4/schedules/current/source', { params: { termId } }).then((r) => {
     if (!r.data) {
       throw new Error('响应数据为空')
     }
