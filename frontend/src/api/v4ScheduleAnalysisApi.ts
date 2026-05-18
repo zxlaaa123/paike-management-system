@@ -1,0 +1,47 @@
+import request from '../utils/request'
+import type { ApiResponse } from './types'
+
+export interface ScheduleAnalysisSummary {
+  planId: number
+  planName: string
+  termId: number
+  termName: string
+  strategyCode: string
+  planStatus: string
+  isCurrent: boolean
+  totalScore: number | null
+  scheduledCount: number
+  unscheduledCount: number
+  conflictCount: number
+  teacherCount: number
+  classCount: number
+  roomCount: number
+  courseCount: number
+  teacherAverageHours: number
+  teacherMaxHours: number
+  teacherMinHours: number
+  roomUtilizationRate: number
+  classAverageDailyLessons: number
+  highRiskCount: number
+  mediumRiskCount: number
+  lowRiskCount: number
+  qualityLevel: string
+  qualitySummary: string
+  suggestions: string[]
+  createdAt: string | null
+  appliedAt: string | null
+}
+
+export function getScheduleAnalysisSummary(planId: number) {
+  return request.get<ApiResponse<ScheduleAnalysisSummary>>(`/v4/schedule-analysis/plans/${planId}/summary`).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
+}
+
+export function refreshScheduleAnalysisSummary(planId: number) {
+  return request.post<ApiResponse<{ planId: number; refreshed: boolean; message: string }>>(`/v4/schedule-analysis/plans/${planId}/refresh`).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
+}

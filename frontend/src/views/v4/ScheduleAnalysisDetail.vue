@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getSchedulePlanById, type SchedulePlan } from '../../api/schedulePlan'
+import { getScheduleAnalysisSummary, refreshScheduleAnalysisSummary, type ScheduleAnalysisSummary } from '../../api/v4ScheduleAnalysisApi'
 import { strategyText } from '../../utils/status'
 
 const route = useRoute()
@@ -10,16 +11,36 @@ const router = useRouter()
 
 const planId = computed(() => Number(route.params.planId))
 const loading = ref(false)
+const refreshing = ref(false)
 const plan = ref<SchedulePlan | null>(null)
+const summary = ref<ScheduleAnalysisSummary | null>(null)
 
 async function fetchData() {
   loading.value = true
   try {
-    plan.value = await getSchedulePlanById(planId.value)
+    const [planData, summaryData] = await Promise.all([
+      getSchedulePlanById(planId.value),
+      getScheduleAnalysisSummary(planId.value),
+    ])
+    plan.value = planData
+    summary.value = summaryData
   } catch (error: any) {
-    ElMessage.error(error?.message || '加载方案信息失败')
+    ElMessage.error(error?.message || '加载分析数据失败')
   } finally {
     loading.value = false
+  }
+}
+
+async function handleRefresh() {
+  refreshing.value = true
+  try {
+    await refreshScheduleAnalysisSummary(planId.value)
+    await fetchData()
+    ElMessage.success('分析结果已刷新')
+  } catch (error: any) {
+    ElMessage.error(error?.message || '刷新失败')
+  } finally {
+    refreshing.value = false
   }
 }
 
@@ -39,30 +60,100 @@ onMounted(fetchData)
           </div>
         </div>
         <div class="summary-actions">
+          <el-button type="primary" plain :loading="refreshing" @click="handleRefresh">刷新分析</el-button>
           <el-button @click="router.push(`/v3/schedule-plans/${plan.id}`)">回到 V3 方案详情</el-button>
         </div>
       </div>
 
-      <el-alert
-        type="info"
-        :closable="false"
-        title="V4 阶段 0 骨架页面"
-        description="当前页面先确认 V3 方案能正常进入 V4 入口。阶段 1 会在这里接入真实质量分析接口。"
-      />
+      <el-row v-if="summary" :gutter="16" class="summary-grid">
+        <el-col :span="6">
+          <div class="summary-box">
+            <span>总分</span>
+            <strong>{{ summary.totalScore ?? '—' }}</strong>
+          </div>
+        </el-col>
+        <el-col :span="6">
+          <div class="summary-box">
+            <span>已排任务</span>
+            <strong>{{ summary.scheduledCount }}</strong>
+          </div>
+        </el-col>
+        <el-col :span="6">
+          <div class="summary-box">
+            <span>未排任务</span>
+            <strong>{{ summary.unscheduledCount }}</strong>
+          </div>
+        </el-col>
+        <el-col :span="6">
+          <div class="summary-box">
+            <span>冲突数量</span>
+            <strong>{{ summary.conflictCount }}</strong>
+          </div>
+        </el-col>
+      </el-row>
     </el-card>
 
-    <el-card v-if="plan" shadow="never" class="check-card">
+    <el-card v-if="summary" shadow="never" class="check-card">
       <template #header>
-        <div class="card-title">当前承接信息</div>
+        <div class="card-title">核心指标卡片</div>
       </template>
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="总分">{{ plan.totalScore ?? '—' }}</el-descriptions-item>
-        <el-descriptions-item label="已排任务">{{ plan.scheduledCount }}</el-descriptions-item>
-        <el-descriptions-item label="未排任务">{{ plan.unscheduledCount }}</el-descriptions-item>
-        <el-descriptions-item label="冲突数量">{{ plan.conflictCount }}</el-descriptions-item>
+      <el-descriptions :column="3" border>
+        <el-descriptions-item label="教师数量">{{ summary.teacherCount }}</el-descriptions-item>
+        <el-descriptions-item label="班级数量">{{ summary.classCount }}</el-descriptions-item>
+        <el-descriptions-item label="教室数量">{{ summary.roomCount }}</el-descriptions-item>
+        <el-descriptions-item label="课程数量">{{ summary.courseCount }}</el-descriptions-item>
+        <el-descriptions-item label="教师平均负载">{{ summary.teacherAverageHours }}</el-descriptions-item>
+        <el-descriptions-item label="教师最大负载">{{ summary.teacherMaxHours }}</el-descriptions-item>
+        <el-descriptions-item label="教师最小负载">{{ summary.teacherMinHours }}</el-descriptions-item>
+        <el-descriptions-item label="教室利用率">{{ summary.roomUtilizationRate }}%</el-descriptions-item>
+        <el-descriptions-item label="班级日均课时">{{ summary.classAverageDailyLessons }}</el-descriptions-item>
+        <el-descriptions-item label="高风险">{{ summary.highRiskCount }}</el-descriptions-item>
+        <el-descriptions-item label="中风险">{{ summary.mediumRiskCount }}</el-descriptions-item>
+        <el-descriptions-item label="低风险">{{ summary.lowRiskCount }}</el-descriptions-item>
       </el-descriptions>
-      <div class="safe-note">当前阶段只读展示 V3 基础信息，不修改正式课表，不修改方案明细。</div>
     </el-card>
+
+    <el-row v-if="summary" :gutter="16">
+      <el-col :span="12">
+        <el-card shadow="never" class="check-card">
+          <template #header>
+            <div class="card-title">质量结论</div>
+          </template>
+          <div class="quality-panel">
+            <el-tag size="large" :type="summary.qualityLevel === '优秀' ? 'success' : summary.qualityLevel === '良好' ? 'primary' : summary.qualityLevel === '可用' ? 'warning' : 'danger'">
+              {{ summary.qualityLevel }}
+            </el-tag>
+            <p>{{ summary.qualitySummary }}</p>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="12">
+        <el-card shadow="never" class="check-card">
+          <template #header>
+            <div class="card-title">建议动作</div>
+          </template>
+          <el-empty v-if="summary.suggestions.length === 0" description="暂无建议" />
+          <ul v-else class="suggestion-list">
+            <li v-for="item in summary.suggestions" :key="item">{{ item }}</li>
+          </ul>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-card v-if="summary" shadow="never" class="check-card">
+      <template #header>
+        <div class="card-title">快捷入口</div>
+      </template>
+      <div class="quick-links">
+        <el-button @click="router.push(`/v3/schedule-plans/${planId}`)">查看 V3 方案详情</el-button>
+        <el-button disabled>评分详情解释（阶段 2）</el-button>
+        <el-button disabled>风险诊断中心（阶段 3）</el-button>
+        <el-button disabled>图表分析（阶段 4）</el-button>
+      </div>
+      <div class="safe-note">当前阶段所有数据均来自只读分析接口，不会修改正式课表或方案明细。</div>
+    </el-card>
+
+    <el-empty v-if="!loading && !summary" description="未找到对应分析结果" />
   </div>
 </template>
 
@@ -97,9 +188,57 @@ onMounted(fetchData)
   color: #69717d;
 }
 
+.summary-grid {
+  margin: 0;
+}
+
+.summary-box {
+  padding: 16px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #fbf8f3 0%, #ffffff 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summary-box span {
+  color: #717b87;
+  font-size: 13px;
+}
+
+.summary-box strong {
+  color: #1f3045;
+  font-size: 28px;
+}
+
 .card-title {
   font-weight: 700;
   color: #223047;
+}
+
+.quality-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.quality-panel p {
+  margin: 0;
+  color: #5f6978;
+  line-height: 1.7;
+}
+
+.suggestion-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #475467;
+  line-height: 1.8;
+}
+
+.quick-links {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .safe-note {
