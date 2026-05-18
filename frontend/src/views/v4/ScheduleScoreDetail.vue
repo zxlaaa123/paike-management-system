@@ -112,7 +112,7 @@ onMounted(fetchData)
           </template>
           <div class="link-row">
             <el-button @click="router.push(`/v4/schedule-analysis/${planId}`)">回到质量分析</el-button>
-            <el-button disabled>风险诊断中心（阶段 3）</el-button>
+            <el-button type="warning" plain @click="router.push(`/v4/schedule-analysis/${planId}/risks`)">风险诊断中心</el-button>
             <el-button disabled>可视化图表（阶段 4）</el-button>
           </div>
         </el-card>
