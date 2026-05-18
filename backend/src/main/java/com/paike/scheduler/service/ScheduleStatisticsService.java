@@ -98,9 +98,6 @@ public class ScheduleStatisticsService {
 
     public List<Map<String, Object>> classroomUtilization(Long semesterId, Long planId) {
         List<?> rawItems = loadItems(semesterId, planId);
-        if (rawItems.isEmpty()) {
-            return List.of();
-        }
 
         // 统计每个教室的使用节次
         Map<Long, Long> roomUsage = new LinkedHashMap<>();
@@ -138,24 +135,6 @@ public class ScheduleStatisticsService {
             row.put("utilizationRate", rate);
             row.put("evaluation", evaluateUtilization(rate.doubleValue()));
             result.add(row);
-        }
-
-        // 未使用的教室也加入
-        Set<Long> usedRoomIds = roomUsage.keySet();
-        for (Classroom room : allRooms) {
-            if (!usedRoomIds.contains(room.getId())) {
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("roomId", room.getId());
-                row.put("roomName", room.getRoomName());
-                row.put("building", room.getBuilding());
-                row.put("capacity", room.getCapacity());
-                row.put("roomType", room.getRoomType());
-                row.put("usedPeriods", 0L);
-                row.put("totalPeriods", TOTAL_AVAILABLE_PERIODS);
-                row.put("utilizationRate", BigDecimal.ZERO.setScale(1));
-                row.put("evaluation", "未使用");
-                result.add(row);
-            }
         }
 
         // 按利用率降序排序

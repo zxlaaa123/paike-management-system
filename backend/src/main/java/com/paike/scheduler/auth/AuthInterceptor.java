@@ -28,7 +28,8 @@ public class AuthInterceptor implements HandlerInterceptor {
             String csrfHeader = request.getHeader("X-CSRF-Token");
             String csrfCookie = getCookieValue(request, "XSRF-TOKEN");
             // CSRF Cookie 存在时要求请求头与之匹配
-            if (csrfCookie != null && !csrfCookie.isBlank() && csrfHeader != null && !csrfCookie.equals(csrfHeader)) {
+            if (csrfCookie != null && !csrfCookie.isBlank()
+                    && (csrfHeader == null || !csrfCookie.equals(csrfHeader))) {
                 throw new BusinessException(403, "CSRF 校验失败");
             }
         }

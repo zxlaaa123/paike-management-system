@@ -24,7 +24,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { PageResult } from '../api/types'
 
-export interface CrudOptions<T, F> {
+export interface CrudOptions<T, F extends object> {
   /** 获取列表数据的 API 函数 */
   fetchList: (params: Record<string, unknown>) => Promise<PageResult<T>>
   /** 创建记录的 API 函数 */
@@ -45,7 +45,7 @@ export interface CrudOptions<T, F> {
   transformRecords?: (records: T[]) => T[]
 }
 
-export function useCrudForm<T extends { id: number }, F>(options: CrudOptions<T, F>) {
+export function useCrudForm<T extends { id: number }, F extends object>(options: CrudOptions<T, F>) {
   const loading = ref(false)
   const tableData = ref<T[]>([]) as { value: T[] }
   const total = ref(0)
@@ -59,7 +59,7 @@ export function useCrudForm<T extends { id: number }, F>(options: CrudOptions<T,
   const formRef = ref()
   const editingId = ref<number | null>(null)
 
-  const form = reactive<F>({ ...options.formDefaults })
+  const form = reactive({ ...options.formDefaults }) as F
 
   async function fetchData() {
     loading.value = true

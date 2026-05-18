@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted, computed } from 'vue'
-import { ElMessage } from 'element-plus'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
 import { getSchedulePlanList, type SchedulePlan } from '../../api/schedulePlan'
 import {
@@ -23,7 +22,7 @@ const planList = ref<SchedulePlan[]>([])
 
 const searchForm = reactive({
   semesterId: undefined as number | undefined,
-  planId: undefined as number | undefined,
+  planId: null as number | null,
 })
 
 const hasCurrentSemester = computed(() => currentSemester.value !== null)
@@ -127,7 +126,7 @@ function onPlanChange() {
   handleTabChange(activeTab.value)
 }
 
-function planName(planId: number | null) {
+function planName(planId: number | null | undefined) {
   if (!planId) return '正式课表'
   const plan = planList.value.find(p => p.id === planId)
   return plan ? plan.name : `方案${planId}`
