@@ -21,6 +21,7 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
         ensureScheduleScoreDetailColumns();
         ensureScheduleRuleWeightUniqueIndex();
         ensureStage7Tables();
+        ensureStage9Tables();
     }
 
     private void ensureSemesterIndexes() {
@@ -271,6 +272,35 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
             ensureIndex("schedule_locked_item", "idx_locked_active", "CREATE INDEX idx_locked_active ON schedule_locked_item(active_flag)");
         } catch (Exception e) {
             log.warn("Failed to ensure schedule_locked_item: {}", e.getMessage());
+        }
+    }
+
+    private void ensureStage9Tables() {
+        ensureScheduleReportTable();
+    }
+
+    private void ensureScheduleReportTable() {
+        try {
+            jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS schedule_report (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '报告ID',
+                    plan_id BIGINT NOT NULL COMMENT '排课方案ID',
+                    report_type VARCHAR(40) NOT NULL COMMENT '报告类型',
+                    format VARCHAR(20) NOT NULL COMMENT '导出格式',
+                    status VARCHAR(20) NOT NULL DEFAULT 'GENERATED' COMMENT '生成状态',
+                    include_charts TINYINT NOT NULL DEFAULT 1 COMMENT '是否包含图表',
+                    include_risks TINYINT NOT NULL DEFAULT 1 COMMENT '是否包含风险',
+                    include_suggestions TINYINT NOT NULL DEFAULT 1 COMMENT '是否包含建议',
+                    file_path VARCHAR(500) NOT NULL COMMENT '报告文件路径',
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+                ) COMMENT='V4 排课分析报告表'
+                """);
+            ensureIndex("schedule_report", "idx_schedule_report_plan", "CREATE INDEX idx_schedule_report_plan ON schedule_report(plan_id)");
+            ensureIndex("schedule_report", "idx_schedule_report_type", "CREATE INDEX idx_schedule_report_type ON schedule_report(report_type)");
+            ensureIndex("schedule_report", "idx_schedule_report_created", "CREATE INDEX idx_schedule_report_created ON schedule_report(created_at)");
+        } catch (Exception e) {
+            log.warn("Failed to ensure schedule_report: {}", e.getMessage());
         }
     }
 

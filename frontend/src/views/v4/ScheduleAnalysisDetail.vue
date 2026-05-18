@@ -158,6 +158,7 @@ onMounted(fetchData)
         <el-button type="warning" plain @click="router.push(`/v4/schedule-analysis/${planId}/risks`)">风险诊断中心</el-button>
         <el-button type="success" plain @click="router.push(`/v4/schedule-analysis/${planId}/charts`)">图表分析</el-button>
         <el-button type="info" plain @click="router.push(`/v4/schedule-analysis/${planId}/locks`)">课程锁定管理</el-button>
+        <el-button type="primary" plain @click="router.push(`/v4/schedule-analysis/${planId}/reports`)">排课报告导出</el-button>
         <el-button
           type="success"
           :disabled="plan?.status === 'ABANDONED' || plan?.status === 'FAILED'"
