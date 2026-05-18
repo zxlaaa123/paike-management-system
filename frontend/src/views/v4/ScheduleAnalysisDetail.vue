@@ -146,7 +146,7 @@ onMounted(fetchData)
       </template>
       <div class="quick-links">
         <el-button @click="router.push(`/v3/schedule-plans/${planId}`)">查看 V3 方案详情</el-button>
-        <el-button disabled>评分详情解释（阶段 2）</el-button>
+        <el-button type="primary" plain @click="router.push(`/v4/schedule-analysis/${planId}/score`)">评分详情解释</el-button>
         <el-button disabled>风险诊断中心（阶段 3）</el-button>
         <el-button disabled>图表分析（阶段 4）</el-button>
       </div>

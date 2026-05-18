@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
+import com.paike.scheduler.entity.ScheduleRuleWeight;
+import com.paike.scheduler.entity.ScheduleScoreDetail;
 import com.paike.scheduler.entity.Semester;
 import com.paike.scheduler.entity.TimeSlot;
 import com.paike.scheduler.mapper.SchedulePlanItemMapper;
@@ -11,6 +13,8 @@ import com.paike.scheduler.mapper.SchedulePlanMapper;
 import com.paike.scheduler.mapper.SemesterMapper;
 import com.paike.scheduler.mapper.TimeSlotMapper;
 import com.paike.scheduler.service.vo.ScheduleAnalysisSummaryVo;
+import com.paike.scheduler.service.vo.ScheduleScoreDetailExplainVo;
+import com.paike.scheduler.service.vo.ScheduleScoreItemVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +36,8 @@ public class V4ScheduleAnalysisService {
     private final SchedulePlanItemMapper schedulePlanItemMapper;
     private final SemesterMapper semesterMapper;
     private final TimeSlotMapper timeSlotMapper;
+    private final ScheduleScoreService scheduleScoreService;
+    private final ScheduleRuleWeightService scheduleRuleWeightService;
 
     public ScheduleAnalysisSummaryVo getPlanSummary(Long planId) {
         SchedulePlan plan = schedulePlanMapper.selectById(planId);
@@ -143,6 +149,150 @@ public class V4ScheduleAnalysisService {
         vo.setCreatedAt(plan.getCreatedAt());
         vo.setAppliedAt(plan.getAppliedAt());
         return vo;
+    }
+
+    public ScheduleScoreDetailExplainVo getPlanScoreDetails(Long planId) {
+        SchedulePlan plan = schedulePlanMapper.selectById(planId);
+        if (plan == null) {
+            throw new BusinessException("排课方案不存在");
+        }
+
+        List<ScheduleScoreDetail> details = scheduleScoreService.getScoreDetails(planId);
+        if (details.isEmpty()) {
+            scheduleScoreService.rescore(plan);
+            plan = schedulePlanMapper.selectById(planId);
+            details = scheduleScoreService.getScoreDetails(planId);
+        }
+
+        List<ScheduleRuleWeight> rules = scheduleRuleWeightService.list(plan.getSemesterId(), plan.getStrategyType(), null);
+        Map<String, ScheduleRuleWeight> ruleMap = rules.stream()
+                .collect(java.util.stream.Collectors.toMap(ScheduleRuleWeight::getRuleCode, rule -> rule, (a, b) -> a));
+        Map<String, ScheduleScoreDetail> detailMap = details.stream()
+                .collect(java.util.stream.Collectors.toMap(ScheduleScoreDetail::getRuleCode, detail -> detail, (a, b) -> a));
+
+        List<String> displayOrder = List.of(
+                "TEACHER_TIME_CONFLICT",
+                "CLASS_TIME_CONFLICT",
+                "CLASSROOM_TIME_CONFLICT",
+                "TEACHER_UNAVAILABLE",
+                "CLASSROOM_CAPACITY",
+                "CLASSROOM_TYPE_MISMATCH",
+                "TEACHER_DAILY_LOAD",
+                "CLASS_DAILY_BALANCE",
+                "CLASSROOM_UTILIZATION",
+                "COURSE_DISTRIBUTION",
+                "CONTINUOUS_PERIOD_LIMIT",
+                "MORNING_THEORY_PRIORITY"
+        );
+
+        List<ScheduleScoreItemVo> scoreItems = new ArrayList<>();
+        for (String ruleCode : displayOrder) {
+            ScheduleRuleWeight rule = ruleMap.get(ruleCode);
+            ScheduleScoreDetail detail = detailMap.get(ruleCode);
+            if (rule == null && detail == null) {
+                continue;
+            }
+            scoreItems.add(toScoreItem(ruleCode, rule, detail));
+        }
+
+        ScheduleScoreDetailExplainVo vo = new ScheduleScoreDetailExplainVo();
+        vo.setPlanId(plan.getId());
+        vo.setPlanName(plan.getName());
+        vo.setStrategyCode(plan.getStrategyType());
+        vo.setTotalScore(plan.getTotalScore());
+        vo.setCalculationSource("V3 评分明细 + 规则权重；若历史方案缺少评分明细，则进入 V4 时按现有方案明细重新评分生成解释数据。");
+        vo.setScoreItems(scoreItems);
+        return vo;
+    }
+
+    private ScheduleScoreItemVo toScoreItem(String ruleCode, ScheduleRuleWeight rule, ScheduleScoreDetail detail) {
+        ScheduleScoreItemVo item = new ScheduleScoreItemVo();
+        item.setScoreKey(mapRuleCode(ruleCode));
+        item.setScoreName(resolveRuleName(ruleCode, rule, detail));
+        item.setWeight(rule != null ? scale(rule.getWeight()) : detail != null ? scale(detail.getMaxScore()) : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+        item.setMaxScore(BigDecimal.valueOf(100).setScale(2, RoundingMode.HALF_UP));
+        item.setDescription(resolveDescription(ruleCode, rule));
+        item.setViolationCount(detail != null ? detail.getViolationCount() : 0);
+        item.setDetailMessage(detail != null ? detail.getDetailMessage() : "暂无评分明细");
+        item.setScoreValue(calculateDisplayScore(rule, detail));
+        return item;
+    }
+
+    private BigDecimal calculateDisplayScore(ScheduleRuleWeight rule, ScheduleScoreDetail detail) {
+        BigDecimal weight = rule != null && rule.getWeight() != null ? rule.getWeight() : detail != null ? detail.getMaxScore() : BigDecimal.ZERO;
+        if (weight == null || weight.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.valueOf(100).setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal penalty = detail != null && detail.getScore() != null ? detail.getScore().abs() : BigDecimal.ZERO;
+        BigDecimal percentPenalty = penalty
+                .divide(weight, 4, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100));
+        BigDecimal scoreValue = BigDecimal.valueOf(100).subtract(percentPenalty);
+        if (scoreValue.compareTo(BigDecimal.ZERO) < 0) {
+            scoreValue = BigDecimal.ZERO;
+        }
+        if (scoreValue.compareTo(BigDecimal.valueOf(100)) > 0) {
+            scoreValue = BigDecimal.valueOf(100);
+        }
+        return scoreValue.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal scale(BigDecimal value) {
+        if (value == null) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return value.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private String resolveRuleName(String ruleCode, ScheduleRuleWeight rule, ScheduleScoreDetail detail) {
+        if (detail != null && detail.getRuleName() != null && !detail.getRuleName().isBlank()) {
+            return mapRuleName(detail.getRuleName(), ruleCode);
+        }
+        if (rule != null && rule.getRuleName() != null && !rule.getRuleName().isBlank()) {
+            return mapRuleName(rule.getRuleName(), ruleCode);
+        }
+        return mapRuleName(ruleCode, ruleCode);
+    }
+
+    private String resolveDescription(String ruleCode, ScheduleRuleWeight rule) {
+        if (rule != null && rule.getDescription() != null && !rule.getDescription().isBlank()) {
+            return rule.getDescription();
+        }
+        return switch (ruleCode) {
+            case "TEACHER_TIME_CONFLICT", "CLASS_TIME_CONFLICT", "CLASSROOM_TIME_CONFLICT", "TEACHER_UNAVAILABLE", "CLASSROOM_CAPACITY", "CLASSROOM_TYPE_MISMATCH"
+                    -> "硬约束违规越少，分数越高";
+            case "TEACHER_DAILY_LOAD" -> "教师课时分布越均衡，分数越高";
+            case "CLASS_DAILY_BALANCE" -> "班级每日课程安排越均衡，分数越高";
+            case "CLASSROOM_UTILIZATION" -> "教室使用越合理，分数越高";
+            case "COURSE_DISTRIBUTION" -> "同一课程分布越分散，分数越高";
+            case "CONTINUOUS_PERIOD_LIMIT" -> "连续上课节次越合理，分数越高";
+            case "MORNING_THEORY_PRIORITY" -> "理论课安排在更合适时段时，分数更高";
+            default -> "评分维度解释信息";
+        };
+    }
+
+    private String mapRuleCode(String ruleCode) {
+        return switch (ruleCode) {
+            case "TEACHER_TIME_CONFLICT", "CLASS_TIME_CONFLICT", "CLASSROOM_TIME_CONFLICT", "TEACHER_UNAVAILABLE", "CLASSROOM_CAPACITY", "CLASSROOM_TYPE_MISMATCH"
+                    -> "HARD_CONFLICT";
+            case "TEACHER_DAILY_LOAD" -> "TEACHER_BALANCE";
+            case "CLASSROOM_UTILIZATION" -> "ROOM_UTILIZATION";
+            case "CLASS_DAILY_BALANCE" -> "CLASS_LOAD";
+            case "COURSE_DISTRIBUTION", "CONTINUOUS_PERIOD_LIMIT", "MORNING_THEORY_PRIORITY" -> "TIME_DISTRIBUTION";
+            default -> ruleCode;
+        };
+    }
+
+    private String mapRuleName(String rawName, String ruleCode) {
+        return switch (ruleCode) {
+            case "TEACHER_TIME_CONFLICT", "CLASS_TIME_CONFLICT", "CLASSROOM_TIME_CONFLICT", "TEACHER_UNAVAILABLE", "CLASSROOM_CAPACITY", "CLASSROOM_TYPE_MISMATCH"
+                    -> "硬性冲突评分";
+            case "TEACHER_DAILY_LOAD" -> "教师课时均衡评分";
+            case "CLASSROOM_UTILIZATION" -> "教室利用率评分";
+            case "CLASS_DAILY_BALANCE" -> "班级负载评分";
+            case "COURSE_DISTRIBUTION", "CONTINUOUS_PERIOD_LIMIT", "MORNING_THEORY_PRIORITY" -> "时间分布评分";
+            default -> rawName;
+        };
     }
 
     private int lessonPeriods(SchedulePlanItem item) {

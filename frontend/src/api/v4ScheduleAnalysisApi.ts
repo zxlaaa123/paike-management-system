@@ -32,6 +32,26 @@ export interface ScheduleAnalysisSummary {
   appliedAt: string | null
 }
 
+export interface ScheduleScoreItem {
+  scoreKey: string
+  scoreName: string
+  scoreValue: number
+  maxScore: number
+  weight: number
+  description: string
+  violationCount: number
+  detailMessage: string
+}
+
+export interface ScheduleScoreExplanation {
+  planId: number
+  planName: string
+  strategyCode: string
+  totalScore: number | null
+  calculationSource: string
+  scoreItems: ScheduleScoreItem[]
+}
+
 export function getScheduleAnalysisSummary(planId: number) {
   return request.get<ApiResponse<ScheduleAnalysisSummary>>(`/v4/schedule-analysis/plans/${planId}/summary`).then((r) => {
     if (!r.data) throw new Error('响应数据为空')
@@ -41,6 +61,13 @@ export function getScheduleAnalysisSummary(planId: number) {
 
 export function refreshScheduleAnalysisSummary(planId: number) {
   return request.post<ApiResponse<{ planId: number; refreshed: boolean; message: string }>>(`/v4/schedule-analysis/plans/${planId}/refresh`).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
+}
+
+export function getScheduleScoreExplanation(planId: number) {
+  return request.get<ApiResponse<ScheduleScoreExplanation>>(`/v4/schedule-analysis/plans/${planId}/score-details`).then((r) => {
     if (!r.data) throw new Error('响应数据为空')
     return r.data.data
   })
