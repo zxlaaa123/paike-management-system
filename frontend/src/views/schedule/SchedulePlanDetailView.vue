@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ScheduleAdjustDialog from '../../components/v4/ScheduleAdjustDialog.vue'
+import LocalReplanDialog from '../../components/v4/LocalReplanDialog.vue'
 import { getAllClassrooms, type Classroom } from '../../api/classroom'
 import { getAllTimeSlots, type TimeSlot } from '../../api/timeSlot'
 import {
@@ -23,6 +24,7 @@ import {
   type UnassignedSummaryItem,
 } from '../../api/schedulePlan'
 import type { ScheduleAdjustmentApplyResult } from '../../api/v4ScheduleAdjustmentApi'
+import type { ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
 import { getScoreDetails, getScoreSummary, rescore, type ScheduleScoreDetail, type ScoreSummary } from '../../api/scheduleScore'
 import { strategyText } from '../../utils/status'
 
@@ -59,6 +61,7 @@ const currentTaskId = ref<number | null>(null)
 
 const adjustDialogVisible = ref(false)
 const adjustingItem = ref<SchedulePlanItem | null>(null)
+const localReplanVisible = ref(false)
 
 async function fetchData() {
   loading.value = true
@@ -244,6 +247,11 @@ async function handleAdjustSuccess(_result: ScheduleAdjustmentApplyResult) {
   }
 }
 
+function handleLocalReplanSuccess(result: ScheduleReplanResult) {
+  localReplanVisible.value = false
+  router.push(`/v3/schedule-plans/${result.newPlanId}`)
+}
+
 function statusText(status: string) {
   const map: Record<string, string> = { DRAFT: '草稿', APPLIED: '已应用', ABANDONED: '已废弃' }
   return map[status] || status
@@ -371,6 +379,14 @@ onMounted(async () => {
           </el-button>
           <el-button type="info" plain @click="router.push(`/v4/schedule-analysis/${plan.id}/locks`)">
             课程锁定管理
+          </el-button>
+          <el-button
+            type="success"
+            plain
+            :disabled="plan.status === 'ABANDONED' || plan.status === 'FAILED'"
+            @click="localReplanVisible = true"
+          >
+            局部重排生成新方案
           </el-button>
         </div>
       </el-card>
@@ -538,6 +554,7 @@ onMounted(async () => {
     </el-dialog>
 
     <ScheduleAdjustDialog v-model="adjustDialogVisible" :context="adjustContext" @success="handleAdjustSuccess" />
+    <LocalReplanDialog v-model="localReplanVisible" :plan-id="planId" @success="handleLocalReplanSuccess" />
   </div>
 </template>
 

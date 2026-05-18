@@ -51,6 +51,7 @@ declare module 'vue' {
     ElTabPane: typeof import('element-plus/es')['ElTabPane']
     ElTabs: typeof import('element-plus/es')['ElTabs']
     ElTag: typeof import('element-plus/es')['ElTag']
+    LocalReplanDialog: typeof import('./src/components/v4/LocalReplanDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ScheduleAdjustDialog: typeof import('./src/components/v4/ScheduleAdjustDialog.vue')['default']

@@ -2,8 +2,10 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import LocalReplanDialog from '../../components/v4/LocalReplanDialog.vue'
 import { getSchedulePlanById, type SchedulePlan } from '../../api/schedulePlan'
 import { getScheduleAnalysisSummary, refreshScheduleAnalysisSummary, type ScheduleAnalysisSummary } from '../../api/v4ScheduleAnalysisApi'
+import type { ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
 import { strategyText } from '../../utils/status'
 
 const route = useRoute()
@@ -14,6 +16,7 @@ const loading = ref(false)
 const refreshing = ref(false)
 const plan = ref<SchedulePlan | null>(null)
 const summary = ref<ScheduleAnalysisSummary | null>(null)
+const localReplanVisible = ref(false)
 
 async function fetchData() {
   loading.value = true
@@ -42,6 +45,11 @@ async function handleRefresh() {
   } finally {
     refreshing.value = false
   }
+}
+
+function handleLocalReplanSuccess(result: ScheduleReplanResult) {
+  localReplanVisible.value = false
+  router.push(`/v3/schedule-plans/${result.newPlanId}`)
 }
 
 onMounted(fetchData)
@@ -150,11 +158,19 @@ onMounted(fetchData)
         <el-button type="warning" plain @click="router.push(`/v4/schedule-analysis/${planId}/risks`)">风险诊断中心</el-button>
         <el-button type="success" plain @click="router.push(`/v4/schedule-analysis/${planId}/charts`)">图表分析</el-button>
         <el-button type="info" plain @click="router.push(`/v4/schedule-analysis/${planId}/locks`)">课程锁定管理</el-button>
+        <el-button
+          type="success"
+          :disabled="plan?.status === 'ABANDONED' || plan?.status === 'FAILED'"
+          @click="localReplanVisible = true"
+        >
+          局部重排
+        </el-button>
       </div>
       <div class="safe-note">当前阶段所有数据均来自只读分析接口，不会修改正式课表或方案明细。</div>
     </el-card>
 
     <el-empty v-if="!loading && !summary" description="未找到对应分析结果" />
+    <LocalReplanDialog v-model="localReplanVisible" :plan-id="planId" @success="handleLocalReplanSuccess" />
   </div>
 </template>
 

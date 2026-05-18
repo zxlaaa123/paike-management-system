@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import ScheduleAdjustDialog from '../../components/v4/ScheduleAdjustDialog.vue'
+import LocalReplanDialog from '../../components/v4/LocalReplanDialog.vue'
 import { getSchedulePlanById, type SchedulePlan } from '../../api/schedulePlan'
 import {
   getScheduleRiskList,
@@ -11,6 +12,7 @@ import {
   type ScheduleRiskList,
 } from '../../api/v4ScheduleAnalysisApi'
 import type { ScheduleAdjustmentApplyResult } from '../../api/v4ScheduleAdjustmentApi'
+import type { ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
 import { strategyText } from '../../utils/status'
 
 const route = useRoute()
@@ -25,6 +27,7 @@ const selectedRisk = ref<ScheduleRiskIssue | null>(null)
 const detailVisible = ref(false)
 const adjustVisible = ref(false)
 const adjustingRisk = ref<ScheduleRiskIssue | null>(null)
+const localReplanVisible = ref(false)
 
 const filters = ref({
   riskType: '',
@@ -140,6 +143,11 @@ async function handleAdjustSuccess(_result: ScheduleAdjustmentApplyResult) {
   await fetchData()
 }
 
+function handleLocalReplanSuccess(result: ScheduleReplanResult) {
+  localReplanVisible.value = false
+  router.push(`/v3/schedule-plans/${result.newPlanId}`)
+}
+
 const adjustContext = computed(() => {
   if (!adjustingRisk.value) return null
   return {
@@ -174,6 +182,13 @@ onMounted(fetchData)
           <el-button type="primary" plain :loading="refreshing" @click="handleRefresh">刷新风险</el-button>
           <el-button @click="router.push(`/v4/schedule-analysis/${planId}`)">回到质量分析</el-button>
           <el-button type="success" plain @click="router.push(`/v4/schedule-analysis/${planId}/charts`)">查看图表分析</el-button>
+          <el-button
+            type="success"
+            :disabled="plan?.status === 'ABANDONED' || plan?.status === 'FAILED'"
+            @click="localReplanVisible = true"
+          >
+            局部重排
+          </el-button>
         </div>
       </div>
     </el-card>
@@ -297,6 +312,7 @@ onMounted(fetchData)
     </el-drawer>
 
     <ScheduleAdjustDialog v-model="adjustVisible" :context="adjustContext" @success="handleAdjustSuccess" />
+    <LocalReplanDialog v-model="localReplanVisible" :plan-id="planId" @success="handleLocalReplanSuccess" />
   </div>
 </template>
 

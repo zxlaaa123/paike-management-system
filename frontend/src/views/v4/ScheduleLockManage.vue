@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import LocalReplanDialog from '../../components/v4/LocalReplanDialog.vue'
 import { getSchedulePlanById, getSchedulePlanItems, type SchedulePlan, type SchedulePlanItem } from '../../api/schedulePlan'
 import {
   getScheduleLockList,
@@ -10,6 +11,7 @@ import {
   type ScheduleLockItem,
   type ScheduleLockList,
 } from '../../api/v4ScheduleLockApi'
+import type { ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
 import { strategyText } from '../../utils/status'
 
 const route = useRoute()
@@ -22,6 +24,7 @@ const keyword = ref('')
 const plan = ref<SchedulePlan | null>(null)
 const planItems = ref<SchedulePlanItem[]>([])
 const lockData = ref<ScheduleLockList | null>(null)
+const localReplanVisible = ref(false)
 
 const lockedPlanItemIds = computed(() => new Set((lockData.value?.items ?? []).map((item) => item.planItemId).filter(Boolean)))
 
@@ -141,6 +144,11 @@ async function handleUnlock(item: ScheduleLockItem) {
   }
 }
 
+function handleLocalReplanSuccess(result: ScheduleReplanResult) {
+  localReplanVisible.value = false
+  router.push(`/v3/schedule-plans/${result.newPlanId}`)
+}
+
 function formatPlanItemTime(item: SchedulePlanItem) {
   return `周${item.weekday} 第${item.startPeriod}-${item.endPeriod}节`
 }
@@ -161,6 +169,14 @@ onMounted(fetchData)
         <div class="header-actions">
           <el-button @click="router.push(`/v3/schedule-plans/${plan.id}`)">回到 V3 方案详情</el-button>
           <el-button type="warning" plain @click="router.push(`/v4/schedule-analysis/${plan.id}`)">回到质量分析</el-button>
+          <el-button
+            type="success"
+            plain
+            :disabled="plan.status === 'ABANDONED' || plan.status === 'FAILED'"
+            @click="localReplanVisible = true"
+          >
+            局部重排生成新方案
+          </el-button>
         </div>
       </div>
       <div class="page-note">
@@ -262,6 +278,7 @@ onMounted(fetchData)
       </el-table>
       <el-empty v-if="filteredUnlockedItems.length === 0" description="当前没有可锁定课程" />
     </el-card>
+    <LocalReplanDialog v-model="localReplanVisible" :plan-id="planId" @success="handleLocalReplanSuccess" />
   </div>
 </template>
 
