@@ -38,6 +38,14 @@ app:
     # JWT_SECRET 必须由环境变量显式注入；JwtService 启动时还会再次校验长度与默认值。
     secret: ${JWT_SECRET}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  security:
+    # 生产环境（HTTPS）请把 COOKIE_SECURE 设为 true，让 JWT / CSRF cookie 仅允许在 HTTPS 上携带
+    cookie-secure: ${COOKIE_SECURE:false}
+  cors:
+    # 允许跨域的来源；多个用逗号分隔。同源部署（nginx 反代）下 CORS 不参与，留空即可
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+    # 仅当确实要让浏览器跨域携带 cookie 时才开启，开启后 allowed-origins 不能用 "*"
+    allow-credentials: ${CORS_ALLOW_CREDENTIALS:false}
   ai:
     api-key: ${AI_API_KEY:}
     base-url: ${AI_BASE_URL:https://api.openai.com/v1/chat/completions}

@@ -31,16 +31,20 @@ public class AuthController {
     @Value("${app.jwt.expiration-ms:86400000}")
     private long expirationMs;
 
+    @Value("${app.security.cookie-secure:false}")
+    private boolean cookieSecure;
+
     @PostMapping("/login")
     public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request,
                                        HttpServletRequest httpRequest,
                                        HttpServletResponse response) {
         LoginResponse loginResponse = authService.login(request, resolveClientIp(httpRequest));
 
-        // 设置 httpOnly JWT Cookie（防 XSS 窃取）
+        // 设置 httpOnly JWT Cookie（防 XSS 窃取）。secure 由 app.security.cookie-secure 控制：
+        // 本地 HTTP 留 false，生产 HTTPS 通过 COOKIE_SECURE=true 切换。
         ResponseCookie jwtCookie = ResponseCookie.from("paike_token", loginResponse.getToken())
                 .httpOnly(true)
-                .secure(false) // 开发环境用 HTTP，生产环境应设为 true
+                .secure(cookieSecure)
                 .path("/api")
                 .maxAge(expirationMs / 1000)
                 .sameSite("Strict")
@@ -51,7 +55,7 @@ public class AuthController {
         String csrfToken = UUID.randomUUID().toString();
         ResponseCookie csrfCookie = ResponseCookie.from("XSRF-TOKEN", csrfToken)
                 .httpOnly(false)
-                .secure(false)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(expirationMs / 1000)
                 .sameSite("Strict")

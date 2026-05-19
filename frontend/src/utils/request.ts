@@ -48,8 +48,8 @@ async function parseJsonBlob(data: Blob): Promise<Partial<ApiResponse> | null> {
 
 request.interceptors.request.use(
   (config) => {
-    // CSRF 防护：状态变更请求携带 X-CSRF-Token 头
-    if (config.method && ['post', 'put', 'delete'].includes(config.method.toLowerCase())) {
+    // CSRF 防护：状态变更请求携带 X-CSRF-Token 头（与后端 AuthInterceptor 的 stateChanging 集合一致）
+    if (config.method && ['post', 'put', 'delete', 'patch'].includes(config.method.toLowerCase())) {
       const csrfToken = getCookie('XSRF-TOKEN')
       if (csrfToken) {
         config.headers['X-CSRF-Token'] = csrfToken
