@@ -30,6 +30,56 @@ function deltaText(value?: number | null) {
   return value > 0 ? `+${value}` : `${value}`
 }
 
+function decimalDeltaText(value?: number | null) {
+  if (value == null) return '0'
+  const normalized = Number(value).toFixed(2)
+  return value > 0 ? `+${normalized}` : normalized
+}
+
+function trendType(delta: number, improveWhenLower = false): '' | 'success' | 'danger' | 'info' {
+  if (delta === 0) return 'info'
+  const improved = improveWhenLower ? delta < 0 : delta > 0
+  return improved ? 'success' : 'danger'
+}
+
+function trendText(delta: number, improveWhenLower = false) {
+  if (delta === 0) return '无变化'
+  const improved = improveWhenLower ? delta < 0 : delta > 0
+  return improved ? '提升' : '下降'
+}
+
+function riskLevelTag(level?: string) {
+  if (level === 'HIGH') return 'danger'
+  if (level === 'MEDIUM') return 'warning'
+  if (level === 'LOW') return 'info'
+  return ''
+}
+
+function formatPercent(value?: number | null) {
+  return `${Number(value ?? 0).toFixed(2)}%`
+}
+
+const compare = computed(() => detail.value?.compare ?? null)
+const canOperate = computed(() => ['SIMULATION', 'CONFIRMED'].includes(detail.value?.plan.status || ''))
+const hasBlockingConflicts = computed(() => !!compare.value?.hasNewHardConflicts)
+const canApply = computed(() => canOperate.value && !hasBlockingConflicts.value)
+
+const metricRows = computed(() => {
+  const c = compare.value
+  if (!c) return []
+  return [
+    { key: 'score', label: '总评分', before: c.baselineScore, after: c.simulationScore, delta: c.scoreDelta, lowerBetter: false, formatter: decimalDeltaText },
+    { key: 'scheduled', label: '已排任务数量', before: c.baselineScheduledCount, after: c.simulationScheduledCount, delta: c.scheduledDelta, lowerBetter: false, formatter: deltaText },
+    { key: 'unscheduled', label: '未排任务数量', before: c.baselineUnscheduledCount, after: c.simulationUnscheduledCount, delta: c.unscheduledDelta, lowerBetter: true, formatter: deltaText },
+    { key: 'high', label: '高风险数量', before: c.baselineHighRiskCount, after: c.simulationHighRiskCount, delta: c.highRiskDelta, lowerBetter: true, formatter: deltaText },
+    { key: 'medium', label: '中风险数量', before: c.baselineMediumRiskCount, after: c.simulationMediumRiskCount, delta: c.mediumRiskDelta, lowerBetter: true, formatter: deltaText },
+    { key: 'low', label: '低风险数量', before: c.baselineLowRiskCount, after: c.simulationLowRiskCount, delta: c.lowRiskDelta, lowerBetter: true, formatter: deltaText },
+    { key: 'risk', label: '总风险数量', before: c.baselineRiskCount, after: c.simulationRiskCount, delta: c.riskDelta, lowerBetter: true, formatter: deltaText },
+    { key: 'conflict', label: '硬冲突数量', before: c.baselineConflictCount, after: c.simulationConflictCount, delta: c.conflictDelta, lowerBetter: true, formatter: deltaText },
+    { key: 'changed', label: '课程变动数量', before: 0, after: c.courseChangeCount, delta: c.courseChangeCount, lowerBetter: true, formatter: deltaText },
+  ]
+})
+
 async function fetchData() {
   loading.value = true
   try {
@@ -54,6 +104,10 @@ async function confirmPlan() {
 }
 
 async function applyPlan() {
+  if (hasBlockingConflicts.value) {
+    ElMessage.error(compare.value?.recommendationMessage || '存在新增硬冲突，不能应用')
+    return
+  }
   try {
     await ElMessageBox.confirm('应用后会写入正式课表，并替换当前已应用方案。', '应用试算方案', { type: 'warning' })
   } catch {
@@ -91,8 +145,6 @@ async function discardPlan() {
   }
 }
 
-const canOperate = computed(() => ['SIMULATION', 'CONFIRMED'].includes(detail.value?.plan.status || ''))
-
 onMounted(fetchData)
 </script>
 
@@ -100,49 +152,162 @@ onMounted(fetchData)
   <div class="page" v-loading="loading">
     <el-page-header content="试算方案详情" @back="router.push(`/v5/repair-tasks/${taskId}`)" />
 
-    <el-card v-if="detail" shadow="never" class="main-card">
+    <el-card v-if="detail && compare" shadow="never" class="main-card">
       <template #header>
         <div class="header-row">
           <div>
             <div class="title">{{ detail.plan.name }}</div>
-            <div class="sub">方案ID：{{ detail.plan.id }} · 任务ID：{{ taskId }}</div>
+            <div class="sub">方案ID：{{ detail.plan.id }} · 任务ID：{{ taskId }} · 学期：{{ detail.plan.semesterId }}</div>
           </div>
-          <el-tag :type="statusType(detail.plan.status)">{{ detail.plan.status }}</el-tag>
+          <div class="header-actions">
+            <el-tag :type="statusType(detail.plan.status)">{{ detail.plan.status }}</el-tag>
+            <el-tag :type="compare.recommended ? 'success' : 'danger'">
+              {{ compare.recommended ? '推荐应用' : '不推荐应用' }}
+            </el-tag>
+          </div>
         </div>
       </template>
 
-      <el-row :gutter="12">
+      <el-alert
+        :type="compare.recommended ? 'success' : 'error'"
+        :title="compare.recommendationMessage"
+        :closable="false"
+        show-icon
+      />
+
+      <el-row :gutter="12" class="block">
         <el-col :span="6"><el-statistic title="试算评分" :value="detail.plan.totalScore ?? 0" /></el-col>
         <el-col :span="6"><el-statistic title="风险数" :value="detail.risks.riskCount" /></el-col>
         <el-col :span="6"><el-statistic title="冲突数" :value="detail.plan.conflictCount" /></el-col>
-        <el-col :span="6"><el-statistic title="课程数" :value="detail.plan.scheduledCount" /></el-col>
+        <el-col :span="6"><el-statistic title="课程变动数" :value="compare.courseChangeCount" /></el-col>
       </el-row>
 
       <el-descriptions :column="3" border class="block">
-        <el-descriptions-item label="来源方案">{{ detail.plan.sourcePlanId ?? '—' }}</el-descriptions-item>
-        <el-descriptions-item label="来源课表">{{ detail.plan.sourceScheduleId ?? '—' }}</el-descriptions-item>
-        <el-descriptions-item label="绑定任务">{{ detail.plan.repairTaskId ?? '—' }}</el-descriptions-item>
-        <el-descriptions-item label="生成方式">{{ detail.plan.generatedBy }}</el-descriptions-item>
-        <el-descriptions-item label="生成时间">{{ detail.plan.generatedAt }}</el-descriptions-item>
-        <el-descriptions-item label="说明">{{ detail.plan.description }}</el-descriptions-item>
+        <el-descriptions-item label="对比基线">{{ compare.baselinePlanName }}（{{ compare.baselinePlanId ?? compare.baselineSourceScheduleId ?? '正式课表' }}）</el-descriptions-item>
+        <el-descriptions-item label="试算方案">{{ compare.simulationPlanName }}（{{ compare.simulationPlanId }}）</el-descriptions-item>
+        <el-descriptions-item label="对比摘要">{{ compare.summary }}</el-descriptions-item>
+        <el-descriptions-item label="锁定课程保护">
+          <el-tag :type="compare.lockedCoursesPreserved ? 'success' : 'danger'">
+            {{ compare.lockedCoursesPreserved ? '通过' : '未通过' }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="新增硬冲突">
+          <el-tag :type="compare.hasNewHardConflicts ? 'danger' : 'success'">
+            {{ compare.hasNewHardConflicts ? `${compare.newHardConflictCount} 个` : '无' }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="变动锁定课程">
+          {{ compare.changedLockedCourseNames.length ? compare.changedLockedCourseNames.join('，') : '无' }}
+        </el-descriptions-item>
       </el-descriptions>
 
       <div class="actions" v-if="canOperate">
         <el-button type="warning" :loading="acting" @click="confirmPlan" v-if="detail.plan.status === 'SIMULATION'">确认试算方案</el-button>
-        <el-button type="success" :loading="acting" @click="applyPlan">应用试算方案</el-button>
+        <el-button type="success" :loading="acting" :disabled="!canApply" @click="applyPlan">应用试算方案</el-button>
         <el-button type="danger" :loading="acting" @click="discardPlan">放弃试算方案</el-button>
       </div>
     </el-card>
 
-    <el-card v-if="detail" shadow="never" class="main-card">
+    <el-card v-if="compare" shadow="never" class="main-card">
       <template #header><div class="title">优化前后对比</div></template>
-      <el-descriptions :column="3" border>
-        <el-descriptions-item label="评分变化">{{ detail.compare.baselineScore }} → {{ detail.compare.simulationScore }}（{{ deltaText(detail.compare.scoreDelta) }}）</el-descriptions-item>
-        <el-descriptions-item label="风险变化">{{ detail.compare.baselineRiskCount }} → {{ detail.compare.simulationRiskCount }}（{{ deltaText(detail.compare.riskDelta) }}）</el-descriptions-item>
-        <el-descriptions-item label="冲突变化">{{ detail.compare.baselineConflictCount }} → {{ detail.compare.simulationConflictCount }}（{{ deltaText(detail.compare.conflictDelta) }}）</el-descriptions-item>
-        <el-descriptions-item label="摘要" :span="3">{{ detail.compare.summary }}</el-descriptions-item>
-      </el-descriptions>
-      <el-table :data="detail.compare.changedItems" border stripe class="block">
+      <el-table :data="metricRows" border stripe>
+        <el-table-column prop="label" label="指标" min-width="160" />
+        <el-table-column label="优化前" min-width="140">
+          <template #default="{ row }">{{ row.before }}</template>
+        </el-table-column>
+        <el-table-column label="优化后" min-width="140">
+          <template #default="{ row }">{{ row.after }}</template>
+        </el-table-column>
+        <el-table-column label="变化值" min-width="140">
+          <template #default="{ row }">{{ row.formatter(row.delta) }}</template>
+        </el-table-column>
+        <el-table-column label="趋势" width="120">
+          <template #default="{ row }">
+            <el-tag :type="trendType(Number(row.delta), row.lowerBetter)">{{ trendText(Number(row.delta), row.lowerBetter) }}</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-card v-if="compare" shadow="never" class="main-card">
+      <template #header><div class="title">问题变化</div></template>
+      <el-row :gutter="16">
+        <el-col :span="12">
+          <div class="section-title">已解决问题</div>
+          <el-empty v-if="!compare.resolvedRisks.length" description="没有已解决风险" />
+          <el-table v-else :data="compare.resolvedRisks" border stripe>
+            <el-table-column label="等级" width="100">
+              <template #default="{ row }"><el-tag :type="riskLevelTag(row.level)">{{ row.level }}</el-tag></template>
+            </el-table-column>
+            <el-table-column prop="riskTypeName" label="类型" min-width="120" />
+            <el-table-column prop="title" label="标题" min-width="180" />
+            <el-table-column prop="description" label="说明" min-width="220" show-overflow-tooltip />
+          </el-table>
+        </el-col>
+        <el-col :span="12">
+          <div class="section-title">新增问题</div>
+          <el-empty v-if="!compare.newRisks.length" description="没有新增风险" />
+          <el-table v-else :data="compare.newRisks" border stripe>
+            <el-table-column label="等级" width="100">
+              <template #default="{ row }"><el-tag :type="riskLevelTag(row.level)">{{ row.level }}</el-tag></template>
+            </el-table-column>
+            <el-table-column prop="riskTypeName" label="类型" min-width="120" />
+            <el-table-column prop="title" label="标题" min-width="180" />
+            <el-table-column prop="description" label="说明" min-width="220" show-overflow-tooltip />
+          </el-table>
+        </el-col>
+      </el-row>
+    </el-card>
+
+    <el-card v-if="compare" shadow="never" class="main-card">
+      <template #header><div class="title">负载与利用率变化</div></template>
+      <div class="section-title">教师负载变化</div>
+      <el-empty v-if="!compare.teacherLoadChanges.length" description="教师负载无变化" />
+      <el-table v-else :data="compare.teacherLoadChanges" border stripe class="block">
+        <el-table-column prop="entityName" label="教师" min-width="160" />
+        <el-table-column prop="baselineLoad" label="优化前" width="120" />
+        <el-table-column prop="simulationLoad" label="优化后" width="120" />
+        <el-table-column label="变化" width="120">
+          <template #default="{ row }">
+            <el-tag :type="row.delta === 0 ? 'info' : 'warning'">{{ deltaText(row.delta) }}</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="section-title">班级负载变化</div>
+      <el-empty v-if="!compare.classLoadChanges.length" description="班级负载无变化" />
+      <el-table v-else :data="compare.classLoadChanges" border stripe class="block">
+        <el-table-column prop="entityName" label="班级" min-width="160" />
+        <el-table-column prop="baselineLoad" label="优化前" width="120" />
+        <el-table-column prop="simulationLoad" label="优化后" width="120" />
+        <el-table-column label="变化" width="120">
+          <template #default="{ row }">
+            <el-tag :type="row.delta === 0 ? 'info' : 'warning'">{{ deltaText(row.delta) }}</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="section-title">教室利用率变化</div>
+      <el-empty v-if="!compare.roomUtilizationChanges.length" description="教室利用率无变化" />
+      <el-table v-else :data="compare.roomUtilizationChanges" border stripe class="block">
+        <el-table-column prop="classroomName" label="教室" min-width="160" />
+        <el-table-column label="优化前" min-width="140">
+          <template #default="{ row }">{{ row.baselineUsedPeriods }} / {{ formatPercent(row.baselineUtilizationRate) }}</template>
+        </el-table-column>
+        <el-table-column label="优化后" min-width="140">
+          <template #default="{ row }">{{ row.simulationUsedPeriods }} / {{ formatPercent(row.simulationUtilizationRate) }}</template>
+        </el-table-column>
+        <el-table-column label="变化" min-width="140">
+          <template #default="{ row }">
+            <el-tag :type="row.utilizationDelta === 0 ? 'info' : 'warning'">{{ decimalDeltaText(row.utilizationDelta) }}%</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-card v-if="compare" shadow="never" class="main-card">
+      <template #header><div class="title">课程变动明细</div></template>
+      <el-table :data="compare.changedItems" border stripe>
         <el-table-column label="课程" prop="courseName" min-width="140" />
         <el-table-column label="教师" prop="teacherName" min-width="120" />
         <el-table-column label="班级" prop="className" min-width="120" />
@@ -200,8 +365,10 @@ onMounted(fetchData)
 .page { display: flex; flex-direction: column; gap: 16px; }
 .main-card { border-radius: 8px; }
 .header-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .title { font-size: 18px; font-weight: 700; color: #243447; }
 .sub { margin-top: 6px; color: #667085; font-size: 13px; }
 .block { margin-top: 16px; }
 .actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+.section-title { margin-top: 12px; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: #344054; }
 </style>

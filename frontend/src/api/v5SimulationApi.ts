@@ -66,18 +66,69 @@ export interface V5SimulationItemChange {
   conflictReason: string | null
 }
 
+export interface V5SimulationLoadChange {
+  entityId: number | null
+  entityName: string
+  baselineLoad: number
+  simulationLoad: number
+  delta: number
+}
+
+export interface V5SimulationRoomUtilizationChange {
+  classroomId: number | null
+  classroomName: string | null
+  baselineUsedPeriods: number
+  simulationUsedPeriods: number
+  deltaPeriods: number
+  baselineUtilizationRate: number
+  simulationUtilizationRate: number
+  utilizationDelta: number
+}
+
 export interface V5SimulationCompare {
+  baselineSemesterId: number | null
+  simulationSemesterId: number
   baselinePlanId: number | null
   simulationPlanId: number
+  baselineSourceScheduleId: number | null
+  baselinePlanName: string
+  simulationPlanName: string
   baselineScore: number
   simulationScore: number
   scoreDelta: number
+  baselineScheduledCount: number
+  simulationScheduledCount: number
+  scheduledDelta: number
+  baselineUnscheduledCount: number
+  simulationUnscheduledCount: number
+  unscheduledDelta: number
   baselineRiskCount: number
   simulationRiskCount: number
   riskDelta: number
+  baselineHighRiskCount: number
+  simulationHighRiskCount: number
+  highRiskDelta: number
+  baselineMediumRiskCount: number
+  simulationMediumRiskCount: number
+  mediumRiskDelta: number
+  baselineLowRiskCount: number
+  simulationLowRiskCount: number
+  lowRiskDelta: number
   baselineConflictCount: number
   simulationConflictCount: number
   conflictDelta: number
+  courseChangeCount: number
+  lockedCoursesPreserved: boolean
+  changedLockedCourseNames: string[]
+  hasNewHardConflicts: boolean
+  newHardConflictCount: number
+  recommended: boolean
+  recommendationMessage: string
+  newRisks: ScheduleRiskIssue[]
+  resolvedRisks: ScheduleRiskIssue[]
+  teacherLoadChanges: V5SimulationLoadChange[]
+  classLoadChanges: V5SimulationLoadChange[]
+  roomUtilizationChanges: V5SimulationRoomUtilizationChange[]
   changedItems: V5SimulationItemChange[]
   summary: string
 }
