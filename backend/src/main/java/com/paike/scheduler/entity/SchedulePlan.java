@@ -18,11 +18,15 @@ public class SchedulePlan {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private Long sourcePlanId;
+
     private Long semesterId;
 
     private String name;
 
     private String strategyType;
+
+    private String planMode;
 
     private String status;
 
