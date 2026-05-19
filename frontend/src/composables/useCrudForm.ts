@@ -123,10 +123,18 @@ export function useCrudForm<T extends { id: number }, F extends object>(options:
 
   async function handleDelete(row: T, nameField: keyof T) {
     const name = row[nameField] as unknown as string
-    await ElMessageBox.confirm(`确定删除${options.entityName}「${name}」吗？`, '提示', { type: 'warning' })
-    await options.deleteItem(row.id)
-    ElMessage.success('删除成功')
-    fetchData()
+    try {
+      await ElMessageBox.confirm(`确定删除${options.entityName}「${name}」吗？`, '提示', { type: 'warning' })
+    } catch {
+      return
+    }
+    try {
+      await options.deleteItem(row.id)
+      ElMessage.success('删除成功')
+      fetchData()
+    } catch (e: any) {
+      ElMessage.error(e?.message || '删除失败')
+    }
   }
 
   onMounted(fetchData)

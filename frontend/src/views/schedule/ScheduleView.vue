@@ -161,10 +161,18 @@ async function handleSubmit() {
 }
 
 async function handleDelete(row: Schedule) {
-  await ElMessageBox.confirm('确定删除该排课记录吗？', '提示', { type: 'warning' })
-  await deleteSchedule(row.id)
-  ElMessage.success('删除成功')
-  fetchData()
+  try {
+    await ElMessageBox.confirm('确定删除该排课记录吗？', '提示', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await deleteSchedule(row.id)
+    ElMessage.success('删除成功')
+    fetchData()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '删除失败')
+  }
 }
 
 function openAdjust(row: Schedule) {
