@@ -67,6 +67,9 @@ public class V4ScheduleReplanService {
 
         V4ScheduleReplanRequest safeRequest = request == null ? new V4ScheduleReplanRequest() : request;
         boolean keepLocked = !Boolean.FALSE.equals(safeRequest.getKeepLocked());
+        if (Boolean.FALSE.equals(safeRequest.getKeepLocked())) {
+            throw new BusinessException("V5 修复约束：锁定课程不可移动，局部重排必须保留锁定项");
+        }
         String strategyCode = normalizeStrategyCode(safeRequest.getStrategyCode());
         String newPlanName = resolvePlanName(safeRequest.getNewPlanName(), sourcePlan.getName());
 

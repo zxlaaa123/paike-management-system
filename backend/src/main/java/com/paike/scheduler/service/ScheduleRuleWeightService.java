@@ -1,6 +1,7 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.ScheduleRuleWeight;
 import com.paike.scheduler.mapper.ScheduleRuleWeightMapper;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +34,10 @@ public class ScheduleRuleWeightService {
 
     public void updateWeight(Long id, java.math.BigDecimal weight, Integer enabled, String description) {
         ScheduleRuleWeight rule = ruleWeightMapper.selectById(id);
-        if (rule == null) throw new com.paike.scheduler.common.exception.BusinessException("规则不存在");
+        if (rule == null) throw new BusinessException("规则不存在");
+        if (enabled != null && enabled == 0 && isHardRule(rule)) {
+            throw new BusinessException("硬约束规则不能关闭：" + rule.getRuleCode());
+        }
         if (weight != null) rule.setWeight(weight);
         if (enabled != null) rule.setEnabled(enabled);
         if (description != null) rule.setDescription(description);
@@ -44,6 +48,9 @@ public class ScheduleRuleWeightService {
         for (ScheduleRuleWeight rule : rules) {
             ScheduleRuleWeight existing = ruleWeightMapper.selectById(rule.getId());
             if (existing != null) {
+                if (rule.getEnabled() != null && rule.getEnabled() == 0 && isHardRule(existing)) {
+                    throw new BusinessException("硬约束规则不能关闭：" + existing.getRuleCode());
+                }
                 existing.setWeight(rule.getWeight());
                 existing.setEnabled(rule.getEnabled());
                 ruleWeightMapper.updateById(existing);
@@ -126,5 +133,20 @@ public class ScheduleRuleWeightService {
         rule.setEnabled(1);
         rule.setDescription(desc);
         rules.add(rule);
+    }
+
+    private boolean isHardRule(ScheduleRuleWeight rule) {
+        if (rule == null || rule.getRuleCode() == null) {
+            return false;
+        }
+        return switch (rule.getRuleCode()) {
+            case "TEACHER_TIME_CONFLICT",
+                    "CLASS_TIME_CONFLICT",
+                    "CLASSROOM_TIME_CONFLICT",
+                    "TEACHER_UNAVAILABLE",
+                    "CLASSROOM_CAPACITY",
+                    "CLASSROOM_TYPE_MISMATCH" -> true;
+            default -> "HARD".equalsIgnoreCase(rule.getRuleType());
+        };
     }
 }
