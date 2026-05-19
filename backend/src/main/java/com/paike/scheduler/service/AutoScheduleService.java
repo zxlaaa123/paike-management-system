@@ -114,8 +114,9 @@ public class AutoScheduleService {
         int failedTaskCount = 0;
 
         for (TeachingTask task : targetTasks) {
-            // 计算需要排的大节数
-            int requiredSlots = (int) Math.ceil(task.getWeeklyHours() / 2.0);
+            // 计算需要排的大节数（weeklyHours 列允许 NULL，需做防御性兜底）
+            Integer weekly = task.getWeeklyHours();
+            int requiredSlots = weekly == null ? 0 : (int) Math.ceil(weekly / 2.0);
             int scheduledSlots = countScheduledSlots(task.getId());
             int remainingSlots = requiredSlots - scheduledSlots;
 
@@ -192,7 +193,7 @@ public class AutoScheduleService {
                             usedDays.add(slot.getDayOfWeek());
                             break;
                         } else {
-                            lastFailReason = conflict.replace("排课失败：", "");
+                            lastFailReason = conflict.replace("排课失败:", "");
                             lastFailReasonType = categorizeReason(lastFailReason);
                         }
                     }
@@ -267,8 +268,10 @@ public class AutoScheduleService {
             int countB = getClassStudentCount(b.getClassId());
             if (countB != countA) return countB - countA;
 
-            // 3. 每周课时多的优先
-            if (b.getWeeklyHours() != a.getWeeklyHours()) return b.getWeeklyHours() - a.getWeeklyHours();
+            // 3. 每周课时多的优先（Integer 比较走 intValue，避免对象引用比较 + null 拆箱）
+            int hoursA = a.getWeeklyHours() == null ? 0 : a.getWeeklyHours();
+            int hoursB = b.getWeeklyHours() == null ? 0 : b.getWeeklyHours();
+            if (hoursA != hoursB) return hoursB - hoursA;
 
             // 4. 教师禁排时间多的优先
             long unavailA = unavailableCount.getOrDefault(a.getTeacherId(), 0L);

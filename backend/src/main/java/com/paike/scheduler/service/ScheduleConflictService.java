@@ -57,9 +57,10 @@ public class ScheduleConflictService {
         if (teacher != null && teacher.getStatus() != 1) {
             return "排课失败:" + teacher.getName() + "老师已停用,不能参与排课";
         }
-        // 1.5 教师禁排时间检查
+        // 1.5 教师禁排时间检查（teacher 可能因被软删而为 null，需要兜底显示名）
         if (unavailableTimeService.isUnavailable(task.getTeacherId(), timeSlotId)) {
-            return "排课失败:" + teacher.getName() + "老师在" + timeSlot.getTimeLabel() + "设置了禁排时间";
+            String displayName = teacher != null ? teacher.getName() + "老师" : "该教师";
+            return "排课失败:" + displayName + "在" + timeSlot.getTimeLabel() + "设置了禁排时间";
         }
         // 2. 停用班级不能参与排课
         if (classInfo != null && classInfo.getStatus() != 1) {
@@ -140,9 +141,11 @@ public class ScheduleConflictService {
             taskWrapper.ne(Schedule::getId, excludeScheduleId);
         }
         int scheduledSlots = scheduleMapper.selectCount(taskWrapper).intValue();
-        int requiredSlots = (int) Math.ceil(task.getWeeklyHours() / 2.0);
+        Integer weeklyHours = task.getWeeklyHours();
+        int weeklyHoursVal = weeklyHours == null ? 0 : weeklyHours;
+        int requiredSlots = (int) Math.ceil(weeklyHoursVal / 2.0);
         if (scheduledSlots + 1 > requiredSlots) {
-            return "排课失败:该教学任务每周课时为" + task.getWeeklyHours() + "学时,最多排" + requiredSlots + "个大节,当前已排" + scheduledSlots + "个大节";
+            return "排课失败:该教学任务每周课时为" + weeklyHoursVal + "学时,最多排" + requiredSlots + "个大节,当前已排" + scheduledSlots + "个大节";
         }
 
         // 11. 读取软规则。前面的资源占用、容量、类型属于硬约束,这里的每日上限和同课同日属于配置化约束。
