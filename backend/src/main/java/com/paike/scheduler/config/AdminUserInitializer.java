@@ -7,8 +7,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -29,6 +31,7 @@ public class AdminUserInitializer implements CommandLineRunner {
     private String configuredPassword;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void run(String... args) {
         SysUser existed = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
             .eq(SysUser::getUsername, "admin"));
@@ -54,7 +57,14 @@ public class AdminUserInitializer implements CommandLineRunner {
         admin.setDeleted(0);
         admin.setCreateTime(LocalDateTime.now());
         admin.setUpdateTime(LocalDateTime.now());
-        sysUserMapper.insert(admin);
+        try {
+            sysUserMapper.insert(admin);
+        } catch (DuplicateKeyException e) {
+            // 多实例并发启动 / CommandLineRunner 偶发并发触发时，两个事务都拿到 selectOne=null，
+            // 第二个 insert 会撞 unique(username)。这里直接放过，让另一个实例的种子结果生效。
+            log.info("admin 用户在并发初始化中已被另一实例创建，跳过当前 insert。", e);
+            return;
+        }
 
         if (generated) {
             // 走 stdout 而非日志文件，避免明文密码持久化到 logs/ 目录
