@@ -158,14 +158,14 @@ public class AutoScheduleService {
                     }
 
                     // 检查教师每日最大课程数
-                    if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), teacherMaxDailySlots, batch.getId())) {
+                    if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), teacherMaxDailySlots)) {
                         lastFailReason = "教师每天最多" + teacherMaxDailySlots + "个大节";
                         lastFailReasonType = "TEACHER_DAILY_LIMIT";
                         continue;
                     }
 
                     // 检查班级每日最大课程数
-                    if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), classMaxDailySlots, batch.getId())) {
+                    if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), classMaxDailySlots)) {
                         lastFailReason = "班级每天最多" + classMaxDailySlots + "个大节";
                         lastFailReasonType = "CLASS_DAILY_LIMIT";
                         continue;
@@ -320,8 +320,12 @@ public class AutoScheduleService {
     /**
      * 这里用 < maxSlots，而不是 <= maxSlots。
      * 原因是当前正在尝试插入一个新大节，若已达到上限，则本次尝试必须拦下。
+     *
+     * 同一批次内"先插再查"的行在同事务（@Transactional 见类入口）下 MyBatis
+     * 通过同一连接读得到（MySQL 的 read-own-writes），无需额外 batchId 过滤。
+     * 之前残留的 currentBatchId 参数已删除，避免给调用方造成"还在生效"的错觉。
      */
-    private boolean checkTeacherDailyLimit(Long teacherId, int dayOfWeek, int maxSlots, Long currentBatchId) {
+    private boolean checkTeacherDailyLimit(Long teacherId, int dayOfWeek, int maxSlots) {
         List<Long> slotIds = getTimeSlotIdsByDay(dayOfWeek);
         if (slotIds.isEmpty()) return true;
         LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<Schedule>()
@@ -335,7 +339,7 @@ public class AutoScheduleService {
     /**
      * 班级每日上限和教师上限同口径处理，避免新增当前大节后越过规则阈值。
      */
-    private boolean checkClassDailyLimit(Long classId, int dayOfWeek, int maxSlots, Long currentBatchId) {
+    private boolean checkClassDailyLimit(Long classId, int dayOfWeek, int maxSlots) {
         List<Long> slotIds = getTimeSlotIdsByDay(dayOfWeek);
         if (slotIds.isEmpty()) return true;
         LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<Schedule>()
