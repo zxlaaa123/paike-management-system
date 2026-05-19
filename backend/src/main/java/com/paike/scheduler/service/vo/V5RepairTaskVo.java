@@ -9,6 +9,7 @@ public class V5RepairTaskVo {
     private Long id;
     private Long semesterId;
     private Long planId;
+    private String title;
     private String taskCode;
     private String taskType;
     private String status;
@@ -17,4 +18,3 @@ public class V5RepairTaskVo {
     private LocalDateTime finishedAt;
     private LocalDateTime createdAt;
 }
-

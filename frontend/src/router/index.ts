@@ -120,6 +120,16 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/v4/ScheduleAnalysisOverview.vue'),
       },
       {
+        path: 'v5/repair-tasks',
+        name: 'V5RepairTaskList',
+        component: () => import('../views/v5/RepairTaskListView.vue'),
+      },
+      {
+        path: 'v5/repair-tasks/:taskId',
+        name: 'V5RepairTaskDetail',
+        component: () => import('../views/v5/RepairTaskDetailView.vue'),
+      },
+      {
         path: 'v4/schedule-analysis/:planId',
         name: 'V4ScheduleAnalysisDetail',
         component: () => import('../views/v4/ScheduleAnalysisDetail.vue'),

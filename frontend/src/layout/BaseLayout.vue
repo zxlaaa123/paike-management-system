@@ -107,6 +107,13 @@ onMounted(() => {
           </template>
           <el-menu-item index="/v4/schedule-analysis">分析总览</el-menu-item>
         </el-sub-menu>
+        <el-sub-menu index="v5-repair">
+          <template #title>
+            <el-icon><Collection /></el-icon>
+            <span>V5 修复流程</span>
+          </template>
+          <el-menu-item index="/v5/repair-tasks">修复任务管理</el-menu-item>
+        </el-sub-menu>
         <el-sub-menu index="analysis">
           <template #title>
             <el-icon><PieChart /></el-icon>

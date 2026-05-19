@@ -23,6 +23,7 @@ import {
   type ScheduleUnassignedTask,
   type UnassignedSummaryItem,
 } from '../../api/schedulePlan'
+import { createRepairTask } from '../../api/v5RepairTaskApi'
 import type { ScheduleAdjustmentApplyResult } from '../../api/v4ScheduleAdjustmentApi'
 import type { ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
 import { getScoreDetails, getScoreSummary, rescore, type ScheduleScoreDetail, type ScoreSummary } from '../../api/scheduleScore'
@@ -62,6 +63,7 @@ const currentTaskId = ref<number | null>(null)
 const adjustDialogVisible = ref(false)
 const adjustingItem = ref<SchedulePlanItem | null>(null)
 const localReplanVisible = ref(false)
+const creatingRepair = ref(false)
 
 async function fetchData() {
   loading.value = true
@@ -315,6 +317,30 @@ function goBack() {
   router.push('/v3/schedule-plans')
 }
 
+async function createRepairTaskFromPlan() {
+  if (!plan.value) return
+  creatingRepair.value = true
+  try {
+    const task = await createRepairTask({
+      semesterId: plan.value.semesterId,
+      planId: plan.value.id,
+      sourcePlanId: plan.value.id,
+      taskType: 'LOCAL_REPLAN',
+      title: `方案修复：${plan.value.name}`,
+      triggerSource: 'MANUAL',
+      riskTypes: [],
+      riskItemIds: [],
+      scopePlanItemIds: [],
+    })
+    ElMessage.success('修复任务已创建')
+    router.push(`/v5/repair-tasks/${task.id}`)
+  } catch (error: any) {
+    ElMessage.error(error?.message || '创建修复任务失败')
+  } finally {
+    creatingRepair.value = false
+  }
+}
+
 onMounted(async () => {
   await Promise.all([
     fetchData(),
@@ -387,6 +413,15 @@ onMounted(async () => {
             @click="localReplanVisible = true"
           >
             局部重排生成新方案
+          </el-button>
+          <el-button
+            type="primary"
+            plain
+            :loading="creatingRepair"
+            :disabled="plan.status === 'ABANDONED'"
+            @click="createRepairTaskFromPlan"
+          >
+            创建修复任务
           </el-button>
         </div>
       </el-card>

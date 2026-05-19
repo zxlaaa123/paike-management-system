@@ -11,6 +11,7 @@ import {
   type ScheduleRiskIssue,
   type ScheduleRiskList,
 } from '../../api/v4ScheduleAnalysisApi'
+import { createRepairTask } from '../../api/v5RepairTaskApi'
 import type { ScheduleAdjustmentApplyResult } from '../../api/v4ScheduleAdjustmentApi'
 import type { ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
 import { strategyText } from '../../utils/status'
@@ -28,6 +29,7 @@ const detailVisible = ref(false)
 const adjustVisible = ref(false)
 const adjustingRisk = ref<ScheduleRiskIssue | null>(null)
 const localReplanVisible = ref(false)
+const creatingRepair = ref(false)
 
 const filters = ref({
   riskType: '',
@@ -124,6 +126,29 @@ function openDetail(risk: ScheduleRiskIssue) {
   detailVisible.value = true
 }
 
+async function createRepairFromRisk(risk: ScheduleRiskIssue) {
+  if (!plan.value) return
+  creatingRepair.value = true
+  try {
+    const task = await createRepairTask({
+      semesterId: plan.value.semesterId,
+      planId: plan.value.id,
+      taskType: 'RISK_REPAIR',
+      title: `风险修复：${risk.title}`,
+      triggerSource: 'MANUAL',
+      riskTypes: [risk.riskType],
+      riskItemIds: [risk.id],
+      scopePlanItemIds: risk.relatedItemIds ?? [],
+    })
+    ElMessage.success('修复任务已创建')
+    router.push(`/v5/repair-tasks/${task.id}`)
+  } catch (error: any) {
+    ElMessage.error(error?.message || '创建修复任务失败')
+  } finally {
+    creatingRepair.value = false
+  }
+}
+
 function canAdjust(risk: ScheduleRiskIssue) {
   return !!risk.relatedItemIds?.length
 }
@@ -180,6 +205,7 @@ onMounted(fetchData)
         </div>
         <div class="hero-actions">
           <el-button type="primary" plain :loading="refreshing" @click="handleRefresh">刷新风险</el-button>
+          <el-button :loading="creatingRepair" @click="router.push('/v5/repair-tasks')">修复任务</el-button>
           <el-button @click="router.push(`/v4/schedule-analysis/${planId}`)">回到质量分析</el-button>
           <el-button type="success" plain @click="router.push(`/v4/schedule-analysis/${planId}/charts`)">查看图表分析</el-button>
           <el-button
@@ -272,6 +298,7 @@ onMounted(fetchData)
         <el-table-column label="操作" width="170" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">查看详情</el-button>
+            <el-button link type="success" :loading="creatingRepair" @click="createRepairFromRisk(row)">创建修复任务</el-button>
             <el-button v-if="canAdjust(row)" link type="warning" @click="openAdjust(row)">尝试调整</el-button>
           </template>
         </el-table-column>
@@ -306,6 +333,7 @@ onMounted(fetchData)
         </el-card>
 
         <div v-if="canAdjust(selectedRisk)" class="drawer-actions">
+          <el-button type="success" plain :loading="creatingRepair" @click="createRepairFromRisk(selectedRisk)">创建修复任务</el-button>
           <el-button type="warning" plain @click="openAdjust(selectedRisk)">尝试局部调整</el-button>
         </div>
       </div>

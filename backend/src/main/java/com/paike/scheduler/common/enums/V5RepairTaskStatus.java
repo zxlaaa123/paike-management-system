@@ -4,12 +4,14 @@ import lombok.Getter;
 
 @Getter
 public enum V5RepairTaskStatus {
-    PENDING("PENDING"),
-    RUNNING("RUNNING"),
-    GENERATED("GENERATED"),
+    CREATED("CREATED"),
+    ANALYZING("ANALYZING"),
+    SUGGESTED("SUGGESTED"),
+    SIMULATED("SIMULATED"),
     APPLIED("APPLIED"),
+    CANCELLED("CANCELLED"),
     FAILED("FAILED"),
-    CANCELLED("CANCELLED");
+    ;
 
     private final String code;
 
@@ -17,4 +19,3 @@ public enum V5RepairTaskStatus {
         this.code = code;
     }
 }
-

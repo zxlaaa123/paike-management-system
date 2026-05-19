@@ -42,7 +42,7 @@ public class V5Stage1DataService {
         task.setSourceScheduleId(request.getSourceScheduleId());
         task.setTaskCode(request.getTaskCode().trim());
         task.setTaskType(request.getTaskType().trim().toUpperCase(Locale.ROOT));
-        task.setStatus(V5RepairTaskStatus.PENDING.getCode());
+        task.setStatus(V5RepairTaskStatus.CREATED.getCode());
         task.setTriggerSource(normalizeOrDefault(request.getTriggerSource(), "MANUAL"));
         task.setRiskTypes(trimToNull(request.getRiskTypes()));
         task.setTargetItemCount(0);
@@ -204,4 +204,3 @@ public class V5Stage1DataService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 }
-

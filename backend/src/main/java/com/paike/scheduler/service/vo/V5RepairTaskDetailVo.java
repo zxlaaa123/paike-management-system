@@ -1,47 +1,36 @@
-package com.paike.scheduler.entity;
+package com.paike.scheduler.service.vo;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
-@Getter
-@Setter
-@TableName("schedule_repair_task")
-public class ScheduleRepairTask {
-
-    @TableId(type = IdType.AUTO)
+@Data
+public class V5RepairTaskDetailVo {
     private Long id;
     private Long semesterId;
     private Long planId;
     private Long sourcePlanId;
     private Long sourceScheduleId;
+    private Long resultPlanId;
     private String taskCode;
     private String title;
     private String taskType;
     private String status;
     private String triggerSource;
-    private String riskTypes;
-    private String riskItemIds;
-    private String scopePlanItemIds;
+    private List<String> riskTypes;
+    private List<Long> riskItemIds;
+    private List<Long> scopePlanItemIds;
     private Integer targetItemCount;
     private Integer lockedItemCount;
     private Integer processedItemCount;
     private Integer successItemCount;
     private Integer failureItemCount;
-    private Long resultPlanId;
     private LocalDateTime startedAt;
     private LocalDateTime finishedAt;
     private String errorMessage;
     private String cancelReason;
-
-    @TableField("created_at")
     private LocalDateTime createdAt;
-
-    @TableField("updated_at")
     private LocalDateTime updatedAt;
 }
+
