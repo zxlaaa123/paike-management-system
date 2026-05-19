@@ -241,6 +241,10 @@ function openAdjustDialog(item: SchedulePlanItem) {
   adjustDialogVisible.value = true
 }
 
+function openCandidatesByItem(item: SchedulePlanItem) {
+  router.push(`/v5/candidate-positions?planItemId=${item.id}`)
+}
+
 async function handleAdjustSuccess(_result: ScheduleAdjustmentApplyResult) {
   adjustDialogVisible.value = false
   await Promise.all([fetchData(), fetchScoreData(), loadExplainData()])
@@ -449,9 +453,10 @@ onMounted(async () => {
                 </template>
               </el-table-column>
               <el-table-column prop="conflictReason" label="冲突原因" min-width="180" />
-              <el-table-column label="操作" width="160">
+              <el-table-column label="操作" width="220">
                 <template #default="{ row }">
                   <el-button type="primary" link size="small" @click="openTaskLogs(row)">日志</el-button>
+                  <el-button type="info" link size="small" @click="openCandidatesByItem(row)">候选位置</el-button>
                   <el-button v-if="plan.status !== 'ABANDONED'" type="warning" link size="small" @click="openAdjustDialog(row)">调整</el-button>
                 </template>
               </el-table-column>

@@ -130,6 +130,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/v5/RepairTaskDetailView.vue'),
       },
       {
+        path: 'v5/candidate-positions',
+        name: 'V5CandidatePositions',
+        component: () => import('../views/v5/CandidatePositionView.vue'),
+      },
+      {
         path: 'v4/schedule-analysis/:planId',
         name: 'V4ScheduleAnalysisDetail',
         component: () => import('../views/v4/ScheduleAnalysisDetail.vue'),

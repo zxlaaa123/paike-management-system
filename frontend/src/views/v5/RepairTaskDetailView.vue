@@ -80,6 +80,20 @@ const canOperate = computed(() => {
   return !!task.value && !['CANCELLED', 'FAILED', 'APPLIED'].includes(task.value.status)
 })
 
+function openCandidates() {
+  if (!task.value) return
+  const planItemId = task.value.scopePlanItemIds?.[0]
+  const scheduleId = task.value.sourceScheduleId ?? undefined
+  if (!planItemId && !scheduleId) {
+    ElMessage.warning('当前任务缺少课程定位信息，无法查看候选位置')
+    return
+  }
+  const query = new URLSearchParams()
+  if (planItemId) query.set('planItemId', String(planItemId))
+  if (scheduleId) query.set('scheduleId', String(scheduleId))
+  router.push(`/v5/candidate-positions?${query.toString()}`)
+}
+
 onMounted(fetchData)
 </script>
 
@@ -122,6 +136,7 @@ onMounted(fetchData)
       </el-row>
 
       <div class="actions" v-if="canOperate">
+        <el-button type="info" :loading="updating" @click="openCandidates">查看候选位置</el-button>
         <el-button :loading="updating" @click="changeStatus('ANALYZING')">标记分析中</el-button>
         <el-button :loading="updating" @click="changeStatus('SUGGESTED')">标记已建议</el-button>
         <el-button :loading="updating" @click="changeStatus('SIMULATED')">标记已试算</el-button>
@@ -141,4 +156,3 @@ onMounted(fetchData)
 .stats { margin-top: 16px; }
 .actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
 </style>
-

@@ -107,10 +107,10 @@ public class V5RuleEvaluationService {
         boolean simulationOnly = !Boolean.FALSE.equals(request.getSimulationOnly());
         details.add(repair("SIMULATION_ONLY", "只生成试算方案", simulationOnly, simulationOnly ? "当前为试算模式" : "请求未启用试算模式"));
 
-        boolean noDirectFormalOverwrite = !simulationOnly || !"APPLIED".equalsIgnoreCase(plan.getStatus()) ? simulationOnly : false;
+        // 候选位置阶段只做评估，不执行应用；该规则作为流程提示，不应阻塞候选可用性。
         details.add(repair("NO_DIRECT_FORMAL_OVERWRITE", "不直接覆盖正式课表",
-                noDirectFormalOverwrite,
-                noDirectFormalOverwrite ? "当前评估不会直接覆盖正式课表" : "已应用方案必须仅输出试算结果"));
+                true,
+                "候选位置阶段仅用于评估，正式课表变更需通过试算与人工应用流程"));
     }
 
     private void checkHardRules(

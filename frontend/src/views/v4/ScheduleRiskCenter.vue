@@ -162,6 +162,15 @@ function openAdjust(risk: ScheduleRiskIssue) {
   adjustVisible.value = true
 }
 
+function openCandidates(risk: ScheduleRiskIssue) {
+  const planItemId = risk.relatedItemIds?.[0]
+  if (!planItemId) {
+    ElMessage.warning('当前风险缺少方案明细，无法生成候选位置')
+    return
+  }
+  router.push(`/v5/candidate-positions?planItemId=${planItemId}`)
+}
+
 async function handleAdjustSuccess(_result: ScheduleAdjustmentApplyResult) {
   adjustVisible.value = false
   detailVisible.value = false
@@ -295,10 +304,11 @@ onMounted(fetchData)
         </el-table-column>
         <el-table-column prop="description" label="说明" min-width="240" show-overflow-tooltip />
         <el-table-column prop="suggestion" label="建议" min-width="240" show-overflow-tooltip />
-        <el-table-column label="操作" width="170" fixed="right">
+        <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">查看详情</el-button>
             <el-button link type="success" :loading="creatingRepair" @click="createRepairFromRisk(row)">创建修复任务</el-button>
+            <el-button link type="info" @click="openCandidates(row)">候选位置</el-button>
             <el-button v-if="canAdjust(row)" link type="warning" @click="openAdjust(row)">尝试调整</el-button>
           </template>
         </el-table-column>
@@ -334,6 +344,7 @@ onMounted(fetchData)
 
         <div v-if="canAdjust(selectedRisk)" class="drawer-actions">
           <el-button type="success" plain :loading="creatingRepair" @click="createRepairFromRisk(selectedRisk)">创建修复任务</el-button>
+          <el-button type="info" plain @click="openCandidates(selectedRisk)">候选位置</el-button>
           <el-button type="warning" plain @click="openAdjust(selectedRisk)">尝试局部调整</el-button>
         </div>
       </div>
