@@ -1,5 +1,6 @@
 import request from '../utils/request'
 import type { ApiResponse } from './types'
+import type { V5SimulationPlanDetail } from './v5SimulationApi'
 
 export type V5SuggestionType =
   | 'KEEP_TIME_CHANGE_ROOM'
@@ -61,9 +62,8 @@ export function getRepairSuggestionDetail(taskId: number, suggestionId: number) 
 }
 
 export function chooseSuggestionForSimulation(taskId: number, suggestionId: number) {
-  return request.post<ApiResponse<V5RepairSuggestion>>(`/v5/repair-tasks/${taskId}/suggestions/${suggestionId}/simulate`).then((r) => {
+  return request.post<ApiResponse<V5SimulationPlanDetail>>(`/v5/repair-tasks/${taskId}/suggestions/${suggestionId}/simulate`).then((r) => {
     if (!r.data) throw new Error('响应数据为空')
     return r.data.data
   })
 }
-

@@ -20,6 +20,10 @@ public class SchedulePlan {
 
     private Long sourcePlanId;
 
+    private Long sourceScheduleId;
+
+    private Long repairTaskId;
+
     private Long semesterId;
 
     private String name;

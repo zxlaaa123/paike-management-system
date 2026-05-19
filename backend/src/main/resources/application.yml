@@ -14,7 +14,7 @@ spring:
   sql:
     init:
       mode: always
-      schema-locations: classpath:db/schema.sql,classpath:db/v2_schema.sql,classpath:db/v2_alter_schedule.sql,classpath:db/v2_alter_score_report.sql,classpath:db/v3_semester.sql,classpath:db/v3_semester_data_bind.sql,classpath:db/v3_schedule_plan.sql,classpath:db/v3_score.sql,classpath:db/v5_stage1.sql,classpath:db/v5_stage3.sql
+      schema-locations: classpath:db/schema.sql,classpath:db/v2_schema.sql,classpath:db/v2_alter_schedule.sql,classpath:db/v2_alter_score_report.sql,classpath:db/v3_semester.sql,classpath:db/v3_semester_data_bind.sql,classpath:db/v3_schedule_plan.sql,classpath:db/v3_score.sql,classpath:db/v5_stage1.sql,classpath:db/v5_stage3.sql,classpath:db/v5_stage6.sql
       continue-on-error: true
 
 mybatis-plus:

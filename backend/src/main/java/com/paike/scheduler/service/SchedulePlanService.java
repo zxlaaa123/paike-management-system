@@ -46,6 +46,8 @@ public class SchedulePlanService {
                 .eq(SchedulePlan::getSemesterId, semesterId);
         if (status != null && !status.isBlank()) {
             wrapper.eq(SchedulePlan::getStatus, status);
+        } else {
+            wrapper.notIn(SchedulePlan::getStatus, List.of("SIMULATION", "CONFIRMED", "DISCARDED"));
         }
         if (strategyType != null && !strategyType.isBlank()) {
             wrapper.eq(SchedulePlan::getStrategyType, strategyType);
@@ -264,8 +266,14 @@ public class SchedulePlanService {
         if (plan == null) {
             throw new BusinessException("排课方案不存在");
         }
+        if ("SIMULATION".equals(plan.getStatus()) || "CONFIRMED".equals(plan.getStatus())) {
+            throw new BusinessException("试算方案必须从试算详情页校验后应用");
+        }
         if ("ABANDONED".equals(plan.getStatus())) {
             throw new BusinessException("已废弃方案不能应用");
+        }
+        if ("DISCARDED".equals(plan.getStatus())) {
+            throw new BusinessException("已放弃试算方案不能应用");
         }
         if (plan.getScheduledCount() == null || plan.getScheduledCount() == 0) {
             throw new BusinessException("该方案没有排课明细，无法应用");
@@ -292,6 +300,93 @@ public class SchedulePlanService {
         List<SchedulePlanItem> items = planItemMapper.selectList(
                 new LambdaQueryWrapper<SchedulePlanItem>()
                         .eq(SchedulePlanItem::getPlanId, id));
+
+        Map<String, Long> timeSlotMap = timeSlotMapper.selectList(null).stream()
+                .collect(Collectors.toMap(
+                        ts -> ts.getDayOfWeek() + "_" + ts.getPeriodNo(),
+                        TimeSlot::getId,
+                        (a, b) -> a));
+
+        int insertedCount = 0;
+        for (SchedulePlanItem item : items) {
+            int periodNo = (item.getStartPeriod() + 1) / 2;
+            String key = item.getWeekday() + "_" + periodNo;
+            Long timeSlotId = timeSlotMap.get(key);
+            if (timeSlotId == null) {
+                throw new BusinessException("无法找到对应的时间段：周" + item.getWeekday() + " 第" + item.getStartPeriod() + "-" + item.getEndPeriod() + "节");
+            }
+
+            Schedule schedule = new Schedule();
+            schedule.setSemesterId(semesterId);
+            schedule.setPlanId(plan.getId());
+            schedule.setTeachingTaskId(item.getTeachingTaskId());
+            schedule.setCourseId(item.getCourseId());
+            schedule.setTeacherId(item.getTeacherId());
+            schedule.setClassId(item.getClassId());
+            schedule.setClassroomId(item.getClassroomId());
+            schedule.setTimeSlotId(timeSlotId);
+            schedule.setSourceType("PLAN");
+            schedule.setDeleted(0);
+            schedule.setCreateTime(LocalDateTime.now());
+            schedule.setUpdateTime(LocalDateTime.now());
+            scheduleMapper.insert(schedule);
+            insertedCount++;
+        }
+
+        plan.setStatus("APPLIED");
+        plan.setAppliedAt(LocalDateTime.now());
+        plan.setUpdatedAt(LocalDateTime.now());
+        planMapper.updateById(plan);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("planId", plan.getId());
+        result.put("semesterId", semesterId);
+        result.put("appliedCount", insertedCount);
+        result.put("appliedAt", plan.getAppliedAt());
+        return result;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> applySimulationPlan(Long id) {
+        SchedulePlan plan = planMapper.selectById(id);
+        if (plan == null) {
+            throw new BusinessException("试算方案不存在");
+        }
+        if (!"CONFIRMED".equals(plan.getStatus())) {
+            throw new BusinessException("试算方案确认后才能应用");
+        }
+        if (plan.getRepairTaskId() == null) {
+            throw new BusinessException("试算方案缺少修复任务绑定，不能应用");
+        }
+        return applyPlanInternal(plan);
+    }
+
+    private Map<String, Object> applyPlanInternal(SchedulePlan plan) {
+        if (plan.getScheduledCount() == null || plan.getScheduledCount() == 0) {
+            throw new BusinessException("该方案没有排课明细，无法应用");
+        }
+
+        Long semesterId = plan.getSemesterId();
+
+        List<SchedulePlan> oldAppliedPlans = planMapper.selectList(
+                new LambdaQueryWrapper<SchedulePlan>()
+                        .eq(SchedulePlan::getSemesterId, semesterId)
+                        .eq(SchedulePlan::getStatus, "APPLIED"));
+        for (SchedulePlan oldPlan : oldAppliedPlans) {
+            scheduleMapper.update(null,
+                    new LambdaUpdateWrapper<Schedule>()
+                            .eq(Schedule::getSemesterId, semesterId)
+                            .eq(Schedule::getPlanId, oldPlan.getId())
+                            .set(Schedule::getDeleted, 1)
+                            .set(Schedule::getUpdateTime, LocalDateTime.now()));
+            oldPlan.setStatus("DRAFT");
+            oldPlan.setUpdatedAt(LocalDateTime.now());
+            planMapper.updateById(oldPlan);
+        }
+
+        List<SchedulePlanItem> items = planItemMapper.selectList(
+                new LambdaQueryWrapper<SchedulePlanItem>()
+                        .eq(SchedulePlanItem::getPlanId, plan.getId()));
 
         Map<String, Long> timeSlotMap = timeSlotMapper.selectList(null).stream()
                 .collect(Collectors.toMap(

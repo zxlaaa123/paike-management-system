@@ -2,8 +2,10 @@ package com.paike.scheduler.controller;
 
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.service.V5RepairSuggestionService;
+import com.paike.scheduler.service.V5SimulationService;
 import com.paike.scheduler.service.dto.V5RepairSuggestionGenerateRequest;
 import com.paike.scheduler.service.vo.V5RepairSuggestionVo;
+import com.paike.scheduler.service.vo.V5SimulationPlanDetailVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +17,7 @@ import java.util.List;
 public class V5RepairSuggestionController {
 
     private final V5RepairSuggestionService repairSuggestionService;
+    private final V5SimulationService simulationService;
 
     @PostMapping("/generate")
     public Result<List<V5RepairSuggestionVo>> generate(
@@ -35,8 +38,7 @@ public class V5RepairSuggestionController {
     }
 
     @PostMapping("/{suggestionId}/simulate")
-    public Result<V5RepairSuggestionVo> simulate(@PathVariable Long taskId, @PathVariable Long suggestionId) {
-        return Result.success("已选择建议，可进入试算流程", repairSuggestionService.markForSimulation(taskId, suggestionId));
+    public Result<V5SimulationPlanDetailVo> simulate(@PathVariable Long taskId, @PathVariable Long suggestionId) {
+        return Result.success("试算方案已生成", simulationService.generate(taskId, suggestionId));
     }
 }
-

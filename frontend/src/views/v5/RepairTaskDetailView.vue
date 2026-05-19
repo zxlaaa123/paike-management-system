@@ -89,12 +89,11 @@ async function openSuggestionDetail(row: V5RepairSuggestion) {
 
 async function chooseForSimulation(row: V5RepairSuggestion) {
   try {
-    await chooseSuggestionForSimulation(taskId.value, row.id)
-    ElMessage.success('已选择该建议，后续可进入试算流程')
-    suggestions.value = await listRepairSuggestions(taskId.value)
-    task.value = await getRepairTaskDetail(taskId.value)
+    const simulation = await chooseSuggestionForSimulation(taskId.value, row.id)
+    ElMessage.success('试算方案已生成')
+    router.push(`/v5/repair-tasks/${taskId.value}/simulations/${simulation.plan.id}`)
   } catch (error: any) {
-    ElMessage.error(error?.message || '选择建议失败')
+    ElMessage.error(error?.message || '生成试算方案失败')
   }
 }
 
@@ -216,7 +215,7 @@ onMounted(fetchData)
       <template #header>
         <div class="header-row">
           <div class="title">修复建议列表</div>
-          <div class="sub">支持多选对比与选择建议进入试算</div>
+          <div class="sub">支持多选对比与生成试算方案</div>
         </div>
       </template>
       <el-table :data="suggestions" stripe border @selection-change="(rows:any)=>selectedSuggestions=rows">
@@ -245,7 +244,7 @@ onMounted(fetchData)
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openSuggestionDetail(row)">详情</el-button>
-            <el-button link type="success" @click="chooseForSimulation(row)">生成试算</el-button>
+            <el-button link type="success" @click="chooseForSimulation(row)">生成试算方案</el-button>
           </template>
         </el-table-column>
       </el-table>

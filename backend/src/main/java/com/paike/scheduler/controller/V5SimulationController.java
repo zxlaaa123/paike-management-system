@@ -1,0 +1,41 @@
+package com.paike.scheduler.controller;
+
+import com.paike.scheduler.common.response.Result;
+import com.paike.scheduler.service.V5SimulationService;
+import com.paike.scheduler.service.vo.V5SimulationPlanDetailVo;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/v5/repair-tasks/{taskId}/simulations")
+@RequiredArgsConstructor
+public class V5SimulationController {
+
+    private final V5SimulationService simulationService;
+
+    @GetMapping("/{planId}")
+    public Result<V5SimulationPlanDetailVo> detail(@PathVariable Long taskId, @PathVariable Long planId) {
+        return Result.success(simulationService.detail(taskId, planId));
+    }
+
+    @PostMapping("/{planId}/confirm")
+    public Result<V5SimulationPlanDetailVo> confirm(@PathVariable Long taskId, @PathVariable Long planId) {
+        return Result.success("试算方案已确认", simulationService.confirm(taskId, planId));
+    }
+
+    @PostMapping("/{planId}/apply")
+    public Result<Map<String, Object>> apply(@PathVariable Long taskId, @PathVariable Long planId) {
+        return Result.success("试算方案已应用", simulationService.apply(taskId, planId));
+    }
+
+    @PostMapping("/{planId}/discard")
+    public Result<V5SimulationPlanDetailVo> discard(@PathVariable Long taskId, @PathVariable Long planId) {
+        return Result.success("试算方案已放弃", simulationService.discard(taskId, planId));
+    }
+}

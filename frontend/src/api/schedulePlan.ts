@@ -3,6 +3,9 @@ import type { ApiResponse, PageResult } from './types'
 
 export interface SchedulePlan {
   id: number
+  sourcePlanId?: number | null
+  sourceScheduleId?: number | null
+  repairTaskId?: number | null
   semesterId: number
   semesterName?: string
   name: string
