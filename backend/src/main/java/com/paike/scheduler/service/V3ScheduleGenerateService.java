@@ -215,18 +215,30 @@ public class V3ScheduleGenerateService {
         boolean prioritizeMorning = ruleService.getBoolValue("PRIORITIZE_MORNING");
         boolean avoidFridayAfternoon = ruleService.getBoolValue("AVOID_FRIDAY_AFTERNOON");
         return timeSlots.stream().sorted((a, b) -> {
+            int aPeriodNo = a.getPeriodNo() == null ? Integer.MAX_VALUE : a.getPeriodNo();
+            int bPeriodNo = b.getPeriodNo() == null ? Integer.MAX_VALUE : b.getPeriodNo();
+            int aDayOfWeek = a.getDayOfWeek() == null ? Integer.MAX_VALUE : a.getDayOfWeek();
+            int bDayOfWeek = b.getDayOfWeek() == null ? Integer.MAX_VALUE : b.getDayOfWeek();
+
             if (prioritizeMorning) {
-                boolean aMorning = a.getPeriodNo() <= 2;
-                boolean bMorning = b.getPeriodNo() <= 2;
+                boolean aMorning = aPeriodNo <= 2;
+                boolean bMorning = bPeriodNo <= 2;
                 if (aMorning != bMorning) return aMorning ? -1 : 1;
             }
             if (avoidFridayAfternoon) {
-                boolean aFriPm = a.getDayOfWeek() == 5 && a.getPeriodNo() >= 3;
-                boolean bFriPm = b.getDayOfWeek() == 5 && b.getPeriodNo() >= 3;
+                boolean aFriPm = aDayOfWeek == 5 && aPeriodNo >= 3;
+                boolean bFriPm = bDayOfWeek == 5 && bPeriodNo >= 3;
                 if (aFriPm != bFriPm) return aFriPm ? 1 : -1;
             }
-            return Integer.compare(a.getSortOrder(), b.getSortOrder());
+            return Integer.compare(safeSortOrder(a), safeSortOrder(b));
         }).toList();
+    }
+
+    private int safeSortOrder(TimeSlot slot) {
+        if (slot == null) {
+            return Integer.MAX_VALUE;
+        }
+        return slot.getSortOrder() == null ? Integer.MAX_VALUE : slot.getSortOrder();
     }
 
     private List<Classroom> loadAvailableClassrooms() {

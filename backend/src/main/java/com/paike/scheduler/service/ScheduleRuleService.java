@@ -108,9 +108,12 @@ public class ScheduleRuleService {
     }
 
     private int parseInt(String value, String key) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new BusinessException(key + " 的值为空，无法解析为整数");
+        }
         try {
             return Integer.parseInt(value.trim());
-        } catch (NumberFormatException e) {
+        } catch (Exception e) {
             throw new BusinessException(key + " 的值 '" + value + "' 不是有效整数");
         }
     }

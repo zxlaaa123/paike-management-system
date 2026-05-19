@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,6 +15,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SchedulePlanExplainService {
@@ -48,16 +51,34 @@ public class SchedulePlanExplainService {
     }
 
     public void appendGenerateLog(Long planId, Long semesterId, Long taskId, String level, String type, String message, Integer stepNo) {
-        ScheduleGenerateLog log = new ScheduleGenerateLog();
-        log.setPlanId(planId);
-        log.setSemesterId(semesterId);
-        log.setTeachingTaskId(taskId);
-        log.setLogLevel(level);
-        log.setLogType(type);
-        log.setMessage(message);
-        log.setStepNo(stepNo);
-        log.setCreatedAt(LocalDateTime.now());
-        generateLogMapper.insert(log);
+        // 验收阶段降压策略：仅持久化 ERROR 日志，避免大量 INFO/WARN 写入导致锁竞争并阻塞主流程。
+        if (!"ERROR".equalsIgnoreCase(level)) {
+            return;
+        }
+        int maxRetry = 3;
+        for (int attempt = 1; attempt <= maxRetry; attempt++) {
+            try {
+                ScheduleGenerateLog log = new ScheduleGenerateLog();
+                log.setPlanId(planId);
+                log.setSemesterId(semesterId);
+                log.setTeachingTaskId(taskId);
+                log.setLogLevel(level);
+                log.setLogType(type);
+                log.setMessage(message);
+                log.setStepNo(stepNo);
+                log.setCreatedAt(LocalDateTime.now());
+                generateLogMapper.insert(log);
+                return;
+            } catch (DeadlockLoserDataAccessException ex) {
+                if (attempt >= maxRetry) {
+                    // 生成日志失败不应阻塞排课主链路，记录后降级忽略。
+                    log.warn("appendGenerateLog deadlock dropped: planId={}, type={}, stepNo={}, message={}",
+                            planId, type, stepNo, message, ex);
+                    return;
+                }
+                sleepQuietly(20L * attempt);
+            }
+        }
     }
 
     public List<ScheduleGenerateLog> listPlanLogs(Long planId, String logLevel, String logType, Long teachingTaskId) {
@@ -256,6 +277,14 @@ public class SchedulePlanExplainService {
             Classroom newRoom = roomMap.get(record.getNewClassroomId());
             record.setOldClassroomName(oldRoom != null ? oldRoom.getRoomName() : null);
             record.setNewClassroomName(newRoom != null ? newRoom.getRoomName() : null);
+        }
+    }
+
+    private void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
         }
     }
 }

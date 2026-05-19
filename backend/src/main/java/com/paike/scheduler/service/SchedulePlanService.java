@@ -347,32 +347,12 @@ public class SchedulePlanService {
         if ("ABANDONED".equals(plan.getStatus())) {
             throw new BusinessException("已废弃方案不能回滚应用");
         }
-        if (!"APPLIED".equals(plan.getStatus())) {
-            throw new BusinessException("只有已应用的方案才能回滚");
+        if (plan.getScheduledCount() == null || plan.getScheduledCount() == 0) {
+            throw new BusinessException("该方案没有排课明细，无法回滚应用");
         }
 
-        Long semesterId = plan.getSemesterId();
-
-        // 1. 软删除该方案生成的所有正式课表记录
-        int deletedCount = scheduleMapper.update(null,
-                new LambdaUpdateWrapper<Schedule>()
-                        .eq(Schedule::getSemesterId, semesterId)
-                        .eq(Schedule::getPlanId, id)
-                        .set(Schedule::getDeleted, 1)
-                        .set(Schedule::getUpdateTime, LocalDateTime.now()));
-
-        // 2. 将方案状态回退到 DRAFT
-        plan.setStatus("DRAFT");
-        plan.setAppliedAt(null);
-        plan.setUpdatedAt(LocalDateTime.now());
-        planMapper.updateById(plan);
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("planId", plan.getId());
-        result.put("semesterId", semesterId);
-        result.put("rolledBackScheduleCount", deletedCount);
-        result.put("message", "已回滚，共清除 " + deletedCount + " 条正式课表记录");
-        return result;
+        // 回滚语义：将目标方案重新应用为正式课表（而不是只删除当前正式课表）。
+        return applyPlan(id);
     }
 
     private void fillItemRelations(List<SchedulePlanItem> items) {
