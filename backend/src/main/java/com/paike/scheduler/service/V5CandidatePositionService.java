@@ -65,7 +65,7 @@ public class V5CandidatePositionService {
 
         boolean includeUnavailable = !Boolean.FALSE.equals(request.getIncludeUnavailable());
         int limit = request.getLimit() == null || request.getLimit() <= 0 ? 300 : Math.min(request.getLimit(), 1000);
-        int evaluateBudget = includeUnavailable ? Math.min(Math.max(limit, 1), 40) : Math.min(Math.max(limit * 2, 1), 60);
+        int evaluateBudget = includeUnavailable ? Math.min(Math.max(limit * 6, 1), 480) : Math.min(Math.max(limit * 20, 1), 1200);
         List<SchedulePlanItem> planItems = schedulePlanItemMapper.selectList(new LambdaQueryWrapper<SchedulePlanItem>()
                 .eq(SchedulePlanItem::getPlanId, source.planId));
         Set<Long> lockedIds = scheduleLockedItemMapper.selectList(new LambdaQueryWrapper<ScheduleLockedItem>()

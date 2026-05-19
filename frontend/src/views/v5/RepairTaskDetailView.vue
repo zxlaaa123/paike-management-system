@@ -9,13 +9,25 @@ import {
   type V5RepairTaskDetail,
   type V5RepairTaskStatus,
 } from '../../api/v5RepairTaskApi'
+import {
+  chooseSuggestionForSimulation,
+  generateRepairSuggestions,
+  getRepairSuggestionDetail,
+  listRepairSuggestions,
+  type V5RepairSuggestion,
+} from '../../api/v5RepairSuggestionApi'
 
 const route = useRoute()
 const router = useRouter()
 const taskId = computed(() => Number(route.params.taskId))
 const loading = ref(false)
 const updating = ref(false)
+const generatingSuggestions = ref(false)
 const task = ref<V5RepairTaskDetail | null>(null)
+const suggestions = ref<V5RepairSuggestion[]>([])
+const selectedSuggestions = ref<V5RepairSuggestion[]>([])
+const detailVisible = ref(false)
+const currentSuggestion = ref<V5RepairSuggestion | null>(null)
 
 const statusOptions: Array<{ label: string; value: V5RepairTaskStatus }> = [
   { label: '已创建', value: 'CREATED' },
@@ -43,11 +55,65 @@ async function fetchData() {
   loading.value = true
   try {
     task.value = await getRepairTaskDetail(taskId.value)
+    suggestions.value = await listRepairSuggestions(taskId.value)
   } catch (error: any) {
     ElMessage.error(error?.message || '加载任务详情失败')
   } finally {
     loading.value = false
   }
+}
+
+async function generateSuggestions() {
+  generatingSuggestions.value = true
+  try {
+    suggestions.value = await generateRepairSuggestions(taskId.value, { includeUnavailable: true, candidateLimit: 24 })
+    ElMessage.success('修复建议已生成')
+    if (task.value && task.value.status !== 'SUGGESTED') {
+      task.value = await getRepairTaskDetail(taskId.value)
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.message || '生成修复建议失败')
+  } finally {
+    generatingSuggestions.value = false
+  }
+}
+
+async function openSuggestionDetail(row: V5RepairSuggestion) {
+  try {
+    currentSuggestion.value = await getRepairSuggestionDetail(taskId.value, row.id)
+    detailVisible.value = true
+  } catch (error: any) {
+    ElMessage.error(error?.message || '加载建议详情失败')
+  }
+}
+
+async function chooseForSimulation(row: V5RepairSuggestion) {
+  try {
+    await chooseSuggestionForSimulation(taskId.value, row.id)
+    ElMessage.success('已选择该建议，后续可进入试算流程')
+    suggestions.value = await listRepairSuggestions(taskId.value)
+    task.value = await getRepairTaskDetail(taskId.value)
+  } catch (error: any) {
+    ElMessage.error(error?.message || '选择建议失败')
+  }
+}
+
+function suggestionTypeText(type: string) {
+  const map: Record<string, string> = {
+    KEEP_TIME_CHANGE_ROOM: '保时换教室',
+    KEEP_ROOM_CHANGE_TIME: '保教室换时间',
+    CHANGE_TIME_AND_ROOM: '换时间和教室',
+    MANUAL_REVIEW: '人工处理',
+    PARTIAL_RESCHEDULE: '局部重排',
+  }
+  return map[type] || type
+}
+
+function levelTagType(level: string) {
+  if (level === 'HIGH') return 'success'
+  if (level === 'MEDIUM') return 'warning'
+  if (level === 'LOW') return 'info'
+  return 'danger'
 }
 
 async function changeStatus(status: V5RepairTaskStatus) {
@@ -137,6 +203,7 @@ onMounted(fetchData)
 
       <div class="actions" v-if="canOperate">
         <el-button type="info" :loading="updating" @click="openCandidates">查看候选位置</el-button>
+        <el-button type="primary" :loading="generatingSuggestions" @click="generateSuggestions">生成修复建议</el-button>
         <el-button :loading="updating" @click="changeStatus('ANALYZING')">标记分析中</el-button>
         <el-button :loading="updating" @click="changeStatus('SUGGESTED')">标记已建议</el-button>
         <el-button :loading="updating" @click="changeStatus('SIMULATED')">标记已试算</el-button>
@@ -144,6 +211,71 @@ onMounted(fetchData)
         <el-button type="danger" :loading="updating" @click="cancelTask">取消任务</el-button>
       </div>
     </el-card>
+
+    <el-card shadow="never" class="main-card">
+      <template #header>
+        <div class="header-row">
+          <div class="title">修复建议列表</div>
+          <div class="sub">支持多选对比与选择建议进入试算</div>
+        </div>
+      </template>
+      <el-table :data="suggestions" stripe border @selection-change="(rows:any)=>selectedSuggestions=rows">
+        <el-table-column type="selection" width="48" />
+        <el-table-column prop="suggestionCode" label="建议编码" width="150" />
+        <el-table-column label="建议类型" width="170">
+          <template #default="{ row }">{{ suggestionTypeText(row.suggestionType) }}</template>
+        </el-table-column>
+        <el-table-column label="推荐等级" width="120">
+          <template #default="{ row }"><el-tag :type="levelTagType(row.recommendationLevel)">{{ row.recommendationLevel }}</el-tag></template>
+        </el-table-column>
+        <el-table-column label="原安排" min-width="180">
+          <template #default="{ row }">周{{ row.sourceWeekday ?? '-' }} {{ row.sourceStartPeriod ?? '-' }}-{{ row.sourceEndPeriod ?? '-' }} {{ row.sourceClassroomName || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="建议安排" min-width="180">
+          <template #default="{ row }">周{{ row.targetWeekday ?? '-' }} {{ row.targetStartPeriod ?? '-' }}-{{ row.targetEndPeriod ?? '-' }} {{ row.targetClassroomName || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="解决原风险" width="110">
+          <template #default="{ row }"><el-tag :type="row.resolvesOriginalRisk ? 'success' : 'info'">{{ row.resolvesOriginalRisk ? '是' : '否' }}</el-tag></template>
+        </el-table-column>
+        <el-table-column label="新风险" width="100">
+          <template #default="{ row }"><el-tag :type="row.introducesNewRisk ? 'warning' : 'success'">{{ row.introducesNewRisk ? '有' : '无' }}</el-tag></template>
+        </el-table-column>
+        <el-table-column prop="expectedScoreDelta" label="评分变化" width="110" />
+        <el-table-column prop="reasonSummary" label="建议说明" min-width="220" show-overflow-tooltip />
+        <el-table-column label="操作" width="180" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="openSuggestionDetail(row)">详情</el-button>
+            <el-button link type="success" @click="chooseForSimulation(row)">生成试算</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-alert
+        v-if="selectedSuggestions.length > 1"
+        type="info"
+        show-icon
+        :closable="false"
+        :title="`已选择 ${selectedSuggestions.length} 条建议，可横向对比原安排/新安排/评分变化后再选择试算`"
+        style="margin-top:12px"
+      />
+    </el-card>
+
+    <el-drawer v-model="detailVisible" title="建议详情" size="520px">
+      <el-descriptions v-if="currentSuggestion" :column="1" border>
+        <el-descriptions-item label="建议编码">{{ currentSuggestion.suggestionCode }}</el-descriptions-item>
+        <el-descriptions-item label="建议类型">{{ suggestionTypeText(currentSuggestion.suggestionType) }}</el-descriptions-item>
+        <el-descriptions-item label="推荐等级">{{ currentSuggestion.recommendationLevel }}</el-descriptions-item>
+        <el-descriptions-item label="关联风险">{{ currentSuggestion.riskType || '-' }} / {{ currentSuggestion.riskItemId || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="原课程安排">
+          周{{ currentSuggestion.sourceWeekday ?? '-' }} {{ currentSuggestion.sourceStartPeriod ?? '-' }}-{{ currentSuggestion.sourceEndPeriod ?? '-' }} {{ currentSuggestion.sourceClassroomName || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="建议后安排">
+          周{{ currentSuggestion.targetWeekday ?? '-' }} {{ currentSuggestion.targetStartPeriod ?? '-' }}-{{ currentSuggestion.targetEndPeriod ?? '-' }} {{ currentSuggestion.targetClassroomName || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="影响对象">{{ (currentSuggestion.affectedItems || []).join(', ') || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="评分变化预估">{{ currentSuggestion.expectedScoreDelta ?? 0 }}</el-descriptions-item>
+        <el-descriptions-item label="建议说明">{{ currentSuggestion.description || currentSuggestion.reasonSummary }}</el-descriptions-item>
+      </el-descriptions>
+    </el-drawer>
   </div>
 </template>
 
