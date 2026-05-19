@@ -21,6 +21,7 @@ import com.paike.scheduler.service.vo.V5CandidatePositionResultVo;
 import com.paike.scheduler.service.vo.V5CandidatePositionVo;
 import com.paike.scheduler.service.vo.V5RepairSuggestionVo;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +36,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class V5RepairSuggestionService {
@@ -365,7 +367,9 @@ public class V5RepairSuggestionService {
         if (json == null || json.isBlank()) return new SuggestionDetail();
         try {
             return objectMapper.readValue(json, new TypeReference<SuggestionDetail>() {});
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.warn("反序列化 SuggestionDetail 失败，使用空对象兜底；payload 前 200 字符: {}",
+                    json.substring(0, Math.min(200, json.length())), e);
             return new SuggestionDetail();
         }
     }
@@ -374,7 +378,9 @@ public class V5RepairSuggestionService {
         if (json == null || json.isBlank()) return List.of();
         try {
             return objectMapper.readValue(json, new TypeReference<List<Long>>() {});
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.warn("反序列化 List<Long> 失败，使用空列表兜底；payload 前 200 字符: {}",
+                    json.substring(0, Math.min(200, json.length())), e);
             return List.of();
         }
     }
