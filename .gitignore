@@ -48,3 +48,10 @@ test_result.json
 # Codex local files
 .codex/
 AGENTS.md
+
+# Local unrelated docs
+docs/v4/V4_08_局部重排开发计划.md
+深度架构审查报告.md
+docs/V1-V4_总体验收_AI执行说明_2026-05-19.md
+docs/V1-V4_总体验收实施计划_精简版_2026-05-19.md
+backend/data/

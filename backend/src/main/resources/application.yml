@@ -35,3 +35,8 @@ app:
   jwt:
     secret: ${JWT_SECRET:replace_with_a_strong_secret_key_for_stage3_v1_auth}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  ai:
+    api-key: ${AI_API_KEY:}
+    base-url: ${AI_BASE_URL:https://api.openai.com/v1/chat/completions}
+    model: ${AI_MODEL:gpt-4o-mini}
+    timeout-ms: ${AI_TIMEOUT_MS:20000}
