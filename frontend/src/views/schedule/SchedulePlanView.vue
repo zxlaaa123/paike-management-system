@@ -10,6 +10,7 @@ import {
 } from '../../api/schedulePlan'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
 import { strategyText } from '../../utils/status'
+import { extractMessage, isCancel } from '../../utils/errors'
 
 const router = useRouter()
 
@@ -31,6 +32,13 @@ const currentSemester = ref<Semester | null>(null)
 
 const hasCurrentSemester = computed(() => currentSemester.value !== null)
 
+function fallback<T>(promise: Promise<T>, defaultValue: T): Promise<T> {
+  return promise.catch((err) => {
+    console.warn('fetchOptions partial fail:', err)
+    return defaultValue
+  })
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -48,8 +56,8 @@ async function fetchData() {
 
 async function fetchOptions() {
   const [semesters, current] = await Promise.all([
-    getAllSemesters(),
-    getCurrentSemester().catch(() => null),
+    fallback(getAllSemesters(), []),
+    fallback(getCurrentSemester(), null),
   ])
   semesterList.value = semesters
   currentSemester.value = current
@@ -84,17 +92,29 @@ async function handleDelete(row: SchedulePlan) {
     ElMessage.warning('只能删除草稿方案')
     return
   }
-  await ElMessageBox.confirm(`确定删除方案「${row.name}」吗？删除后不可恢复。`, '提示', { type: 'warning' })
-  await deleteSchedulePlan(row.id)
-  ElMessage.success('删除成功')
-  fetchData()
+  try {
+    await ElMessageBox.confirm(`确定删除方案「${row.name}」吗？删除后不可恢复。`, '提示', { type: 'warning' })
+    await deleteSchedulePlan(row.id)
+    ElMessage.success('删除成功')
+    fetchData()
+  } catch (err: unknown) {
+    if (isCancel(err)) return
+    ElMessage.error(extractMessage(err, '删除失败'))
+    fetchData()
+  }
 }
 
 async function handleAbandon(row: SchedulePlan) {
-  await ElMessageBox.confirm(`确定废弃方案「${row.name}」吗？`, '提示', { type: 'warning' })
-  await abandonSchedulePlan(row.id)
-  ElMessage.success('已废弃')
-  fetchData()
+  try {
+    await ElMessageBox.confirm(`确定废弃方案「${row.name}」吗？`, '提示', { type: 'warning' })
+    await abandonSchedulePlan(row.id)
+    ElMessage.success('已废弃')
+    fetchData()
+  } catch (err: unknown) {
+    if (isCancel(err)) return
+    ElMessage.error(extractMessage(err, '废弃失败'))
+    fetchData()
+  }
 }
 
 function statusTagType(status: string) {
@@ -114,7 +134,10 @@ function rowClass({ row }: { row: SchedulePlan }): string {
 }
 
 onMounted(() => {
-  fetchOptions().then(fetchData)
+  void (async () => {
+    await fetchOptions()
+    await fetchData()
+  })()
 })
 </script>
 

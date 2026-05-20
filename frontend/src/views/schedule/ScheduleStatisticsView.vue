@@ -32,10 +32,17 @@ const workloadData = ref<TeacherWorkloadItem[]>([])
 const utilizationData = ref<ClassroomUtilizationItem[]>([])
 const balanceData = ref<ClassBalanceItem[]>([])
 
+function fallback<T>(promise: Promise<T>, defaultValue: T): Promise<T> {
+  return promise.catch((err) => {
+    console.warn('fetchOptions partial fail:', err)
+    return defaultValue
+  })
+}
+
 async function fetchOptions() {
   const [semesters, current] = await Promise.all([
-    getAllSemesters(),
-    getCurrentSemester().catch(() => null),
+    fallback(getAllSemesters(), []),
+    fallback(getCurrentSemester(), null),
   ])
   semesterList.value = semesters
   currentSemester.value = current

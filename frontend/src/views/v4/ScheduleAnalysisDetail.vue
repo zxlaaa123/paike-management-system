@@ -7,6 +7,7 @@ import { getSchedulePlanById, type SchedulePlan } from '../../api/schedulePlan'
 import { getScheduleAnalysisSummary, refreshScheduleAnalysisSummary, type ScheduleAnalysisSummary } from '../../api/v4ScheduleAnalysisApi'
 import type { ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
 import { strategyText } from '../../utils/status'
+import { extractMessage } from '../../utils/errors'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,8 +28,8 @@ async function fetchData() {
     ])
     plan.value = planData
     summary.value = summaryData
-  } catch (error: any) {
-    ElMessage.error(error?.message || '加载分析数据失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载分析数据失败'))
   } finally {
     loading.value = false
   }
@@ -40,8 +41,8 @@ async function handleRefresh() {
     await refreshScheduleAnalysisSummary(planId.value)
     await fetchData()
     ElMessage.success('分析结果已刷新')
-  } catch (error: any) {
-    ElMessage.error(error?.message || '刷新失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '刷新失败'))
   } finally {
     refreshing.value = false
   }

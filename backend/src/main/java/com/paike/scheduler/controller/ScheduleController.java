@@ -91,7 +91,7 @@ public class ScheduleController {
         String conflict = conflictService.checkConflict(
             form.getTeachingTaskId(), form.getTimeSlotId(), form.getClassroomId(), null);
         if (conflict != null) {
-            return Result.fail(400, conflict);
+            throw new BusinessException(400, ScheduleConflictService.stripReasonTag(conflict));
         }
 
         TeachingTask task = teachingTaskMapper.selectById(form.getTeachingTaskId());
@@ -189,7 +189,7 @@ public class ScheduleController {
         String conflict = conflictService.checkConflict(
             form.getTeachingTaskId(), form.getTimeSlotId(), form.getClassroomId(), null);
         if (conflict != null) {
-            return Result.success(Map.of("hasConflict", true, "message", conflict));
+            return Result.success(Map.of("hasConflict", true, "message", ScheduleConflictService.stripReasonTag(conflict)));
         }
         return Result.success(Map.of("hasConflict", false, "message", ""));
     }

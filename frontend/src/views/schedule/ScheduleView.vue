@@ -18,6 +18,7 @@ import { getAllTeachingTasks, type TeachingTask } from '../../api/teachingTask'
 import { getAllTimeSlots, type TimeSlot } from '../../api/timeSlot'
 import { getAllClassrooms, type Classroom } from '../../api/classroom'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
+import { extractMessage } from '../../utils/errors'
 
 const router = useRouter()
 const loading = ref(false)
@@ -64,14 +65,22 @@ const hasCurrentSemester = computed(() => currentSemester.value !== null)
 
 // 按星期分组的时间段
 const timeSlotsByDay = computed(() => {
-  const map: Record<number, TimeSlot[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] }
+  const map: Record<number, TimeSlot[]> = {}
   for (const slot of timeSlotList.value) {
-    if (map[slot.dayOfWeek]) map[slot.dayOfWeek].push(slot)
+    if (!map[slot.dayOfWeek]) map[slot.dayOfWeek] = []
+    map[slot.dayOfWeek].push(slot)
   }
   return map
 })
 
-const dayNames: Record<number, string> = { 1: '周一', 2: '周二', 3: '周三', 4: '周四', 5: '周五' }
+const dayNames: Record<number, string> = { 1: '周一', 2: '周二', 3: '周三', 4: '周四', 5: '周五', 6: '周六', 7: '周日' }
+
+function fallback<T>(promise: Promise<T>, defaultValue: T): Promise<T> {
+  return promise.catch((err) => {
+    console.warn('fetchOptions partial fail:', err)
+    return defaultValue
+  })
+}
 
 async function fetchData() {
   loading.value = true
@@ -90,11 +99,11 @@ async function fetchData() {
 
 async function fetchOptions() {
   const [tasks, slots, rooms, semesters, current] = await Promise.all([
-    getAllTeachingTasks(),
-    getAllTimeSlots(),
-    getAllClassrooms(),
-    getAllSemesters(),
-    getCurrentSemester().catch(() => null),
+    fallback(getAllTeachingTasks(), []),
+    fallback(getAllTimeSlots(), []),
+    fallback(getAllClassrooms(), []),
+    fallback(getAllSemesters(), []),
+    fallback(getCurrentSemester(), null),
   ])
   taskList.value = tasks
   timeSlotList.value = slots
@@ -170,8 +179,8 @@ async function handleDelete(row: Schedule) {
     await deleteSchedule(row.id)
     ElMessage.success('删除成功')
     fetchData()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '删除失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '删除失败'))
   }
 }
 
@@ -224,7 +233,10 @@ function goSourceRisk() {
 }
 
 onMounted(() => {
-  fetchOptions().then(fetchData)
+  void (async () => {
+    await fetchOptions()
+    await fetchData()
+  })()
 })
 
 const adjustContext = computed(() => {

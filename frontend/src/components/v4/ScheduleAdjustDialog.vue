@@ -10,6 +10,7 @@ import {
   type ScheduleAdjustmentCheckResult,
   type ScheduleAdjustmentTargetType,
 } from '../../api/v4ScheduleAdjustmentApi'
+import { extractMessage, isCancel } from '../../utils/errors'
 
 interface AdjustDialogContext {
   targetType: ScheduleAdjustmentTargetType
@@ -156,8 +157,8 @@ async function handleCheck() {
     } else {
       ElMessage.success('未检测到阻塞冲突，可以保存')
     }
-  } catch (error: any) {
-    ElMessage.error(error?.message || '检测失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '检测失败'))
   } finally {
     checking.value = false
   }
@@ -188,9 +189,9 @@ async function handleSubmit(forceAdjust = false) {
     ElMessage.success(result.message || '调整成功')
     emit('success', result)
     emit('update:modelValue', false)
-  } catch (error: any) {
-    if (error === 'cancel') return
-    ElMessage.error(error?.message || '保存失败')
+  } catch (error: unknown) {
+    if (isCancel(error)) return
+    ElMessage.error(extractMessage(error, '保存失败'))
   } finally {
     saving.value = false
   }

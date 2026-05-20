@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import { getSchedulePlanById, type SchedulePlan } from '../../api/schedulePlan'
 import { getScheduleScoreExplanation, type ScheduleScoreExplanation } from '../../api/v4ScheduleAnalysisApi'
 import { strategyText } from '../../utils/status'
+import { extractMessage } from '../../utils/errors'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,8 +24,8 @@ async function fetchData() {
     ])
     plan.value = planData
     scoreExplanation.value = scoreData
-  } catch (error: any) {
-    ElMessage.error(error?.message || '加载评分详情失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载评分详情失败'))
   } finally {
     loading.value = false
   }

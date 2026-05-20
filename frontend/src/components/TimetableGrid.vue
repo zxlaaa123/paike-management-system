@@ -8,13 +8,25 @@ const props = defineProps<{
   highlight?: 'class' | 'teacher' | 'room'
 }>()
 
-const dayNames = ['', '周一', '周二', '周三', '周四', '周五']
-const periods = [
-  { index: 1, label: '第1-2节' },
-  { index: 2, label: '第3-4节' },
-  { index: 3, label: '第5-6节' },
-  { index: 4, label: '第7-8节' },
-]
+const dayNameMap = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日']
+const defaultDays = [1, 2, 3, 4, 5]
+const defaultPeriods = [1, 2, 3, 4]
+
+const days = computed(() => {
+  const values = [...new Set(props.items.map((item) => item.dayOfWeek).filter(Boolean))]
+  return (values.length ? values : defaultDays).sort((a, b) => a - b)
+})
+
+const periods = computed(() => {
+  const values = [...new Set(props.items.map((item) => item.period).filter(Boolean))]
+  return (values.length ? values : defaultPeriods).sort((a, b) => a - b).map((period) => {
+    const item = props.items.find((entry) => entry.period === period)
+    return {
+      index: period,
+      label: item?.timeSlotName || `第${period * 2 - 1}-${period * 2}节`,
+    }
+  })
+})
 
 const cells = computed(() => {
   const map: Record<string, TimetableItem> = {}
@@ -36,13 +48,13 @@ function getCell(day: number, period: number) {
       <thead>
         <tr>
           <th class="period-col"></th>
-          <th v-for="d in 5" :key="d" class="day-col">{{ dayNames[d] }}</th>
+          <th v-for="d in days" :key="d" class="day-col">{{ dayNameMap[d] || `周${d}` }}</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="p in periods" :key="p.index">
           <td class="period-label">{{ p.label }}</td>
-          <td v-for="d in 5" :key="d" class="cell">
+          <td v-for="d in days" :key="d" class="cell">
             <template v-if="getCell(d, p.index)">
               <div class="cell-content">
                 <div class="primary">{{ getCell(d, p.index).courseName }}</div>
@@ -90,7 +102,7 @@ function getCell(day: number, period: number) {
   width: 80px;
 }
 .day-col {
-  width: calc((100% - 80px) / 5);
+  min-width: 120px;
 }
 .period-label {
   background-color: #fafafa;

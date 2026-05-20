@@ -9,6 +9,7 @@ import {
   getSimulationDetail,
   type V5SimulationPlanDetail,
 } from '../../api/v5SimulationApi'
+import { extractMessage } from '../../utils/errors'
 
 const route = useRoute()
 const router = useRouter()
@@ -84,8 +85,8 @@ async function fetchData() {
   loading.value = true
   try {
     detail.value = await getSimulationDetail(taskId.value, planId.value)
-  } catch (error: any) {
-    ElMessage.error(error?.message || '加载试算方案失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载试算方案失败'))
   } finally {
     loading.value = false
   }
@@ -96,8 +97,8 @@ async function confirmPlan() {
   try {
     detail.value = await confirmSimulation(taskId.value, planId.value)
     ElMessage.success('试算方案已确认')
-  } catch (error: any) {
-    ElMessage.error(error?.message || '确认失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '确认失败'))
   } finally {
     acting.value = false
   }
@@ -121,8 +122,8 @@ async function applyPlan() {
     await applySimulation(taskId.value, planId.value)
     ElMessage.success('试算方案已应用')
     await fetchData()
-  } catch (error: any) {
-    ElMessage.error(error?.message || '应用失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '应用失败'))
   } finally {
     acting.value = false
   }
@@ -138,8 +139,8 @@ async function discardPlan() {
   try {
     detail.value = await discardSimulation(taskId.value, planId.value)
     ElMessage.success('试算方案已放弃')
-  } catch (error: any) {
-    ElMessage.error(error?.message || '放弃失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '放弃失败'))
   } finally {
     acting.value = false
   }

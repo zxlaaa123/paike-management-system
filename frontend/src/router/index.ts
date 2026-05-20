@@ -199,7 +199,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
-    redirect: '/dashboard',
+    redirect: '/login',
   },
 ]
 
@@ -213,22 +213,18 @@ router.beforeEach(async (to, _from) => {
   const needAuth = to.matched.some((record) => record.meta.requiresAuth)
 
   if (!needAuth) {
-    if (to.path === '/login' && authStore.isLoggedIn) {
+    if (to.path === '/login' && authStore.userInfo) {
       return '/dashboard'
     }
     return
-  }
-
-  if (!authStore.isLoggedIn) {
-    return { path: '/login', query: { redirect: to.fullPath } }
   }
 
   if (!authStore.userInfo) {
     try {
       await authStore.fetchCurrentUser()
     } catch (_error) {
-      await authStore.logout()
-      return '/login'
+      authStore.clearToken()
+      return { path: '/login', query: { redirect: to.fullPath } }
     }
   }
 })

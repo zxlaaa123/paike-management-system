@@ -10,6 +10,7 @@ import {
   type Semester,
   type SemesterForm,
 } from '../../api/semester'
+import { extractMessage } from '../../utils/errors'
 
 const loading = ref(false)
 const tableData = ref<Semester[]>([])
@@ -132,8 +133,8 @@ async function handleDelete(row: Semester) {
     await deleteSemester(row.id)
     ElMessage.success('删除成功')
     fetchData()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '删除失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '删除失败'))
   }
 }
 
@@ -152,8 +153,8 @@ async function handleSetCurrent(row: Semester) {
     await setCurrentSemester(row.id)
     ElMessage.success('已设置为当前学期')
     fetchData()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '设置失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '设置失败'))
   }
 }
 

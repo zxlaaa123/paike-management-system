@@ -193,8 +193,8 @@ public class AutoScheduleService {
                             usedDays.add(slot.getDayOfWeek());
                             break;
                         } else {
-                            lastFailReason = conflict.replace("排课失败:", "");
-                            lastFailReasonType = categorizeReason(lastFailReason);
+                            lastFailReasonType = categorizeReason(conflict);
+                            lastFailReason = ScheduleConflictService.stripReasonTag(conflict).replace("排课失败:", "");
                         }
                     }
 
@@ -401,6 +401,8 @@ public class AutoScheduleService {
      */
     private String categorizeReason(String reason) {
         if (reason == null || reason.isBlank()) return "UNKNOWN";
+        String taggedType = ScheduleConflictService.extractReasonType(reason);
+        if (!"UNKNOWN".equals(taggedType)) return taggedType;
         if (reason.contains("教师禁排")) return "TEACHER_UNAVAILABLE";
         if (reason.contains("已有课程") && reason.contains("老师")) return "TEACHER_CONFLICT";
         if (reason.contains("已有课程") && !reason.contains("老师")) return "CLASS_CONFLICT";

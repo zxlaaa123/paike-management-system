@@ -7,6 +7,7 @@ import {
   type V5CandidatePosition,
   type V5CandidatePositionResult,
 } from '../../api/v5CandidatePositionApi'
+import { extractMessage } from '../../utils/errors'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,8 +62,8 @@ async function loadData() {
       includeUnavailable: includeUnavailable.value,
       limit: 80,
     })
-  } catch (error: any) {
-    ElMessage.error(error?.message || '生成候选位置失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '生成候选位置失败'))
   } finally {
     loading.value = false
   }

@@ -23,6 +23,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { PageResult } from '../api/types'
+import { extractMessage } from '../utils/errors'
 
 export interface CrudOptions<T, F extends object> {
   /** 获取列表数据的 API 函数 */
@@ -99,7 +100,7 @@ export function useCrudForm<T extends { id: number }, F extends object>(options:
   function openEdit(row: T) {
     dialogTitle.value = `编辑${options.entityName}`
     editingId.value = row.id
-    Object.assign(form, row)
+    Object.assign(form, structuredClone(row))
     dialogVisible.value = true
   }
 
@@ -132,8 +133,8 @@ export function useCrudForm<T extends { id: number }, F extends object>(options:
       await options.deleteItem(row.id)
       ElMessage.success('删除成功')
       fetchData()
-    } catch (e: any) {
-      ElMessage.error(e?.message || '删除失败')
+    } catch (e: unknown) {
+      ElMessage.error(extractMessage(e, '删除失败'))
     }
   }
 

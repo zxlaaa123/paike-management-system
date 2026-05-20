@@ -11,6 +11,7 @@ import {
   type TeacherForm,
 } from '../../api/teacher'
 import { statusText, statusTagType } from '../../utils/status'
+import { extractMessage } from '../../utils/errors'
 
 const loading = ref(false)
 const tableData = ref<Teacher[]>([])
@@ -124,8 +125,8 @@ async function handleDelete(row: Teacher) {
     await deleteTeacher(row.id)
     ElMessage.success('删除成功')
     fetchData()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '删除失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '删除失败'))
   }
 }
 
@@ -141,8 +142,8 @@ async function handleStatusChange(row: Teacher) {
     await updateTeacherStatus(row.id, newStatus)
     ElMessage.success(`${action}成功`)
     fetchData()
-  } catch (e: any) {
-    ElMessage.error(e?.message || `${action}失败`)
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, `${action}失败`))
   }
 }
 
