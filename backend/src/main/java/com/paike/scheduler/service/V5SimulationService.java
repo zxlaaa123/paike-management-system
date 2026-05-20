@@ -76,6 +76,7 @@ public class V5SimulationService {
     private final V4ScheduleRiskService riskService;
     private final V5RuleEvaluationService ruleEvaluationService;
     private final SchedulePlanExplainService explainService;
+    private final V5ConsistencyCheckService consistencyCheckService;
     private final ObjectMapper objectMapper;
 
     @Transactional(rollbackFor = Exception.class)
@@ -288,6 +289,11 @@ public class V5SimulationService {
         vo.setRisks(risks);
         vo.setCompare(buildCompare(baseline, plan, baselineRisks, risks, changedItem.before(), changedItem.after()));
         vo.setLocalReplanSummary(buildPersistedLocalReplanSummary(task, plan, adjustLogs));
+        try {
+            vo.setLatestConsistencyReport(consistencyCheckService.latest(taskId, plan.getId()));
+        } catch (Exception ignored) {
+            // 历史报告读取失败不影响详情返回
+        }
         return vo;
     }
 
@@ -311,6 +317,8 @@ public class V5SimulationService {
         if (!"SIMULATION".equals(plan.getStatus()) && !"CONFIRMED".equals(plan.getStatus())) {
             throw new BusinessException("只有试算或已确认方案可以应用");
         }
+        // apply gate：强制后端重跑一致性校验，存在 BLOCKING 时阻止应用
+        consistencyCheckService.ensurePassBeforeApply(taskId, planId);
         schedulePlanService.refreshPlanConflictState(planId);
         scoreService.rescore(planMapper.selectById(planId));
         plan = planMapper.selectById(planId);

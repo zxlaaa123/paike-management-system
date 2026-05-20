@@ -1,8 +1,10 @@
 package com.paike.scheduler.controller;
 
 import com.paike.scheduler.common.response.Result;
+import com.paike.scheduler.service.V5ConsistencyCheckService;
 import com.paike.scheduler.service.V5SimulationService;
 import com.paike.scheduler.service.dto.V5LocalReplanRequest;
+import com.paike.scheduler.service.vo.V5ConsistencyCheckReportVo;
 import com.paike.scheduler.service.vo.V5SimulationPlanDetailVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +22,7 @@ import java.util.Map;
 public class V5SimulationController {
 
     private final V5SimulationService simulationService;
+    private final V5ConsistencyCheckService consistencyCheckService;
 
     @PostMapping("/local-replan")
     public Result<V5SimulationPlanDetailVo> localReplan(@PathVariable Long taskId, @RequestBody(required = false) V5LocalReplanRequest request) {
@@ -44,5 +47,15 @@ public class V5SimulationController {
     @PostMapping("/{planId}/discard")
     public Result<V5SimulationPlanDetailVo> discard(@PathVariable Long taskId, @PathVariable Long planId) {
         return Result.success("试算方案已放弃", simulationService.discard(taskId, planId));
+    }
+
+    @PostMapping("/{planId}/consistency-check")
+    public Result<V5ConsistencyCheckReportVo> runConsistencyCheck(@PathVariable Long taskId, @PathVariable Long planId) {
+        return Result.success("一致性校验完成", consistencyCheckService.check(taskId, planId, true));
+    }
+
+    @GetMapping("/{planId}/consistency-check/latest")
+    public Result<V5ConsistencyCheckReportVo> latestConsistencyCheck(@PathVariable Long taskId, @PathVariable Long planId) {
+        return Result.success(consistencyCheckService.latest(taskId, planId));
     }
 }
