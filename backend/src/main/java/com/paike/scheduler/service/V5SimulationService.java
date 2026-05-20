@@ -8,6 +8,7 @@ import com.paike.scheduler.common.enums.V5SuggestionStatus;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.Classroom;
 import com.paike.scheduler.entity.Schedule;
+import com.paike.scheduler.entity.ScheduleAdjustLog;
 import com.paike.scheduler.entity.ScheduleOptimizationCompare;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
@@ -26,8 +27,12 @@ import com.paike.scheduler.mapper.ScheduleRepairSuggestionMapper;
 import com.paike.scheduler.mapper.ScheduleRepairTaskMapper;
 import com.paike.scheduler.mapper.ScheduleScoreDetailMapper;
 import com.paike.scheduler.mapper.TimeSlotMapper;
+import com.paike.scheduler.service.dto.V5CandidateEvaluateRequest;
+import com.paike.scheduler.service.dto.V5LocalReplanRequest;
 import com.paike.scheduler.service.vo.ScheduleRiskIssueVo;
 import com.paike.scheduler.service.vo.ScheduleRiskListVo;
+import com.paike.scheduler.service.vo.V5CandidateEvaluationVo;
+import com.paike.scheduler.service.vo.V5LocalReplanSummaryVo;
 import com.paike.scheduler.service.vo.V5SimulationCompareVo;
 import com.paike.scheduler.service.vo.V5SimulationItemChangeVo;
 import com.paike.scheduler.service.vo.V5SimulationLoadChangeVo;
@@ -69,6 +74,8 @@ public class V5SimulationService {
     private final SchedulePlanService schedulePlanService;
     private final ScheduleScoreService scoreService;
     private final V4ScheduleRiskService riskService;
+    private final V5RuleEvaluationService ruleEvaluationService;
+    private final SchedulePlanExplainService explainService;
     private final ObjectMapper objectMapper;
 
     @Transactional(rollbackFor = Exception.class)
@@ -133,6 +140,135 @@ public class V5SimulationService {
         return detail(taskId, simulation.getId());
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public V5SimulationPlanDetailVo localReplan(Long taskId, V5LocalReplanRequest request) {
+        ScheduleRepairTask task = requireTask(taskId);
+        if (isTerminal(task.getStatus())) {
+            throw new BusinessException("已结束任务不能生成局部重排试算方案");
+        }
+        SchedulePlan baseline = resolveBaselinePlan(task);
+        if (baseline == null) {
+            throw new BusinessException("局部重排必须基于原方案，不能直接基于正式课表全量重排");
+        }
+
+        V5LocalReplanRequest safeRequest = request == null ? new V5LocalReplanRequest() : request;
+        List<SchedulePlanItem> sourceItems = loadSourceItems(task, baseline);
+        if (sourceItems.isEmpty()) {
+            throw new BusinessException("局部重排基础没有课程明细");
+        }
+        Map<Long, SchedulePlanItem> sourceItemMap = sourceItems.stream()
+                .filter(item -> item.getId() != null)
+                .collect(Collectors.toMap(SchedulePlanItem::getId, this::copyDetachedItem, (a, b) -> a, LinkedHashMap::new));
+        Set<Long> scopeIds = resolveLocalReplanScope(task, baseline, sourceItems, safeRequest);
+        if (scopeIds.isEmpty()) {
+            throw new BusinessException("局部重排范围为空，请选择班级、教师、教室、时间段、风险项或课程");
+        }
+
+        List<ScheduleLockedItem> locks = loadActiveLocks(baseline.getId());
+        Set<Long> lockedIds = locks.stream()
+                .map(ScheduleLockedItem::getPlanItemId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        List<Long> replanableSourceIds = scopeIds.stream()
+                .filter(id -> !lockedIds.contains(id))
+                .filter(sourceItemMap::containsKey)
+                .toList();
+        if (replanableSourceIds.isEmpty()) {
+            throw new BusinessException("局部重排范围内没有可移动课程，全部课程已锁定或不存在");
+        }
+
+        List<String> logs = new ArrayList<>();
+        logs.add("局部重排开始：范围课程 " + scopeIds.size() + " 条，锁定课程 " + lockedIds.size() + " 条，可重排课程 " + replanableSourceIds.size() + " 条。");
+        SchedulePlan simulation = createLocalReplanPlan(task, baseline, safeRequest, sourceItems, scopeIds, lockedIds);
+        Map<Long, Long> copiedItemIds = copyItems(simulation, sourceItems);
+        copyLocks(locks, copiedItemIds, simulation.getId());
+
+        Set<Long> simulationScopeIds = scopeIds.stream()
+                .map(copiedItemIds::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        List<Long> movedItemIds = new ArrayList<>();
+        List<Long> failedItemIds = new ArrayList<>();
+        int candidateLimit = safeRequest.getCandidateLimit() == null || safeRequest.getCandidateLimit() <= 0
+                ? 600
+                : Math.min(safeRequest.getCandidateLimit(), 2000);
+
+        for (Long sourceItemId : replanableSourceIds) {
+            Long simulationItemId = copiedItemIds.get(sourceItemId);
+            if (simulationItemId == null) {
+                failedItemIds.add(sourceItemId);
+                logs.add("课程 " + sourceItemId + " 未复制到试算方案，跳过。");
+                continue;
+            }
+            SchedulePlanItem before = sourceItemMap.get(sourceItemId);
+            SchedulePlanItem target = planItemMapper.selectById(simulationItemId);
+            CandidatePlacement placement = findBestLocalPlacement(simulation.getId(), target, simulationScopeIds, candidateLimit);
+            if (placement == null) {
+                failedItemIds.add(sourceItemId);
+                String reason = "未找到满足硬约束的候选位置";
+                logs.add("课程 " + sourceItemId + " 重排失败：" + reason + "。");
+                appendAdjustLog(simulation, target, before, target, BigDecimal.ZERO, reason);
+                continue;
+            }
+
+            target.setWeekday(placement.weekday());
+            target.setStartPeriod(placement.startPeriod());
+            target.setEndPeriod(placement.endPeriod());
+            target.setClassroomId(placement.classroomId());
+            target.setSourceType("V5_LOCAL_REPLAN");
+            target.setUpdatedAt(LocalDateTime.now());
+            planItemMapper.updateById(target);
+
+            SchedulePlanItem after = planItemMapper.selectById(simulationItemId);
+            if (hasPlacementChanged(before, after)) {
+                movedItemIds.add(sourceItemId);
+                logs.add("课程 " + sourceItemId + " 已移动到 周" + after.getWeekday() + " 第" + after.getStartPeriod() + "-" + after.getEndPeriod() + "节，评分变化 " + placement.score() + "。");
+                appendAdjustLog(simulation, after, before, after, placement.score(), "V5局部重排：选择软约束评分最优可用位置");
+            } else {
+                logs.add("课程 " + sourceItemId + " 保持原位置：原位置仍为当前最优可用位置。");
+            }
+        }
+
+        int conflictCount = schedulePlanService.refreshPlanConflictState(simulation.getId());
+        simulation = planMapper.selectById(simulation.getId());
+        simulation.setConflictCount(conflictCount);
+        scoreService.rescore(simulation);
+        simulation = planMapper.selectById(simulation.getId());
+
+        ScheduleRiskListVo baselineRisks = riskService.getPlanRisks(baseline.getId(), null, null, null);
+        ScheduleRiskListVo simulationRisks = riskService.getPlanRisks(simulation.getId(), null, null, null);
+        V5SimulationCompareVo compare = buildCompare(baseline, simulation, baselineRisks, simulationRisks, null, null);
+        if (Boolean.TRUE.equals(compare.getHasNewHardConflicts())) {
+            throw new BusinessException("局部重排结果引入新的硬冲突，已回滚。请缩小范围或增加可用教室/时间段");
+        }
+        persistCompare(task, baseline, simulation, compare);
+
+        task.setStatus(V5RepairTaskStatus.SIMULATED.getCode());
+        task.setResultPlanId(simulation.getId());
+        task.setLockedItemCount(lockedIds.size());
+        task.setTargetItemCount(scopeIds.size());
+        task.setProcessedItemCount(replanableSourceIds.size());
+        task.setSuccessItemCount(Math.max(0, replanableSourceIds.size() - failedItemIds.size()));
+        task.setFailureItemCount(failedItemIds.size());
+        task.setFinishedAt(LocalDateTime.now());
+        repairTaskMapper.updateById(task);
+
+        logs.add("局部重排完成：移动 " + movedItemIds.size() + " 条，失败 " + failedItemIds.size() + " 条；生成试算方案 " + simulation.getId() + "，未写入正式课表。");
+        V5LocalReplanSummaryVo summary = new V5LocalReplanSummaryVo();
+        summary.setScopeItemCount(scopeIds.size());
+        summary.setLockedCount(lockedIds.size());
+        summary.setReplanableCount(replanableSourceIds.size());
+        summary.setMovedCount(movedItemIds.size());
+        summary.setFailedCount(failedItemIds.size());
+        summary.setMovedItemIds(movedItemIds);
+        summary.setFailedItemIds(failedItemIds);
+        summary.setLogs(logs);
+
+        V5SimulationPlanDetailVo detail = detail(taskId, simulation.getId());
+        detail.setLocalReplanSummary(summary);
+        return detail;
+    }
+
     public V5SimulationPlanDetailVo detail(Long taskId, Long planId) {
         ScheduleRepairTask task = requireTask(taskId);
         SchedulePlan plan = requireSimulationPlan(task, planId);
@@ -147,6 +283,7 @@ public class V5SimulationService {
         vo.setScoreDetails(scoreDetailMapper.selectList(new LambdaQueryWrapper<ScheduleScoreDetail>()
                 .eq(ScheduleScoreDetail::getPlanId, plan.getId())
                 .orderByAsc(ScheduleScoreDetail::getRuleCode)));
+        vo.setAdjustLogs(explainService.listAdjustLogs(plan.getSemesterId(), plan.getId(), null, 1, 500).getRecords());
         vo.setRisks(risks);
         vo.setCompare(buildCompare(baseline, plan, baselineRisks, risks, changedItem.before(), changedItem.after()));
         return vo;
@@ -245,6 +382,234 @@ public class V5SimulationService {
         plan.setUpdatedAt(now);
         planMapper.insert(plan);
         return plan;
+    }
+
+    private SchedulePlan createLocalReplanPlan(
+            ScheduleRepairTask task,
+            SchedulePlan baseline,
+            V5LocalReplanRequest request,
+            List<SchedulePlanItem> sourceItems,
+            Set<Long> scopeIds,
+            Set<Long> lockedIds
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+        SchedulePlan plan = new SchedulePlan();
+        plan.setSemesterId(task.getSemesterId());
+        plan.setSourcePlanId(baseline.getId());
+        plan.setSourceScheduleId(task.getSourceScheduleId());
+        plan.setRepairTaskId(task.getId());
+        plan.setName(resolveLocalReplanName(request.getNewPlanName(), task, baseline));
+        plan.setStrategyType(baseline.getStrategyType());
+        plan.setPlanMode("SIMULATION");
+        plan.setStatus("SIMULATION");
+        plan.setTotalScore(baseline.getTotalScore());
+        plan.setScheduledCount(sourceItems.size());
+        plan.setUnscheduledCount(baseline.getUnscheduledCount());
+        plan.setConflictCount(0);
+        plan.setDescription("V5阶段8局部重排试算方案；来源方案ID=" + baseline.getId()
+                + "；范围课程=" + scopeIds.size()
+                + "；锁定课程=" + lockedIds.size()
+                + "；只移动范围内未锁定课程，不直接覆盖正式课表。");
+        plan.setGeneratedBy("V5_LOCAL_REPLAN");
+        plan.setGeneratedAt(now);
+        plan.setCreatedAt(now);
+        plan.setUpdatedAt(now);
+        planMapper.insert(plan);
+        return plan;
+    }
+
+    private Set<Long> resolveLocalReplanScope(
+            ScheduleRepairTask task,
+            SchedulePlan baseline,
+            List<SchedulePlanItem> sourceItems,
+            V5LocalReplanRequest request
+    ) {
+        Set<Long> scope = new LinkedHashSet<>();
+        addAll(scope, readLongList(task.getScopePlanItemIds()));
+        addAll(scope, request.getSelectedPlanItemIds());
+        addRiskScope(scope, baseline, task, request);
+
+        Set<Long> classIds = toLongSet(request.getClassIds());
+        Set<Long> teacherIds = toLongSet(request.getTeacherIds());
+        Set<Long> classroomIds = toLongSet(request.getClassroomIds());
+        Set<Integer> weekdays = request.getWeekdays() == null
+                ? Set.of()
+                : request.getWeekdays().stream().filter(Objects::nonNull).collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<Integer> periodNos = request.getPeriodNos() == null
+                ? Set.of()
+                : request.getPeriodNos().stream().filter(Objects::nonNull).collect(Collectors.toCollection(LinkedHashSet::new));
+        if (!classIds.isEmpty() || !teacherIds.isEmpty() || !classroomIds.isEmpty() || !weekdays.isEmpty() || !periodNos.isEmpty()) {
+            for (SchedulePlanItem item : sourceItems) {
+                if (!classIds.isEmpty() && classIds.contains(item.getClassId())) scope.add(item.getId());
+                if (!teacherIds.isEmpty() && teacherIds.contains(item.getTeacherId())) scope.add(item.getId());
+                if (!classroomIds.isEmpty() && classroomIds.contains(item.getClassroomId())) scope.add(item.getId());
+                if (!weekdays.isEmpty() && weekdays.contains(item.getWeekday())) scope.add(item.getId());
+                if (!periodNos.isEmpty() && periodNos.contains(toPeriodNo(item.getStartPeriod()))) scope.add(item.getId());
+            }
+        }
+        Set<Long> validIds = sourceItems.stream().map(SchedulePlanItem::getId).collect(Collectors.toSet());
+        scope.removeIf(id -> id == null || !validIds.contains(id));
+        return scope;
+    }
+
+    private void addRiskScope(Set<Long> scope, SchedulePlan baseline, ScheduleRepairTask task, V5LocalReplanRequest request) {
+        Set<Long> riskIds = new LinkedHashSet<>();
+        addAll(riskIds, readLongList(task.getRiskItemIds()));
+        addAll(riskIds, request.getRiskItemIds());
+        if (riskIds.isEmpty()) return;
+        ScheduleRiskListVo risks = riskService.getPlanRisks(baseline.getId(), null, null, null);
+        if (risks == null || risks.getRisks() == null) return;
+        for (ScheduleRiskIssueVo risk : risks.getRisks()) {
+            if (riskIds.contains(risk.getId())) {
+                addAll(scope, risk.getRelatedItemIds());
+            }
+        }
+    }
+
+    private CandidatePlacement findBestLocalPlacement(Long planId, SchedulePlanItem target, Set<Long> simulationScopeIds, int candidateLimit) {
+        List<TimeSlot> timeSlots = timeSlotMapper.selectList(new LambdaQueryWrapper<TimeSlot>()
+                .orderByAsc(TimeSlot::getDayOfWeek)
+                .orderByAsc(TimeSlot::getPeriodNo));
+        List<Classroom> classrooms = classroomMapper.selectList(new LambdaQueryWrapper<Classroom>()
+                .eq(Classroom::getDeleted, 0)
+                .eq(Classroom::getStatus, 1)
+                .orderByAsc(Classroom::getRoomName));
+        CandidatePlacement best = null;
+        int evaluated = 0;
+        for (TimeSlot slot : timeSlots) {
+            Integer start = slot.getPeriodNo() * 2 - 1;
+            Integer end = start + 1;
+            for (Classroom room : classrooms) {
+                if (evaluated >= candidateLimit) return best;
+                V5CandidateEvaluateRequest evalReq = new V5CandidateEvaluateRequest();
+                evalReq.setPlanId(planId);
+                evalReq.setPlanItemId(target.getId());
+                evalReq.setCandidateWeekday(slot.getDayOfWeek());
+                evalReq.setCandidateStartPeriod(start);
+                evalReq.setCandidateEndPeriod(end);
+                evalReq.setCandidateClassroomId(room.getId());
+                evalReq.setScopePlanItemIds(new ArrayList<>(simulationScopeIds));
+                evalReq.setSimulationOnly(true);
+                evalReq.setSourcePlanId(planId);
+                V5CandidateEvaluationVo eval = ruleEvaluationService.evaluateCandidate(evalReq);
+                evaluated++;
+                if (!Boolean.TRUE.equals(eval.getAvailable())) {
+                    continue;
+                }
+                CandidatePlacement candidate = new CandidatePlacement(
+                        room.getId(),
+                        slot.getDayOfWeek(),
+                        start,
+                        end,
+                        eval.getTotalScoreDelta() == null ? BigDecimal.ZERO : eval.getTotalScoreDelta()
+                );
+                if (best == null || compareCandidate(candidate, best) > 0) {
+                    best = candidate;
+                }
+            }
+        }
+        return best;
+    }
+
+    private int compareCandidate(CandidatePlacement a, CandidatePlacement b) {
+        int score = a.score().compareTo(b.score());
+        if (score != 0) return score;
+        int day = Integer.compare(nullSafe(b.weekday()), nullSafe(a.weekday()));
+        if (day != 0) return day;
+        return Integer.compare(nullSafe(b.startPeriod()), nullSafe(a.startPeriod()));
+    }
+
+    private void copyLocks(List<ScheduleLockedItem> locks, Map<Long, Long> copiedItemIds, Long newPlanId) {
+        for (ScheduleLockedItem source : locks) {
+            Long newItemId = copiedItemIds.get(source.getPlanItemId());
+            if (newItemId == null) continue;
+            ScheduleLockedItem target = new ScheduleLockedItem();
+            target.setTargetType("PLAN");
+            target.setPlanId(newPlanId);
+            target.setPlanItemId(newItemId);
+            target.setScheduleId(null);
+            target.setLockReason(source.getLockReason());
+            target.setActiveFlag(1);
+            target.setCreatedAt(LocalDateTime.now());
+            target.setUpdatedAt(LocalDateTime.now());
+            lockedItemMapper.insert(target);
+        }
+    }
+
+    private List<ScheduleLockedItem> loadActiveLocks(Long planId) {
+        return lockedItemMapper.selectList(new LambdaQueryWrapper<ScheduleLockedItem>()
+                .eq(ScheduleLockedItem::getPlanId, planId)
+                .eq(ScheduleLockedItem::getActiveFlag, 1)
+                .isNotNull(ScheduleLockedItem::getPlanItemId)
+                .orderByAsc(ScheduleLockedItem::getId));
+    }
+
+    private void appendAdjustLog(SchedulePlan plan, SchedulePlanItem item, SchedulePlanItem before, SchedulePlanItem after, BigDecimal score, String reason) {
+        ScheduleAdjustLog log = new ScheduleAdjustLog();
+        log.setPlanId(plan.getId());
+        log.setSemesterId(plan.getSemesterId());
+        log.setTeachingTaskId(item.getTeachingTaskId());
+        log.setOldClassroomId(before == null ? null : before.getClassroomId());
+        log.setOldWeekday(before == null ? null : before.getWeekday());
+        log.setOldStartPeriod(before == null ? null : before.getStartPeriod());
+        log.setOldEndPeriod(before == null ? null : before.getEndPeriod());
+        log.setNewClassroomId(after == null ? null : after.getClassroomId());
+        log.setNewWeekday(after == null ? null : after.getWeekday());
+        log.setNewStartPeriod(after == null ? null : after.getStartPeriod());
+        log.setNewEndPeriod(after == null ? null : after.getEndPeriod());
+        log.setBeforeScore(before == null ? BigDecimal.ZERO : before.getScore());
+        log.setAfterScore(score);
+        log.setConflictFlag(after == null ? 0 : after.getConflictFlag());
+        log.setAdjustReason(reason);
+        explainService.appendAdjustLog(log);
+    }
+
+    private String resolveLocalReplanName(String requestedName, ScheduleRepairTask task, SchedulePlan baseline) {
+        String trimmed = trimToNull(requestedName);
+        if (trimmed != null) return trimmed;
+        return "局部重排试算-" + task.getTaskCode() + "-" + baseline.getId();
+    }
+
+    private void addAll(Set<Long> target, List<Long> values) {
+        if (values == null) return;
+        values.stream().filter(Objects::nonNull).forEach(target::add);
+    }
+
+    private Set<Long> toLongSet(List<Long> values) {
+        if (values == null) return Set.of();
+        return values.stream().filter(Objects::nonNull).collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Integer toPeriodNo(Integer startPeriod) {
+        if (startPeriod == null || startPeriod <= 0) return null;
+        return (startPeriod + 1) / 2;
+    }
+
+    private List<Long> readLongList(String json) {
+        if (trimToNull(json) == null) return List.of();
+        try {
+            JsonNode node = objectMapper.readTree(json);
+            if (node == null || !node.isArray()) return List.of();
+            List<Long> result = new ArrayList<>();
+            for (JsonNode item : node) {
+                if (item != null && item.canConvertToLong()) {
+                    result.add(item.asLong());
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private int nullSafe(Integer value) {
+        return value == null ? Integer.MAX_VALUE : value;
     }
 
     private Map<Long, Long> copyItems(SchedulePlan simulation, List<SchedulePlanItem> sourceItems) {
@@ -844,6 +1209,9 @@ public class V5SimulationService {
         private boolean executable() {
             return targetClassroomId != null && targetWeekday != null && targetStartPeriod != null && targetEndPeriod != null;
         }
+    }
+
+    private record CandidatePlacement(Long classroomId, Integer weekday, Integer startPeriod, Integer endPeriod, BigDecimal score) {
     }
 
     private record ItemPair(SchedulePlanItem before, SchedulePlanItem after) {

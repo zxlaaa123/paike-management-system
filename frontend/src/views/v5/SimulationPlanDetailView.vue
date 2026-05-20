@@ -183,6 +183,13 @@ onMounted(fetchData)
         <el-col :span="6"><el-statistic title="课程变动数" :value="compare.courseChangeCount" /></el-col>
       </el-row>
 
+      <el-row v-if="detail.localReplanSummary" :gutter="12" class="block">
+        <el-col :span="6"><el-statistic title="局部范围课程" :value="detail.localReplanSummary.scopeItemCount" /></el-col>
+        <el-col :span="6"><el-statistic title="锁定保留" :value="detail.localReplanSummary.lockedCount" /></el-col>
+        <el-col :span="6"><el-statistic title="实际移动" :value="detail.localReplanSummary.movedCount" /></el-col>
+        <el-col :span="6"><el-statistic title="重排失败" :value="detail.localReplanSummary.failedCount" /></el-col>
+      </el-row>
+
       <el-descriptions :column="3" border class="block">
         <el-descriptions-item label="对比基线">{{ compare.baselinePlanName }}（{{ compare.baselinePlanId ?? compare.baselineSourceScheduleId ?? '正式课表' }}）</el-descriptions-item>
         <el-descriptions-item label="试算方案">{{ compare.simulationPlanName }}（{{ compare.simulationPlanId }}）</el-descriptions-item>
@@ -322,6 +329,28 @@ onMounted(fetchData)
           <template #default="{ row }"><el-tag :type="row.conflictFlag ? 'danger' : 'success'">{{ row.conflictFlag ? '有' : '无' }}</el-tag></template>
         </el-table-column>
         <el-table-column label="原因" prop="conflictReason" min-width="180" show-overflow-tooltip />
+      </el-table>
+    </el-card>
+
+    <el-card v-if="detail?.localReplanSummary || detail?.adjustLogs?.length" shadow="never" class="main-card">
+      <template #header><div class="title">局部重排日志</div></template>
+      <el-timeline v-if="detail?.localReplanSummary?.logs?.length">
+        <el-timeline-item v-for="(log, index) in detail.localReplanSummary.logs" :key="index" type="primary">
+          {{ log }}
+        </el-timeline-item>
+      </el-timeline>
+      <el-table v-if="detail?.adjustLogs?.length" :data="detail.adjustLogs" border stripe class="block">
+        <el-table-column prop="courseName" label="课程" min-width="140" />
+        <el-table-column prop="teacherName" label="教师" min-width="120" />
+        <el-table-column prop="className" label="班级" min-width="120" />
+        <el-table-column label="原位置" min-width="170">
+          <template #default="{ row }">周{{ row.oldWeekday ?? '-' }} {{ row.oldStartPeriod ?? '-' }}-{{ row.oldEndPeriod ?? '-' }} {{ row.oldClassroomName || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="新位置" min-width="170">
+          <template #default="{ row }">周{{ row.newWeekday ?? '-' }} {{ row.newStartPeriod ?? '-' }}-{{ row.newEndPeriod ?? '-' }} {{ row.newClassroomName || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="afterScore" label="评分变化" width="110" />
+        <el-table-column prop="adjustReason" label="日志说明" min-width="240" show-overflow-tooltip />
       </el-table>
     </el-card>
 
