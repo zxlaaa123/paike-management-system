@@ -6,10 +6,12 @@ import {
   applySimulation,
   confirmSimulation,
   discardSimulation,
+  generateRepairExplanation,
   getLatestConsistencyReport,
   getSimulationDetail,
   runConsistencyCheck,
   type V5ConsistencyCheckReport,
+  type V5RepairExplanation,
   type V5SimulationPlanDetail,
 } from '../../api/v5SimulationApi'
 import { extractMessage } from '../../utils/errors'
@@ -21,8 +23,10 @@ const planId = computed(() => Number(route.params.planId))
 const loading = ref(false)
 const acting = ref(false)
 const checking = ref(false)
+const explaining = ref(false)
 const detail = ref<V5SimulationPlanDetail | null>(null)
 const consistencyReport = ref<V5ConsistencyCheckReport | null>(null)
+const explanation = ref<V5RepairExplanation | null>(null)
 
 function statusType(status?: string) {
   if (status === 'APPLIED') return 'success'
@@ -146,6 +150,64 @@ async function refreshConsistencyLatest() {
     consistencyReport.value = await getLatestConsistencyReport(taskId.value, planId.value)
   } catch {
     // 忽略历史报告读取错误
+  }
+}
+
+async function handleGenerateExplanation() {
+  explaining.value = true
+  try {
+    explanation.value = await generateRepairExplanation(taskId.value, planId.value)
+    ElMessage.success(explanation.value?.remote ? 'AI 修复解释已生成' : 'AI 修复解释已生成（本地模板）')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, 'AI 修复解释生成失败'))
+  } finally {
+    explaining.value = false
+  }
+}
+
+function buildExplanationCopyText() {
+  const e = explanation.value
+  if (!e) return ''
+  const lines = [
+    `修复任务 ${e.taskId} · 试算方案 ${e.planId}`,
+    `生成方式：${e.remote ? '远程 AI' : '本地模板'}`,
+    `生成时间：${e.generatedAt}`,
+    '',
+    `【总体评价】${e.overallEvaluation}`,
+    `【推荐理由】${e.recommendationReason}`,
+  ]
+  if (e.improvedMetrics?.length) {
+    lines.push('【改善指标】')
+    e.improvedMetrics.forEach((m, i) => lines.push(`  ${i + 1}. ${m}`))
+  }
+  if (e.remainingIssues?.length) {
+    lines.push('【仍存在问题】')
+    e.remainingIssues.forEach((m, i) => lines.push(`  ${i + 1}. ${m}`))
+  }
+  lines.push(`【应用建议】${e.applyAdvice}`)
+  lines.push(`【答辩摘要】${e.defenseSummary}`)
+  lines.push('')
+  lines.push(e.disclaimer)
+  return lines.join('\n')
+}
+
+async function handleCopyExplanation() {
+  const text = buildExplanationCopyText()
+  if (!text) {
+    ElMessage.warning('暂无可复制内容')
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('已复制 AI 修复解释')
+  } catch {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+    ElMessage.success('已复制 AI 修复解释')
   }
 }
 
@@ -339,6 +401,73 @@ onMounted(fetchData)
       </template>
     </el-card>
 
+    <el-card v-if="detail" shadow="never" class="main-card">
+      <template #header>
+        <div class="header-row">
+          <div class="title">AI 修复解释</div>
+          <div class="header-actions">
+            <el-tag v-if="explanation" :type="explanation.remote ? 'success' : 'info'">
+              {{ explanation.remote ? '远程 AI' : '本地模板' }}
+            </el-tag>
+            <el-button size="small" type="primary" :loading="explaining" @click="handleGenerateExplanation">
+              生成 AI 修复解释
+            </el-button>
+            <el-button size="small" :disabled="!explanation" @click="handleCopyExplanation">复制全文</el-button>
+          </div>
+        </div>
+      </template>
+      <el-alert
+        type="warning"
+        :closable="false"
+        show-icon
+        title="AI 建议仅供参考，最终以系统校验结果为准。AI 不会自动应用方案或修改数据。"
+      />
+      <el-empty v-if="!explanation" description="尚未生成 AI 修复解释，请点击上方按钮触发" class="block" />
+      <template v-else>
+        <el-descriptions :column="3" border class="block">
+          <el-descriptions-item label="任务 ID">{{ explanation.taskId }}</el-descriptions-item>
+          <el-descriptions-item label="试算方案 ID">{{ explanation.planId }}</el-descriptions-item>
+          <el-descriptions-item label="生成时间">{{ explanation.generatedAt }}</el-descriptions-item>
+          <el-descriptions-item label="是否建议应用" :span="3">
+            <el-tag :type="explanation.recommendApply ? 'success' : 'danger'">
+              {{ explanation.recommendApply ? '建议应用' : '不建议应用' }}
+            </el-tag>
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <div class="section-title">总体评价</div>
+        <el-alert type="info" :closable="false" :title="explanation.overallEvaluation" />
+
+        <div class="section-title">推荐理由</div>
+        <el-alert type="success" :closable="false" :title="explanation.recommendationReason" />
+
+        <el-row :gutter="16" class="block">
+          <el-col :span="12">
+            <div class="section-title">改善的指标</div>
+            <el-empty v-if="!explanation.improvedMetrics?.length" description="无显著改善指标" />
+            <ul v-else class="ai-list">
+              <li v-for="(item, idx) in explanation.improvedMetrics" :key="idx">{{ item }}</li>
+            </ul>
+          </el-col>
+          <el-col :span="12">
+            <div class="section-title">仍存在的问题</div>
+            <el-empty v-if="!explanation.remainingIssues?.length" description="未发现遗留问题" />
+            <ul v-else class="ai-list">
+              <li v-for="(item, idx) in explanation.remainingIssues" :key="idx">{{ item }}</li>
+            </ul>
+          </el-col>
+        </el-row>
+
+        <div class="section-title">应用建议</div>
+        <el-alert :type="explanation.recommendApply ? 'success' : 'warning'" :closable="false" :title="explanation.applyAdvice" />
+
+        <div class="section-title">答辩展示摘要</div>
+        <el-alert type="info" :closable="false" :title="explanation.defenseSummary" />
+
+        <div class="sub block">{{ explanation.disclaimer }}</div>
+      </template>
+    </el-card>
+
     <el-card v-if="compare" shadow="never" class="main-card">
       <template #header><div class="title">优化前后对比</div></template>
       <el-table :data="metricRows" border stripe>
@@ -524,4 +653,6 @@ onMounted(fetchData)
 .block { margin-top: 16px; }
 .actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
 .section-title { margin-top: 12px; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: #344054; }
+.ai-list { margin: 0; padding-left: 20px; color: #344054; line-height: 1.9; }
+.ai-list li { margin-bottom: 2px; }
 </style>

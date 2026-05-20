@@ -278,3 +278,25 @@ export function getLatestConsistencyReport(taskId: number, planId: number) {
     return r.data.data
   })
 }
+
+export interface V5RepairExplanation {
+  taskId: number
+  planId: number
+  remote: boolean
+  generatedAt: string
+  overallEvaluation: string
+  recommendationReason: string
+  improvedMetrics: string[]
+  remainingIssues: string[]
+  applyAdvice: string
+  recommendApply: boolean | null
+  defenseSummary: string
+  disclaimer: string
+}
+
+export function generateRepairExplanation(taskId: number, planId: number) {
+  return request.post<ApiResponse<V5RepairExplanation>>(`/v5/repair-tasks/${taskId}/simulations/${planId}/ai-explanation`).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
+}

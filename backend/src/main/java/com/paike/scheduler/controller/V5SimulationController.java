@@ -2,9 +2,11 @@ package com.paike.scheduler.controller;
 
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.service.V5ConsistencyCheckService;
+import com.paike.scheduler.service.V5RepairExplanationService;
 import com.paike.scheduler.service.V5SimulationService;
 import com.paike.scheduler.service.dto.V5LocalReplanRequest;
 import com.paike.scheduler.service.vo.V5ConsistencyCheckReportVo;
+import com.paike.scheduler.service.vo.V5RepairExplanationVo;
 import com.paike.scheduler.service.vo.V5SimulationPlanDetailVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +25,7 @@ public class V5SimulationController {
 
     private final V5SimulationService simulationService;
     private final V5ConsistencyCheckService consistencyCheckService;
+    private final V5RepairExplanationService repairExplanationService;
 
     @PostMapping("/local-replan")
     public Result<V5SimulationPlanDetailVo> localReplan(@PathVariable Long taskId, @RequestBody(required = false) V5LocalReplanRequest request) {
@@ -57,5 +60,10 @@ public class V5SimulationController {
     @GetMapping("/{planId}/consistency-check/latest")
     public Result<V5ConsistencyCheckReportVo> latestConsistencyCheck(@PathVariable Long taskId, @PathVariable Long planId) {
         return Result.success(consistencyCheckService.latest(taskId, planId));
+    }
+
+    @PostMapping("/{planId}/ai-explanation")
+    public Result<V5RepairExplanationVo> generateExplanation(@PathVariable Long taskId, @PathVariable Long planId) {
+        return Result.success("AI 修复解释已生成", repairExplanationService.generate(taskId, planId));
     }
 }
