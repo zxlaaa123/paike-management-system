@@ -190,6 +190,42 @@ export interface V5SimulationPlanDetail {
   risks: ScheduleRiskList
   compare: V5SimulationCompare
   localReplanSummary: V5LocalReplanSummary | null
+  latestConsistencyReport: V5ConsistencyCheckReport | null
+}
+
+export interface V5ConsistencyIssue {
+  code: string
+  severity: 'BLOCKING' | 'WARNING' | 'INFO'
+  category: string
+  name: string
+  message: string
+  suggestion: string | null
+  planItemId: number | null
+  teachingTaskId: number | null
+  courseName: string | null
+  teacherName: string | null
+  className: string | null
+  classroomName: string | null
+  weekday: number | null
+  startPeriod: number | null
+  endPeriod: number | null
+}
+
+export interface V5ConsistencyCheckReport {
+  reportId: number | null
+  taskId: number
+  planId: number
+  sourcePlanId: number | null
+  semesterId: number | null
+  status: 'PASS' | 'WARN' | 'FAIL'
+  passed: boolean
+  blockingIssueCount: number
+  warningIssueCount: number
+  infoIssueCount: number
+  summary: string
+  recommendation: string
+  issues: V5ConsistencyIssue[]
+  checkedAt: string
 }
 
 export function generateLocalReplan(taskId: number, payload?: V5LocalReplanPayload) {
@@ -224,6 +260,20 @@ export function applySimulation(taskId: number, planId: number) {
 
 export function discardSimulation(taskId: number, planId: number) {
   return request.post<ApiResponse<V5SimulationPlanDetail>>(`/v5/repair-tasks/${taskId}/simulations/${planId}/discard`).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
+}
+
+export function runConsistencyCheck(taskId: number, planId: number) {
+  return request.post<ApiResponse<V5ConsistencyCheckReport>>(`/v5/repair-tasks/${taskId}/simulations/${planId}/consistency-check`).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
+}
+
+export function getLatestConsistencyReport(taskId: number, planId: number) {
+  return request.get<ApiResponse<V5ConsistencyCheckReport | null>>(`/v5/repair-tasks/${taskId}/simulations/${planId}/consistency-check/latest`).then((r) => {
     if (!r.data) throw new Error('响应数据为空')
     return r.data.data
   })

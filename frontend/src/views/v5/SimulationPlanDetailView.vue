@@ -6,7 +6,10 @@ import {
   applySimulation,
   confirmSimulation,
   discardSimulation,
+  getLatestConsistencyReport,
   getSimulationDetail,
+  runConsistencyCheck,
+  type V5ConsistencyCheckReport,
   type V5SimulationPlanDetail,
 } from '../../api/v5SimulationApi'
 import { extractMessage } from '../../utils/errors'
@@ -17,7 +20,9 @@ const taskId = computed(() => Number(route.params.taskId))
 const planId = computed(() => Number(route.params.planId))
 const loading = ref(false)
 const acting = ref(false)
+const checking = ref(false)
 const detail = ref<V5SimulationPlanDetail | null>(null)
+const consistencyReport = ref<V5ConsistencyCheckReport | null>(null)
 
 function statusType(status?: string) {
   if (status === 'APPLIED') return 'success'
@@ -63,7 +68,29 @@ function formatPercent(value?: number | null) {
 const compare = computed(() => detail.value?.compare ?? null)
 const canOperate = computed(() => ['SIMULATION', 'CONFIRMED'].includes(detail.value?.plan.status || ''))
 const hasBlockingConflicts = computed(() => !!compare.value?.hasNewHardConflicts)
-const canApply = computed(() => canOperate.value && !hasBlockingConflicts.value)
+const hasConsistencyBlocking = computed(() => (consistencyReport.value?.blockingIssueCount ?? 0) > 0)
+const canApply = computed(() => canOperate.value && !hasBlockingConflicts.value && !hasConsistencyBlocking.value)
+
+function severityTag(severity?: string): '' | 'success' | 'warning' | 'info' | 'danger' {
+  if (severity === 'BLOCKING') return 'danger'
+  if (severity === 'WARNING') return 'warning'
+  if (severity === 'INFO') return 'info'
+  return ''
+}
+
+function consistencyStatusTag(status?: string): '' | 'success' | 'warning' | 'info' | 'danger' {
+  if (status === 'PASS') return 'success'
+  if (status === 'WARN') return 'warning'
+  if (status === 'FAIL') return 'danger'
+  return 'info'
+}
+
+function consistencyAlertType(status?: string): 'success' | 'warning' | 'error' | 'info' {
+  if (status === 'PASS') return 'success'
+  if (status === 'WARN') return 'warning'
+  if (status === 'FAIL') return 'error'
+  return 'info'
+}
 
 const metricRows = computed(() => {
   const c = compare.value
@@ -85,10 +112,40 @@ async function fetchData() {
   loading.value = true
   try {
     detail.value = await getSimulationDetail(taskId.value, planId.value)
+    consistencyReport.value = detail.value?.latestConsistencyReport ?? null
   } catch (error: unknown) {
     ElMessage.error(extractMessage(error, '加载试算方案失败'))
   } finally {
     loading.value = false
+  }
+}
+
+async function triggerConsistencyCheck(opts?: { silent?: boolean }): Promise<V5ConsistencyCheckReport | null> {
+  checking.value = true
+  try {
+    const report = await runConsistencyCheck(taskId.value, planId.value)
+    consistencyReport.value = report
+    if (!opts?.silent) {
+      if (report.passed) {
+        ElMessage.success(report.summary || '一致性校验通过')
+      } else {
+        ElMessage.warning(report.summary || '一致性校验存在阻塞问题')
+      }
+    }
+    return report
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '一致性校验失败'))
+    return null
+  } finally {
+    checking.value = false
+  }
+}
+
+async function refreshConsistencyLatest() {
+  try {
+    consistencyReport.value = await getLatestConsistencyReport(taskId.value, planId.value)
+  } catch {
+    // 忽略历史报告读取错误
   }
 }
 
@@ -109,6 +166,13 @@ async function applyPlan() {
     ElMessage.error(compare.value?.recommendationMessage || '存在新增硬冲突，不能应用')
     return
   }
+  // 应用前自动触发一致性校验，确保后端最新状态没有 BLOCKING
+  const preCheck = await triggerConsistencyCheck({ silent: true })
+  if (!preCheck) return
+  if (!preCheck.passed) {
+    ElMessageBox.alert(preCheck.recommendation || '一致性校验存在阻塞问题，禁止应用', '应用被阻止', { type: 'error' })
+    return
+  }
   try {
     await ElMessageBox.confirm('应用后会写入正式课表，并替换当前已应用方案。', '应用试算方案', { type: 'warning' })
   } catch {
@@ -124,6 +188,7 @@ async function applyPlan() {
     await fetchData()
   } catch (error: unknown) {
     ElMessage.error(extractMessage(error, '应用失败'))
+    await refreshConsistencyLatest()
   } finally {
     acting.value = false
   }
@@ -210,10 +275,68 @@ onMounted(fetchData)
       </el-descriptions>
 
       <div class="actions" v-if="canOperate">
+        <el-button type="primary" :loading="checking" @click="triggerConsistencyCheck()">一致性校验</el-button>
         <el-button type="warning" :loading="acting" @click="confirmPlan" v-if="detail.plan.status === 'SIMULATION'">确认试算方案</el-button>
         <el-button type="success" :loading="acting" :disabled="!canApply" @click="applyPlan">应用试算方案</el-button>
         <el-button type="danger" :loading="acting" @click="discardPlan">放弃试算方案</el-button>
       </div>
+    </el-card>
+
+    <el-card v-if="detail" shadow="never" class="main-card">
+      <template #header>
+        <div class="header-row">
+          <div class="title">一致性校验</div>
+          <div class="header-actions">
+            <el-tag v-if="consistencyReport" :type="consistencyStatusTag(consistencyReport.status)">
+              {{ consistencyReport.status }}
+            </el-tag>
+            <el-button size="small" type="primary" :loading="checking" @click="triggerConsistencyCheck()">立即校验</el-button>
+          </div>
+        </div>
+      </template>
+      <el-empty v-if="!consistencyReport" description="尚未执行一致性校验，请点击上方按钮触发" />
+      <template v-else>
+        <el-alert
+          :type="consistencyAlertType(consistencyReport.status)"
+          :title="consistencyReport.summary"
+          :description="consistencyReport.recommendation"
+          :closable="false"
+          show-icon
+        />
+        <el-row :gutter="12" class="block">
+          <el-col :span="6"><el-statistic title="阻塞问题" :value="consistencyReport.blockingIssueCount" /></el-col>
+          <el-col :span="6"><el-statistic title="警告问题" :value="consistencyReport.warningIssueCount" /></el-col>
+          <el-col :span="6"><el-statistic title="提示问题" :value="consistencyReport.infoIssueCount" /></el-col>
+          <el-col :span="6"><el-statistic title="问题总数" :value="consistencyReport.issues?.length ?? 0" /></el-col>
+        </el-row>
+        <div class="sub" v-if="consistencyReport.checkedAt">检查时间：{{ consistencyReport.checkedAt }}</div>
+        <el-empty v-if="!consistencyReport.issues?.length" description="未发现问题" class="block" />
+        <el-table v-else :data="consistencyReport.issues" border stripe class="block">
+          <el-table-column label="级别" width="100">
+            <template #default="{ row }">
+              <el-tag :type="severityTag(row.severity)">{{ row.severity }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="category" label="分类" width="100" />
+          <el-table-column prop="name" label="规则" min-width="160" />
+          <el-table-column prop="message" label="说明" min-width="260" show-overflow-tooltip />
+          <el-table-column label="关联课程" min-width="180">
+            <template #default="{ row }">
+              <span v-if="row.courseName || row.teacherName || row.className">
+                {{ row.courseName || '-' }} / {{ row.teacherName || '-' }} / {{ row.className || '-' }}
+              </span>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="时间" min-width="140">
+            <template #default="{ row }">
+              <span v-if="row.weekday">周{{ row.weekday }} 第{{ row.startPeriod }}-{{ row.endPeriod }}节</span>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="suggestion" label="处理建议" min-width="220" show-overflow-tooltip />
+        </el-table>
+      </template>
     </el-card>
 
     <el-card v-if="compare" shadow="never" class="main-card">

@@ -17,4 +17,5 @@ public class V5SimulationPlanDetailVo {
     private ScheduleRiskListVo risks;
     private V5SimulationCompareVo compare;
     private V5LocalReplanSummaryVo localReplanSummary;
+    private V5ConsistencyCheckReportVo latestConsistencyReport;
 }
