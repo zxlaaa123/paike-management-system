@@ -283,9 +283,11 @@ public class V5SimulationService {
         vo.setScoreDetails(scoreDetailMapper.selectList(new LambdaQueryWrapper<ScheduleScoreDetail>()
                 .eq(ScheduleScoreDetail::getPlanId, plan.getId())
                 .orderByAsc(ScheduleScoreDetail::getRuleCode)));
-        vo.setAdjustLogs(explainService.listAdjustLogs(plan.getSemesterId(), plan.getId(), null, 1, 500).getRecords());
+        List<ScheduleAdjustLog> adjustLogs = explainService.listAdjustLogs(plan.getSemesterId(), plan.getId(), null, 1, 500).getRecords();
+        vo.setAdjustLogs(adjustLogs);
         vo.setRisks(risks);
         vo.setCompare(buildCompare(baseline, plan, baselineRisks, risks, changedItem.before(), changedItem.after()));
+        vo.setLocalReplanSummary(buildPersistedLocalReplanSummary(task, plan, adjustLogs));
         return vo;
     }
 
@@ -562,6 +564,40 @@ public class V5SimulationService {
         log.setConflictFlag(after == null ? 0 : after.getConflictFlag());
         log.setAdjustReason(reason);
         explainService.appendAdjustLog(log);
+    }
+
+    private V5LocalReplanSummaryVo buildPersistedLocalReplanSummary(ScheduleRepairTask task, SchedulePlan plan, List<ScheduleAdjustLog> adjustLogs) {
+        if (!"V5_LOCAL_REPLAN".equals(plan.getGeneratedBy())) {
+            return null;
+        }
+        List<ScheduleAdjustLog> logs = adjustLogs == null ? List.of() : adjustLogs;
+        List<Long> movedItemIds = logs.stream()
+                .map(ScheduleAdjustLog::getTeachingTaskId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        List<String> messages = new ArrayList<>();
+        messages.add("局部重排试算方案：" + plan.getName() + "，来源方案 " + plan.getSourcePlanId() + "，未写入正式课表。");
+        messages.add("范围课程 " + intValue(task.getTargetItemCount()) + " 条，锁定课程 " + intValue(task.getLockedItemCount()) + " 条，可重排课程 " + intValue(task.getProcessedItemCount()) + " 条。");
+        for (ScheduleAdjustLog log : logs) {
+            messages.add((log.getAdjustReason() == null ? "局部重排调整" : log.getAdjustReason())
+                    + "：周" + log.getOldWeekday() + " 第" + log.getOldStartPeriod() + "-" + log.getOldEndPeriod()
+                    + "节 -> 周" + log.getNewWeekday() + " 第" + log.getNewStartPeriod() + "-" + log.getNewEndPeriod() + "节。");
+        }
+        if (logs.isEmpty()) {
+            messages.add("当前局部重排未移动课程：原位置已是满足约束的可用位置，或范围内课程无需调整。");
+        }
+
+        V5LocalReplanSummaryVo summary = new V5LocalReplanSummaryVo();
+        summary.setScopeItemCount(intValue(task.getTargetItemCount()));
+        summary.setLockedCount(intValue(task.getLockedItemCount()));
+        summary.setReplanableCount(intValue(task.getProcessedItemCount()));
+        summary.setMovedCount(logs.size());
+        summary.setFailedCount(intValue(task.getFailureItemCount()));
+        summary.setMovedItemIds(movedItemIds);
+        summary.setFailedItemIds(List.of());
+        summary.setLogs(messages);
+        return summary;
     }
 
     private String resolveLocalReplanName(String requestedName, ScheduleRepairTask task, SchedulePlan baseline) {
