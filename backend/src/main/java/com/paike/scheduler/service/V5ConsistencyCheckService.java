@@ -343,17 +343,23 @@ public class V5ConsistencyCheckService {
     }
 
     private void checkDuplicateTeachingTask(SchedulePlan plan, List<SchedulePlanItem> items, List<V5ConsistencyIssueVo> issues) {
-        Map<Long, List<SchedulePlanItem>> grouped = new LinkedHashMap<>();
+        // 一个教学任务一周可以排多次（不同时间段），只有在"同一周次+同一时段"出现两条以上才算真正的重复
+        Map<String, List<SchedulePlanItem>> grouped = new LinkedHashMap<>();
         for (SchedulePlanItem item : items) {
-            if (item.getTeachingTaskId() == null) continue;
-            grouped.computeIfAbsent(item.getTeachingTaskId(), k -> new ArrayList<>()).add(item);
+            if (item.getTeachingTaskId() == null || item.getWeekday() == null
+                    || item.getStartPeriod() == null || item.getEndPeriod() == null) continue;
+            String key = item.getTeachingTaskId() + "#" + item.getWeekday() + "#" + item.getStartPeriod() + "-" + item.getEndPeriod();
+            grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(item);
         }
-        for (Map.Entry<Long, List<SchedulePlanItem>> entry : grouped.entrySet()) {
+        for (Map.Entry<String, List<SchedulePlanItem>> entry : grouped.entrySet()) {
             if (entry.getValue().size() <= 1) continue;
-            V5ConsistencyIssueVo vo = issue("DUPLICATE_TEACHING_TASK", SEVERITY_BLOCKING, "DATA", "同一教学任务重复排入",
-                    "teachingTaskId=" + entry.getKey() + " 在试算方案中出现 " + entry.getValue().size() + " 条记录",
-                    "请检查复制和移动逻辑，确保每个教学任务只对应一条明细");
-            fillItemContext(vo, entry.getValue().get(0), null);
+            SchedulePlanItem first = entry.getValue().get(0);
+            V5ConsistencyIssueVo vo = issue("DUPLICATE_TEACHING_TASK", SEVERITY_BLOCKING, "DATA", "同一教学任务在同一时段重复排入",
+                    "teachingTaskId=" + first.getTeachingTaskId() + " 在周" + first.getWeekday()
+                            + " 第" + first.getStartPeriod() + "-" + first.getEndPeriod() + "节出现 "
+                            + entry.getValue().size() + " 条记录",
+                    "请检查复制和移动逻辑，确保同一时段只对应一条明细");
+            fillItemContext(vo, first, null);
             issues.add(vo);
         }
     }
