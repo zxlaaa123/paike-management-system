@@ -47,6 +47,8 @@ test_result.json
 
 # Codex local files
 .codex/
+.codegraph/
+.cursor/
 AGENTS.md
 
 # Local unrelated docs
@@ -55,3 +57,11 @@ docs/v4/V4_08_局部重排开发计划.md
 docs/V1-V4_总体验收_AI执行说明_2026-05-19.md
 docs/V1-V4_总体验收实施计划_精简版_2026-05-19.md
 backend/data/
+bug-audit-report.md
+claude-opus-4.7-bug修复建议.md
+claude-opus-4.7-bug验证报告.md
+mimo发现的bug.md
+项目代码结构说明.md
+
+# Package manager drift
+frontend/pnpm-lock.yaml
