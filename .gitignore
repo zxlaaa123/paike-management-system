@@ -57,6 +57,9 @@ docs/v4/V4_08_局部重排开发计划.md
 docs/V1-V4_总体验收_AI执行说明_2026-05-19.md
 docs/V1-V4_总体验收实施计划_精简版_2026-05-19.md
 backend/data/
+v5-stage9-consistency-card.png
+v5-stage9-consistency-check.png
+v5-stage9-continuation-prompt.md
 
 # Bug audit reports (本地审计，不入版控)
 mimo发现的bug.md
