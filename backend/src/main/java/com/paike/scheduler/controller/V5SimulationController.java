@@ -2,11 +2,13 @@ package com.paike.scheduler.controller;
 
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.service.V5SimulationService;
+import com.paike.scheduler.service.dto.V5LocalReplanRequest;
 import com.paike.scheduler.service.vo.V5SimulationPlanDetailVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,6 +20,11 @@ import java.util.Map;
 public class V5SimulationController {
 
     private final V5SimulationService simulationService;
+
+    @PostMapping("/local-replan")
+    public Result<V5SimulationPlanDetailVo> localReplan(@PathVariable Long taskId, @RequestBody(required = false) V5LocalReplanRequest request) {
+        return Result.success("局部重排试算方案已生成", simulationService.localReplan(taskId, request));
+    }
 
     @GetMapping("/{planId}")
     public Result<V5SimulationPlanDetailVo> detail(@PathVariable Long taskId, @PathVariable Long planId) {

@@ -16,6 +16,7 @@ import {
   listRepairSuggestions,
   type V5RepairSuggestion,
 } from '../../api/v5RepairSuggestionApi'
+import { generateLocalReplan, type V5LocalReplanPayload } from '../../api/v5SimulationApi'
 import { extractMessage } from '../../utils/errors'
 
 const route = useRoute()
@@ -24,11 +25,25 @@ const taskId = computed(() => Number(route.params.taskId))
 const loading = ref(false)
 const updating = ref(false)
 const generatingSuggestions = ref(false)
+const localReplanning = ref(false)
+const localReplanVisible = ref(false)
 const task = ref<V5RepairTaskDetail | null>(null)
 const suggestions = ref<V5RepairSuggestion[]>([])
 const selectedSuggestions = ref<V5RepairSuggestion[]>([])
 const detailVisible = ref(false)
 const currentSuggestion = ref<V5RepairSuggestion | null>(null)
+
+const localReplanForm = ref({
+  newPlanName: '',
+  classIds: '',
+  teacherIds: '',
+  classroomIds: '',
+  weekdays: [] as number[],
+  periodNos: [] as number[],
+  riskItemIds: [] as number[],
+  selectedPlanItemIds: [] as number[],
+  candidateLimit: 600,
+})
 
 const statusOptions: Array<{ label: string; value: V5RepairTaskStatus }> = [
   { label: '已创建', value: 'CREATED' },
@@ -98,6 +113,55 @@ async function chooseForSimulation(row: V5RepairSuggestion) {
   }
 }
 
+function openLocalReplan() {
+  if (!task.value) return
+  localReplanForm.value = {
+    newPlanName: `${task.value.title || task.value.taskCode}-局部重排试算`,
+    classIds: '',
+    teacherIds: '',
+    classroomIds: '',
+    weekdays: [],
+    periodNos: [],
+    riskItemIds: [...(task.value.riskItemIds || [])],
+    selectedPlanItemIds: [...(task.value.scopePlanItemIds || [])],
+    candidateLimit: 600,
+  }
+  localReplanVisible.value = true
+}
+
+function parseIds(value: string) {
+  return value
+    .split(/[,\s，]+/)
+    .map((item) => Number(item))
+    .filter((item) => Number.isFinite(item) && item > 0)
+}
+
+async function submitLocalReplan() {
+  if (!task.value) return
+  const payload: V5LocalReplanPayload = {
+    newPlanName: localReplanForm.value.newPlanName.trim() || undefined,
+    classIds: parseIds(localReplanForm.value.classIds),
+    teacherIds: parseIds(localReplanForm.value.teacherIds),
+    classroomIds: parseIds(localReplanForm.value.classroomIds),
+    weekdays: localReplanForm.value.weekdays,
+    periodNos: localReplanForm.value.periodNos,
+    riskItemIds: localReplanForm.value.riskItemIds,
+    selectedPlanItemIds: localReplanForm.value.selectedPlanItemIds,
+    candidateLimit: localReplanForm.value.candidateLimit,
+  }
+  localReplanning.value = true
+  try {
+    const simulation = await generateLocalReplan(task.value.id, payload)
+    ElMessage.success('局部重排试算方案已生成')
+    localReplanVisible.value = false
+    router.push(`/v5/repair-tasks/${task.value.id}/simulations/${simulation.plan.id}`)
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '局部重排失败'))
+  } finally {
+    localReplanning.value = false
+  }
+}
+
 function suggestionTypeText(type: string) {
   const map: Record<string, string> = {
     KEEP_TIME_CHANGE_ROOM: '保时换教室',
@@ -144,6 +208,11 @@ async function cancelTask() {
 
 const canOperate = computed(() => {
   return !!task.value && !['CANCELLED', 'FAILED', 'APPLIED'].includes(task.value.status)
+})
+
+const replanableCount = computed(() => {
+  if (!task.value) return 0
+  return Math.max(0, (task.value.targetItemCount || 0) - (task.value.lockedItemCount || 0))
 })
 
 function openCandidates() {
@@ -203,6 +272,7 @@ onMounted(fetchData)
 
       <div class="actions" v-if="canOperate">
         <el-button type="info" :loading="updating" @click="openCandidates">查看候选位置</el-button>
+        <el-button type="warning" :loading="localReplanning" @click="openLocalReplan">局部重排</el-button>
         <el-button type="primary" :loading="generatingSuggestions" @click="generateSuggestions">生成修复建议</el-button>
         <el-button :loading="updating" @click="changeStatus('ANALYZING')">标记分析中</el-button>
         <el-button :loading="updating" @click="changeStatus('SUGGESTED')">标记已建议</el-button>
@@ -276,6 +346,67 @@ onMounted(fetchData)
         <el-descriptions-item label="建议说明">{{ currentSuggestion.description || currentSuggestion.reasonSummary }}</el-descriptions-item>
       </el-descriptions>
     </el-drawer>
+
+    <el-drawer v-model="localReplanVisible" title="V5 阶段8：局部重排" size="620px">
+      <el-alert
+        type="info"
+        show-icon
+        :closable="false"
+        title="只生成试算方案，不直接写入正式课表；锁定课程不会被移动。"
+      />
+      <el-row :gutter="12" class="block">
+        <el-col :span="8"><el-statistic title="当前范围课程" :value="task?.targetItemCount ?? 0" /></el-col>
+        <el-col :span="8"><el-statistic title="锁定课程" :value="task?.lockedItemCount ?? 0" /></el-col>
+        <el-col :span="8"><el-statistic title="可重排课程" :value="replanableCount" /></el-col>
+      </el-row>
+
+      <el-form label-position="top" class="block">
+        <el-form-item label="试算方案名称">
+          <el-input v-model="localReplanForm.newPlanName" placeholder="不填则自动生成" />
+        </el-form-item>
+        <el-form-item label="按班级范围（班级ID，逗号分隔）">
+          <el-input v-model="localReplanForm.classIds" placeholder="例如：1,2,3" />
+        </el-form-item>
+        <el-form-item label="按教师范围（教师ID，逗号分隔）">
+          <el-input v-model="localReplanForm.teacherIds" placeholder="例如：4,5" />
+        </el-form-item>
+        <el-form-item label="按教室范围（教室ID，逗号分隔）">
+          <el-input v-model="localReplanForm.classroomIds" placeholder="例如：8,9" />
+        </el-form-item>
+        <el-form-item label="按时间段范围">
+          <div class="scope-line">
+            <el-checkbox-group v-model="localReplanForm.weekdays">
+              <el-checkbox-button v-for="day in [1, 2, 3, 4, 5, 6, 7]" :key="day" :value="day">
+              周{{ day }}
+              </el-checkbox-button>
+            </el-checkbox-group>
+            <el-checkbox-group v-model="localReplanForm.periodNos">
+              <el-checkbox-button v-for="period in [1, 2, 3, 4, 5]" :key="period" :value="period">
+                第{{ period }}大节
+              </el-checkbox-button>
+            </el-checkbox-group>
+          </div>
+        </el-form-item>
+        <el-form-item label="按风险项">
+          <el-select v-model="localReplanForm.riskItemIds" multiple clearable filterable placeholder="默认使用任务关联风险项">
+            <el-option v-for="id in task?.riskItemIds || []" :key="id" :label="`风险项 ${id}`" :value="id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="用户勾选课程">
+          <el-select v-model="localReplanForm.selectedPlanItemIds" multiple clearable filterable placeholder="默认使用任务修复范围课程">
+            <el-option v-for="id in task?.scopePlanItemIds || []" :key="id" :label="`课程项 ${id}`" :value="id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="候选遍历上限">
+          <el-input-number v-model="localReplanForm.candidateLimit" :min="100" :max="2000" :step="100" />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="localReplanVisible = false">取消</el-button>
+        <el-button type="warning" :loading="localReplanning" @click="submitLocalReplan">生成局部重排试算方案</el-button>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -286,5 +417,7 @@ onMounted(fetchData)
 .title { font-size: 22px; font-weight: 700; color: #243447; }
 .sub { margin-top: 6px; color: #667085; font-size: 13px; }
 .stats { margin-top: 16px; }
+.block { margin-top: 16px; }
 .actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+.scope-line { display: flex; flex-direction: column; gap: 8px; }
 </style>

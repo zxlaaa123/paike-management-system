@@ -66,6 +66,55 @@ export interface V5SimulationItemChange {
   conflictReason: string | null
 }
 
+export interface ScheduleAdjustLog {
+  id: number
+  planId: number
+  scheduleId: number | null
+  semesterId: number
+  teachingTaskId: number | null
+  oldClassroomId: number | null
+  oldWeekday: number | null
+  oldStartPeriod: number | null
+  oldEndPeriod: number | null
+  newClassroomId: number | null
+  newWeekday: number | null
+  newStartPeriod: number | null
+  newEndPeriod: number | null
+  beforeScore: number | null
+  afterScore: number | null
+  conflictFlag: number | null
+  adjustReason: string | null
+  createdAt: string
+  courseName: string | null
+  teacherName: string | null
+  className: string | null
+  oldClassroomName: string | null
+  newClassroomName: string | null
+}
+
+export interface V5LocalReplanPayload {
+  newPlanName?: string
+  classIds?: number[]
+  teacherIds?: number[]
+  classroomIds?: number[]
+  weekdays?: number[]
+  periodNos?: number[]
+  riskItemIds?: number[]
+  selectedPlanItemIds?: number[]
+  candidateLimit?: number
+}
+
+export interface V5LocalReplanSummary {
+  scopeItemCount: number
+  lockedCount: number
+  replanableCount: number
+  movedCount: number
+  failedCount: number
+  movedItemIds: number[]
+  failedItemIds: number[]
+  logs: string[]
+}
+
 export interface V5SimulationLoadChange {
   entityId: number | null
   entityName: string
@@ -137,8 +186,17 @@ export interface V5SimulationPlanDetail {
   plan: SchedulePlan
   items: SchedulePlanItem[]
   scoreDetails: ScheduleScoreDetail[]
+  adjustLogs: ScheduleAdjustLog[]
   risks: ScheduleRiskList
   compare: V5SimulationCompare
+  localReplanSummary: V5LocalReplanSummary | null
+}
+
+export function generateLocalReplan(taskId: number, payload?: V5LocalReplanPayload) {
+  return request.post<ApiResponse<V5SimulationPlanDetail>>(`/v5/repair-tasks/${taskId}/simulations/local-replan`, payload ?? {}).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
 }
 
 export function getSimulationDetail(taskId: number, planId: number) {
