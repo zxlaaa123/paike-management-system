@@ -14,6 +14,7 @@ import { getAllTeachers, type Teacher } from '../../api/teacher'
 import { getAllClasses, type ClassInfo } from '../../api/classInfo'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
 import { statusText, statusTagType } from '../../utils/status'
+import { extractMessage, isCancel } from '../../utils/errors'
 
 const loading = ref(false)
 const tableData = ref<TeachingTask[]>([])
@@ -59,6 +60,13 @@ const currentSemester = ref<Semester | null>(null)
 
 const hasCurrentSemester = computed(() => currentSemester.value !== null)
 
+function fallback<T>(promise: Promise<T>, defaultValue: T): Promise<T> {
+  return promise.catch((err) => {
+    console.warn('fetchOptions partial fail:', err)
+    return defaultValue
+  })
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -80,11 +88,11 @@ async function fetchData() {
 
 async function fetchOptions() {
   const [courses, teachers, classes, semesters, current] = await Promise.all([
-    getAllCourses(),
-    getAllTeachers(),
-    getAllClasses(),
-    getAllSemesters(),
-    getCurrentSemester().catch(() => null),
+    fallback(getAllCourses(), []),
+    fallback(getAllTeachers(), []),
+    fallback(getAllClasses(), []),
+    fallback(getAllSemesters(), []),
+    fallback(getCurrentSemester(), null),
   ])
   courseList.value = courses
   teacherList.value = teachers
@@ -160,10 +168,16 @@ async function handleSubmit() {
 }
 
 async function handleDelete(row: TeachingTask) {
-  await ElMessageBox.confirm(`确定删除该教学任务吗？`, '提示', { type: 'warning' })
-  await deleteTeachingTask(row.id)
-  ElMessage.success('删除成功')
-  fetchData()
+  try {
+    await ElMessageBox.confirm(`确定删除该教学任务吗？`, '提示', { type: 'warning' })
+    await deleteTeachingTask(row.id)
+    ElMessage.success('删除成功')
+    fetchData()
+  } catch (err: unknown) {
+    if (isCancel(err)) return
+    ElMessage.error(extractMessage(err, '删除失败'))
+    fetchData()
+  }
 }
 
 function needContinuousText(val: number) {
@@ -177,7 +191,10 @@ function getSemesterName(id: number | undefined) {
 }
 
 onMounted(() => {
-  fetchOptions().then(fetchData)
+  void (async () => {
+    await fetchOptions()
+    await fetchData()
+  })()
 })
 </script>
 

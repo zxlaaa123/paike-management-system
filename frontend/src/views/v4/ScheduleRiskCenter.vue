@@ -15,6 +15,7 @@ import { createRepairTask } from '../../api/v5RepairTaskApi'
 import type { ScheduleAdjustmentApplyResult } from '../../api/v4ScheduleAdjustmentApi'
 import type { ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
 import { strategyText } from '../../utils/status'
+import { extractMessage } from '../../utils/errors'
 
 const route = useRoute()
 const router = useRouter()
@@ -89,8 +90,8 @@ async function fetchData() {
     ])
     plan.value = planData
     riskData.value = risks
-  } catch (error: any) {
-    ElMessage.error(error?.message || '加载风险诊断失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载风险诊断失败'))
   } finally {
     loading.value = false
   }
@@ -102,8 +103,8 @@ async function handleRefresh() {
     await refreshScheduleRiskList(planId.value)
     await fetchData()
     ElMessage.success('风险诊断已刷新')
-  } catch (error: any) {
-    ElMessage.error(error?.message || '刷新失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '刷新失败'))
   } finally {
     refreshing.value = false
   }
@@ -142,8 +143,8 @@ async function createRepairFromRisk(risk: ScheduleRiskIssue) {
     })
     ElMessage.success('修复任务已创建')
     router.push(`/v5/repair-tasks/${task.id}`)
-  } catch (error: any) {
-    ElMessage.error(error?.message || '创建修复任务失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '创建修复任务失败'))
   } finally {
     creatingRepair.value = false
   }

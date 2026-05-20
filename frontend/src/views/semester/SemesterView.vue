@@ -10,6 +10,7 @@ import {
   type Semester,
   type SemesterForm,
 } from '../../api/semester'
+import { extractMessage } from '../../utils/errors'
 
 const loading = ref(false)
 const tableData = ref<Semester[]>([])
@@ -119,26 +120,42 @@ async function handleDelete(row: Semester) {
     ElMessage.warning('当前学期不能直接删除，请先设置其他学期为当前学期')
     return
   }
-  await ElMessageBox.confirm(
-    `确定删除学期「${row.name}」吗？`,
-    '提示',
-    { type: 'warning' }
-  )
-  await deleteSemester(row.id)
-  ElMessage.success('删除成功')
-  fetchData()
+  try {
+    await ElMessageBox.confirm(
+      `确定删除学期「${row.name}」吗？`,
+      '提示',
+      { type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  try {
+    await deleteSemester(row.id)
+    ElMessage.success('删除成功')
+    fetchData()
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '删除失败'))
+  }
 }
 
 async function handleSetCurrent(row: Semester) {
   if (row.isCurrent === 1) return
-  await ElMessageBox.confirm(
-    `确定将「${row.name}」设置为当前学期吗？切换后，教学任务、课表、排课方案和统计数据将按该学期展示。`,
-    '提示',
-    { type: 'warning' }
-  )
-  await setCurrentSemester(row.id)
-  ElMessage.success('已设置为当前学期')
-  fetchData()
+  try {
+    await ElMessageBox.confirm(
+      `确定将「${row.name}」设置为当前学期吗？切换后，教学任务、课表、排课方案和统计数据将按该学期展示。`,
+      '提示',
+      { type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  try {
+    await setCurrentSemester(row.id)
+    ElMessage.success('已设置为当前学期')
+    fetchData()
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '设置失败'))
+  }
 }
 
 function statusTagType(status: string) {

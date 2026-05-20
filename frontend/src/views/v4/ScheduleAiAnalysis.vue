@@ -9,6 +9,7 @@ import {
   type ScheduleAiAnalysisType,
 } from '../../api/v4ScheduleAiApi'
 import { strategyText } from '../../utils/status'
+import { extractMessage } from '../../utils/errors'
 
 const route = useRoute()
 const router = useRouter()
@@ -45,8 +46,8 @@ async function fetchPlan() {
   loading.value = true
   try {
     plan.value = await getSchedulePlanById(planId.value)
-  } catch (error: any) {
-    ElMessage.error(error?.message || '加载方案信息失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载方案信息失败'))
   } finally {
     loading.value = false
   }
@@ -57,8 +58,8 @@ async function handleGenerate() {
   try {
     result.value = await generateScheduleAiAnalysis(planId.value, form.value)
     ElMessage.success('AI 分析已生成')
-  } catch (error: any) {
-    ElMessage.error(error?.message || 'AI 分析生成失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, 'AI 分析生成失败'))
   } finally {
     generating.value = false
   }

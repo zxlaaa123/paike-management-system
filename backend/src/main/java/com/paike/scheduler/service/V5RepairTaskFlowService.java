@@ -18,6 +18,7 @@ import com.paike.scheduler.service.vo.ScheduleRiskListVo;
 import com.paike.scheduler.service.vo.V5RepairTaskDetailVo;
 import com.paike.scheduler.service.vo.V5RepairTaskVo;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class V5RepairTaskFlowService {
@@ -255,6 +257,8 @@ public class V5RepairTaskFlowService {
         try {
             return objectMapper.readValue(json, new TypeReference<List<String>>() {});
         } catch (Exception e) {
+            log.warn("反序列化 List<String> 失败，使用空列表兜底；payload 前 200 字符: {}",
+                    json.substring(0, Math.min(200, json.length())), e);
             return List.of();
         }
     }
@@ -264,6 +268,8 @@ public class V5RepairTaskFlowService {
         try {
             return objectMapper.readValue(json, new TypeReference<List<Long>>() {});
         } catch (Exception e) {
+            log.warn("反序列化 List<Long> 失败，使用空列表兜底；payload 前 200 字符: {}",
+                    json.substring(0, Math.min(200, json.length())), e);
             return List.of();
         }
     }

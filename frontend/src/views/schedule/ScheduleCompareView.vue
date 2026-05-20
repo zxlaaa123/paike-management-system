@@ -30,14 +30,14 @@ async function fetchOptions() {
   loading.value = true
   try {
     const [semesters, current] = await Promise.all([
-      getAllSemesters(),
+      getAllSemesters().catch(() => []),
       getCurrentSemester().catch(() => null),
     ])
     semesterList.value = semesters
     currentSemester.value = current
 
     if (current) {
-      const res = await getSchedulePlanList({ semesterId: current.id, size: 100 })
+      const res = await getSchedulePlanList({ semesterId: current.id, size: 100 }).catch(() => ({ records: [] }))
       allPlans.value = res.records
     }
   } finally {

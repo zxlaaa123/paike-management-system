@@ -6,6 +6,7 @@ import com.paike.scheduler.auth.vo.LoginResponse;
 import com.paike.scheduler.auth.vo.UserInfoVo;
 import com.paike.scheduler.common.response.Result;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,14 +31,20 @@ public class AuthController {
     @Value("${app.jwt.expiration-ms:86400000}")
     private long expirationMs;
 
-    @PostMapping("/login")
-    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
-        LoginResponse loginResponse = authService.login(request);
+    @Value("${app.security.cookie-secure:false}")
+    private boolean cookieSecure;
 
-        // 设置 httpOnly JWT Cookie（防 XSS 窃取）
+    @PostMapping("/login")
+    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+                                       HttpServletRequest httpRequest,
+                                       HttpServletResponse response) {
+        LoginResponse loginResponse = authService.login(request, resolveClientIp(httpRequest));
+
+        // 设置 httpOnly JWT Cookie（防 XSS 窃取）。secure 由 app.security.cookie-secure 控制：
+        // 本地 HTTP 留 false，生产 HTTPS 通过 COOKIE_SECURE=true 切换。
         ResponseCookie jwtCookie = ResponseCookie.from("paike_token", loginResponse.getToken())
                 .httpOnly(true)
-                .secure(false) // 开发环境用 HTTP，生产环境应设为 true
+                .secure(cookieSecure)
                 .path("/api")
                 .maxAge(expirationMs / 1000)
                 .sameSite("Strict")
@@ -48,7 +55,7 @@ public class AuthController {
         String csrfToken = UUID.randomUUID().toString();
         ResponseCookie csrfCookie = ResponseCookie.from("XSRF-TOKEN", csrfToken)
                 .httpOnly(false)
-                .secure(false)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(expirationMs / 1000)
                 .sameSite("Strict")
@@ -78,5 +85,22 @@ public class AuthController {
         response.addCookie(clearCsrf);
 
         return Result.success(Map.of("success", true));
+    }
+
+    /**
+     * 从请求头里解析真实客户端 IP，用于登录限流的 IP 维度（A1）。
+     * 优先级：X-Forwarded-For 首项 > X-Real-IP > remoteAddr。
+     */
+    private static String resolveClientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            int comma = forwarded.indexOf(',');
+            return (comma > 0 ? forwarded.substring(0, comma) : forwarded).trim();
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        return request.getRemoteAddr();
     }
 }

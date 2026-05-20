@@ -14,6 +14,8 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -83,12 +85,13 @@ public class ScheduleController {
     }
 
     @PostMapping
+    @Transactional(rollbackFor = Exception.class)
     public Result<Schedule> create(@Valid @RequestBody ScheduleForm form) {
-        // 冲突检测
+        // 冲突检测（先查再插，并发场景下窗口期由 DB 唯一索引 uk_schedule_*_slot 兜底）
         String conflict = conflictService.checkConflict(
             form.getTeachingTaskId(), form.getTimeSlotId(), form.getClassroomId(), null);
         if (conflict != null) {
-            return Result.fail(400, conflict);
+            throw new BusinessException(400, ScheduleConflictService.stripReasonTag(conflict));
         }
 
         TeachingTask task = teachingTaskMapper.selectById(form.getTeachingTaskId());
@@ -105,7 +108,12 @@ public class ScheduleController {
         schedule.setDeleted(0);
         schedule.setCreateTime(LocalDateTime.now());
         schedule.setUpdateTime(LocalDateTime.now());
-        scheduleMapper.insert(schedule);
+        try {
+            scheduleMapper.insert(schedule);
+        } catch (DuplicateKeyException ex) {
+            // TOCTOU 兜底：并发请求都通过了 checkConflict 但只允许一条入库
+            throw new BusinessException(409, "排课冲突：该时间段已有其他课程占用，请刷新后重试");
+        }
 
         fillRelation(schedule);
         return Result.success(schedule);
@@ -181,7 +189,7 @@ public class ScheduleController {
         String conflict = conflictService.checkConflict(
             form.getTeachingTaskId(), form.getTimeSlotId(), form.getClassroomId(), null);
         if (conflict != null) {
-            return Result.success(Map.of("hasConflict", true, "message", conflict));
+            return Result.success(Map.of("hasConflict", true, "message", ScheduleConflictService.stripReasonTag(conflict)));
         }
         return Result.success(Map.of("hasConflict", false, "message", ""));
     }

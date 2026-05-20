@@ -12,6 +12,7 @@ import {
   type ScheduleReportType,
 } from '../../api/v4ScheduleReportApi'
 import { strategyText } from '../../utils/status'
+import { extractMessage } from '../../utils/errors'
 
 const route = useRoute()
 const router = useRouter()
@@ -45,8 +46,8 @@ async function fetchData() {
     const [planData, reportList] = await Promise.all([getSchedulePlanById(planId.value), getScheduleReportList(planId.value)])
     plan.value = planData
     reportItems.value = reportList.items ?? []
-  } catch (error: any) {
-    ElMessage.error(error?.message || '加载报告数据失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载报告数据失败'))
   } finally {
     loading.value = false
   }
@@ -58,8 +59,8 @@ async function handleGenerate() {
     await generateScheduleReport(planId.value, form.value)
     await fetchData()
     ElMessage.success('报告生成成功')
-  } catch (error: any) {
-    ElMessage.error(error?.message || '报告生成失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '报告生成失败'))
   } finally {
     generating.value = false
   }
@@ -69,8 +70,8 @@ async function handleDownload(item: ScheduleReportItem) {
   downloadingId.value = item.reportId
   try {
     await downloadScheduleReport(item)
-  } catch (error: any) {
-    ElMessage.error(error?.message || '下载失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '下载失败'))
   } finally {
     downloadingId.value = null
   }
@@ -207,4 +208,3 @@ onMounted(fetchData)
   }
 }
 </style>
-

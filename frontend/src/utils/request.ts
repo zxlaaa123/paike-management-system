@@ -12,7 +12,12 @@ interface ApiResponse<T = unknown> {
 /** 从浏览器 Cookie 中读取指定名称的值 */
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'))
-  return match ? decodeURIComponent(match[1]) : null
+  if (!match) return null
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return match[1]
+  }
 }
 
 const request = axios.create({
@@ -34,7 +39,9 @@ function redirectToLogin() {
 function handleBusinessUnauthorized(code?: number) {
   if (code === 401) {
     redirectToLogin()
+    return true
   }
+  return false
 }
 
 async function parseJsonBlob(data: Blob): Promise<Partial<ApiResponse> | null> {
@@ -48,8 +55,8 @@ async function parseJsonBlob(data: Blob): Promise<Partial<ApiResponse> | null> {
 
 request.interceptors.request.use(
   (config) => {
-    // CSRF 防护：状态变更请求携带 X-CSRF-Token 头
-    if (config.method && ['post', 'put', 'delete'].includes(config.method.toLowerCase())) {
+    // CSRF 防护：状态变更请求携带 X-CSRF-Token 头（与后端 AuthInterceptor 的 stateChanging 集合一致）
+    if (config.method && ['post', 'put', 'delete', 'patch'].includes(config.method.toLowerCase())) {
       const csrfToken = getCookie('XSRF-TOKEN')
       if (csrfToken) {
         config.headers['X-CSRF-Token'] = csrfToken
@@ -70,7 +77,9 @@ request.interceptors.response.use(
     if (isJsonBlob(response.data)) {
       const payload = await parseJsonBlob(response.data)
       if (payload && typeof payload.message === 'string' && payload.message) {
-        handleBusinessUnauthorized(payload.code)
+        if (handleBusinessUnauthorized(payload.code)) {
+          return Promise.reject(new Error(payload.message))
+        }
         ElMessage.error(payload.message)
         return Promise.reject(new Error(payload.message))
       }
@@ -78,7 +87,9 @@ request.interceptors.response.use(
     }
     const payload = response.data as ApiResponse
     if (payload && typeof payload.code === 'number' && payload.code !== 200) {
-      handleBusinessUnauthorized(payload.code)
+      if (handleBusinessUnauthorized(payload.code)) {
+        return Promise.reject(new Error(payload.message || '未登录或登录已过期'))
+      }
       ElMessage.error(payload.message || '请求失败')
       return Promise.reject(new Error(payload.message || '请求失败'))
     }
@@ -87,9 +98,12 @@ request.interceptors.response.use(
   async (error) => {
     if (error?.response?.status === 401) {
       redirectToLogin()
+      return Promise.reject(error)
     }
     const blobPayload = isJsonBlob(error?.response?.data) ? await parseJsonBlob(error.response.data) : null
-    handleBusinessUnauthorized(blobPayload?.code)
+    if (handleBusinessUnauthorized(blobPayload?.code)) {
+      return Promise.reject(error)
+    }
     const blobMessage = blobPayload?.message
     const message = blobMessage || error?.response?.data?.message || error?.message || '网络异常'
     ElMessage.error(message)

@@ -16,7 +16,7 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref<string>(localStorage.getItem(TOKEN_KEY) || '')
   const userInfo = ref<UserInfo | null>(null)
 
-  const isLoggedIn = computed(() => Boolean(token.value))
+  const isLoggedIn = computed(() => Boolean(userInfo.value))
 
   function setToken(newToken: string) {
     token.value = newToken
@@ -35,10 +35,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function fetchCurrentUser() {
-    if (!token.value) {
-      userInfo.value = null
-      return null
-    }
     const data = await getCurrentUserApi()
     userInfo.value = data
     return data

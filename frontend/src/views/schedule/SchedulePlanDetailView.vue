@@ -28,6 +28,7 @@ import type { ScheduleAdjustmentApplyResult } from '../../api/v4ScheduleAdjustme
 import type { ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
 import { getScoreDetails, getScoreSummary, rescore, type ScheduleScoreDetail, type ScoreSummary } from '../../api/scheduleScore'
 import { strategyText } from '../../utils/status'
+import { extractMessage } from '../../utils/errors'
 
 const route = useRoute()
 const router = useRouter()
@@ -189,8 +190,8 @@ async function handleApply() {
     const result = await applySchedulePlan(planId.value)
     ElMessage.success(`方案已应用，共写入 ${result.appliedCount} 条课表记录`)
     await fetchData()
-  } catch (e: any) {
-    ElMessage.error(e.message || '应用失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '应用失败'))
   } finally {
     applying.value = false
   }
@@ -214,8 +215,8 @@ async function handleRollback() {
     const result = await rollbackSchedulePlan(planId.value)
     ElMessage.success(`已回滚到该方案，共写入 ${result.appliedCount} 条课表记录`)
     await fetchData()
-  } catch (e: any) {
-    ElMessage.error(e.message || '回滚失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '回滚失败'))
   } finally {
     applying.value = false
   }
@@ -338,8 +339,8 @@ async function createRepairTaskFromPlan() {
     })
     ElMessage.success('修复任务已创建')
     router.push(`/v5/repair-tasks/${task.id}`)
-  } catch (error: any) {
-    ElMessage.error(error?.message || '创建修复任务失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '创建修复任务失败'))
   } finally {
     creatingRepair.value = false
   }

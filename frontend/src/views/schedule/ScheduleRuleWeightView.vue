@@ -10,6 +10,13 @@ import {
 } from '../../api/scheduleRuleWeight'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
 
+function fallback<T>(promise: Promise<T>, defaultValue: T): Promise<T> {
+  return promise.catch((err) => {
+    console.warn('fetchOptions partial fail:', err)
+    return defaultValue
+  })
+}
+
 const loading = ref(false)
 const saving = ref(false)
 const tableData = ref<ScheduleRuleWeight[]>([])
@@ -46,8 +53,8 @@ async function fetchData() {
 
 async function fetchOptions() {
   const [semesters, current] = await Promise.all([
-    getAllSemesters(),
-    getCurrentSemester().catch(() => null),
+    fallback(getAllSemesters(), []),
+    fallback(getCurrentSemester(), null),
   ])
   semesterList.value = semesters
   currentSemester.value = current
@@ -99,7 +106,10 @@ async function handleBatchSave() {
 }
 
 onMounted(() => {
-  fetchOptions().then(fetchData)
+  void (async () => {
+    await fetchOptions()
+    await fetchData()
+  })()
 })
 </script>
 

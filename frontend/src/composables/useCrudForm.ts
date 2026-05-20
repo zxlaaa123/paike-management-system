@@ -23,6 +23,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { PageResult } from '../api/types'
+import { extractMessage } from '../utils/errors'
 
 export interface CrudOptions<T, F extends object> {
   /** 获取列表数据的 API 函数 */
@@ -99,7 +100,7 @@ export function useCrudForm<T extends { id: number }, F extends object>(options:
   function openEdit(row: T) {
     dialogTitle.value = `编辑${options.entityName}`
     editingId.value = row.id
-    Object.assign(form, row)
+    Object.assign(form, structuredClone(row))
     dialogVisible.value = true
   }
 
@@ -123,10 +124,18 @@ export function useCrudForm<T extends { id: number }, F extends object>(options:
 
   async function handleDelete(row: T, nameField: keyof T) {
     const name = row[nameField] as unknown as string
-    await ElMessageBox.confirm(`确定删除${options.entityName}「${name}」吗？`, '提示', { type: 'warning' })
-    await options.deleteItem(row.id)
-    ElMessage.success('删除成功')
-    fetchData()
+    try {
+      await ElMessageBox.confirm(`确定删除${options.entityName}「${name}」吗？`, '提示', { type: 'warning' })
+    } catch {
+      return
+    }
+    try {
+      await options.deleteItem(row.id)
+      ElMessage.success('删除成功')
+      fetchData()
+    } catch (e: unknown) {
+      ElMessage.error(extractMessage(e, '删除失败'))
+    }
   }
 
   onMounted(fetchData)

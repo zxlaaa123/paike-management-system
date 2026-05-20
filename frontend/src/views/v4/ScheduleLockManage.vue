@@ -13,6 +13,7 @@ import {
 } from '../../api/v4ScheduleLockApi'
 import type { ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
 import { strategyText } from '../../utils/status'
+import { extractMessage, isCancel } from '../../utils/errors'
 
 const route = useRoute()
 const router = useRouter()
@@ -69,8 +70,8 @@ async function fetchData() {
     plan.value = planData
     planItems.value = itemsData
     lockData.value = lockList
-  } catch (error: any) {
-    ElMessage.error(error?.message || '加载锁定数据失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载锁定数据失败'))
   } finally {
     loading.value = false
   }
@@ -106,9 +107,9 @@ async function handleLock(item: SchedulePlanItem) {
     })
     await refreshLocks()
     ElMessage.success('课程已锁定')
-  } catch (error: any) {
-    if (error !== 'cancel' && error !== 'close') {
-      ElMessage.error(error?.message || '锁定失败')
+  } catch (error: unknown) {
+    if (!isCancel(error)) {
+      ElMessage.error(extractMessage(error, '锁定失败'))
     }
   } finally {
     actionLoadingKey.value = null
@@ -135,9 +136,9 @@ async function handleUnlock(item: ScheduleLockItem) {
     })
     await refreshLocks()
     ElMessage.success('课程已取消锁定')
-  } catch (error: any) {
-    if (error !== 'cancel' && error !== 'close') {
-      ElMessage.error(error?.message || '取消锁定失败')
+  } catch (error: unknown) {
+    if (!isCancel(error)) {
+      ElMessage.error(extractMessage(error, '取消锁定失败'))
     }
   } finally {
     actionLoadingKey.value = null

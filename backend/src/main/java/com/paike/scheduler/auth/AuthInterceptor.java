@@ -22,20 +22,31 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        // 仅对状态变更请求（POST/PUT/DELETE）做 CSRF 校验
+        // 先解析 token 来源：Cookie 路径才会被浏览器自动携带，CSRF 风险才存在；
+        // Authorization Bearer 是 API 客户端主动设置，浏览器不会跨站自动加，CSRF 不适用。
+        String cookieToken = getCookieValue(request, "paike_token");
+        boolean cookieAuth = cookieToken != null && !cookieToken.isBlank();
+
+        // 仅对 cookie 认证的状态变更请求强制 CSRF（POST/PUT/DELETE/PATCH）
         String method = request.getMethod();
-        if ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method) || "DELETE".equalsIgnoreCase(method)) {
+        boolean stateChanging = "POST".equalsIgnoreCase(method)
+                || "PUT".equalsIgnoreCase(method)
+                || "DELETE".equalsIgnoreCase(method)
+                || "PATCH".equalsIgnoreCase(method);
+        if (cookieAuth && stateChanging) {
             String csrfHeader = request.getHeader("X-CSRF-Token");
             String csrfCookie = getCookieValue(request, "XSRF-TOKEN");
-            // CSRF Cookie 存在时要求请求头与之匹配
-            if (csrfCookie != null && !csrfCookie.isBlank()
-                    && (csrfHeader == null || !csrfCookie.equals(csrfHeader))) {
+            // 强制要求双 token 模式：cookie 与 header 都必须存在且相等，缺一就拒绝。
+            // 旧逻辑"cookie 存在才校验"在攻击者清空 XSRF-TOKEN 时会被绕过。
+            if (csrfCookie == null || csrfCookie.isBlank()
+                    || csrfHeader == null || csrfHeader.isBlank()
+                    || !csrfCookie.equals(csrfHeader)) {
                 throw new BusinessException(403, "CSRF 校验失败");
             }
         }
 
-        // 优先从 httpOnly Cookie 读取 token，其次从 Authorization 头
-        String token = getCookieValue(request, "paike_token");
+        // 选定最终 token：cookie 优先，再退到 Bearer
+        String token = cookieToken;
         if (token == null || token.isBlank()) {
             String authHeader = request.getHeader("Authorization");
             if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {

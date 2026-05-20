@@ -18,6 +18,7 @@ import {
   type ScheduleTimeDensityChart,
 } from '../../api/v4ScheduleAnalysisApi'
 import { strategyText } from '../../utils/status'
+import { extractMessage } from '../../utils/errors'
 
 const route = useRoute()
 const router = useRouter()
@@ -52,8 +53,8 @@ async function fetchData() {
     classChart.value = classData
     densityChart.value = densityData
     scoreChart.value = scoreData
-  } catch (error: any) {
-    ElMessage.error(error?.message || '加载图表数据失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载图表数据失败'))
   } finally {
     loading.value = false
   }

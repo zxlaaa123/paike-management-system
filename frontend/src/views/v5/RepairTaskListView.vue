@@ -11,6 +11,7 @@ import {
   type V5RepairTaskStatus,
   type V5RepairTaskSummary,
 } from '../../api/v5RepairTaskApi'
+import { extractMessage } from '../../utils/errors'
 
 const router = useRouter()
 const loading = ref(false)
@@ -58,8 +59,8 @@ async function fetchData() {
     const semester = await getCurrentSemester()
     currentSemesterId.value = semester.id
     tasks.value = await listRepairTasks({ semesterId: semester.id })
-  } catch (error: any) {
-    ElMessage.error(error?.message || '加载修复任务失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载修复任务失败'))
   } finally {
     loading.value = false
   }
@@ -84,8 +85,8 @@ async function handleCreate() {
     createDialogVisible.value = false
     await fetchData()
     router.push(`/v5/repair-tasks/${created.id}`)
-  } catch (error: any) {
-    ElMessage.error(error?.message || '创建失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '创建失败'))
   } finally {
     creating.value = false
   }

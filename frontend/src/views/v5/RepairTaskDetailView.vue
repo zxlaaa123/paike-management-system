@@ -16,6 +16,7 @@ import {
   listRepairSuggestions,
   type V5RepairSuggestion,
 } from '../../api/v5RepairSuggestionApi'
+import { extractMessage } from '../../utils/errors'
 
 const route = useRoute()
 const router = useRouter()
@@ -56,8 +57,8 @@ async function fetchData() {
   try {
     task.value = await getRepairTaskDetail(taskId.value)
     suggestions.value = await listRepairSuggestions(taskId.value)
-  } catch (error: any) {
-    ElMessage.error(error?.message || '加载任务详情失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载任务详情失败'))
   } finally {
     loading.value = false
   }
@@ -71,8 +72,8 @@ async function generateSuggestions() {
     if (task.value && task.value.status !== 'SUGGESTED') {
       task.value = await getRepairTaskDetail(taskId.value)
     }
-  } catch (error: any) {
-    ElMessage.error(error?.message || '生成修复建议失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '生成修复建议失败'))
   } finally {
     generatingSuggestions.value = false
   }
@@ -82,8 +83,8 @@ async function openSuggestionDetail(row: V5RepairSuggestion) {
   try {
     currentSuggestion.value = await getRepairSuggestionDetail(taskId.value, row.id)
     detailVisible.value = true
-  } catch (error: any) {
-    ElMessage.error(error?.message || '加载建议详情失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载建议详情失败'))
   }
 }
 
@@ -92,8 +93,8 @@ async function chooseForSimulation(row: V5RepairSuggestion) {
     const simulation = await chooseSuggestionForSimulation(taskId.value, row.id)
     ElMessage.success('试算方案已生成')
     router.push(`/v5/repair-tasks/${taskId.value}/simulations/${simulation.plan.id}`)
-  } catch (error: any) {
-    ElMessage.error(error?.message || '生成试算方案失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '生成试算方案失败'))
   }
 }
 
@@ -121,8 +122,8 @@ async function changeStatus(status: V5RepairTaskStatus) {
   try {
     task.value = await updateRepairTaskStatus(task.value.id, { status })
     ElMessage.success('状态已更新')
-  } catch (error: any) {
-    ElMessage.error(error?.message || '状态更新失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '状态更新失败'))
   } finally {
     updating.value = false
   }
@@ -134,8 +135,8 @@ async function cancelTask() {
   try {
     task.value = await cancelRepairTask(task.value.id, '用户手动取消')
     ElMessage.success('任务已取消')
-  } catch (error: any) {
-    ElMessage.error(error?.message || '取消失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '取消失败'))
   } finally {
     updating.value = false
   }

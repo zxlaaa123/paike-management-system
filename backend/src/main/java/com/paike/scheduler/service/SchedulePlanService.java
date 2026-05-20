@@ -309,6 +309,7 @@ public class SchedulePlanService {
 
         int insertedCount = 0;
         for (SchedulePlanItem item : items) {
+            validatePeriodPair(item);
             int periodNo = (item.getStartPeriod() + 1) / 2;
             String key = item.getWeekday() + "_" + periodNo;
             Long timeSlotId = timeSlotMap.get(key);
@@ -396,6 +397,7 @@ public class SchedulePlanService {
 
         int insertedCount = 0;
         for (SchedulePlanItem item : items) {
+            validatePeriodPair(item);
             int periodNo = (item.getStartPeriod() + 1) / 2;
             String key = item.getWeekday() + "_" + periodNo;
             Long timeSlotId = timeSlotMap.get(key);
@@ -618,5 +620,23 @@ public class SchedulePlanService {
 
     private String safeName(String value) {
         return value == null ? "未知" : value;
+    }
+
+    /**
+     * 与 V4ScheduleAdjustmentService.resolveTimeSlot 对齐：
+     * startPeriod 必须为奇数（1/3/5/7/9），endPeriod 必须等于 startPeriod+1，
+     * 否则 (startPeriod+1)/2 算出的 periodNo 会把偶数节静默错配到下一节大节。
+     */
+    private void validatePeriodPair(SchedulePlanItem item) {
+        Integer startPeriod = item.getStartPeriod();
+        Integer endPeriod = item.getEndPeriod();
+        Integer weekday = item.getWeekday();
+        if (weekday == null || startPeriod == null || endPeriod == null) {
+            throw new BusinessException("方案 item 缺少 weekday / startPeriod / endPeriod 字段");
+        }
+        if (startPeriod % 2 == 0 || endPeriod - startPeriod != 1) {
+            throw new BusinessException("方案 item 节次非法：周" + weekday
+                    + " 第" + startPeriod + "-" + endPeriod + "节，startPeriod 须为奇数且与 endPeriod 相邻");
+        }
     }
 }

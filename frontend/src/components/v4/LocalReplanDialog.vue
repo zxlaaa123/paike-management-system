@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { getSchedulePlanById, getSchedulePlanItems, type SchedulePlan } from '../../api/schedulePlan'
 import { getScheduleLockList, type ScheduleLockList } from '../../api/v4ScheduleLockApi'
 import { createLocalReplanPlan, type ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
+import { extractMessage } from '../../utils/errors'
 
 const props = defineProps<{
   modelValue: boolean
@@ -54,8 +55,8 @@ async function fetchData() {
     form.newPlanName = buildDefaultPlanName(planData.name)
     form.keepLocked = true
     form.strategyCode = 'LOCAL_REPLAN'
-  } catch (error: any) {
-    ElMessage.error(error?.message || '加载局部重排数据失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载局部重排数据失败'))
     handleClose()
   } finally {
     loading.value = false
@@ -86,8 +87,8 @@ async function handleSubmit() {
     ElMessage.success('新方案已生成，需手动应用')
     emit('success', result)
     handleClose()
-  } catch (error: any) {
-    ElMessage.error(error?.message || '局部重排生成失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '局部重排生成失败'))
   } finally {
     submitting.value = false
   }

@@ -11,6 +11,7 @@ import {
   type TeacherForm,
 } from '../../api/teacher'
 import { statusText, statusTagType } from '../../utils/status'
+import { extractMessage } from '../../utils/errors'
 
 const loading = ref(false)
 const tableData = ref<Teacher[]>([])
@@ -115,19 +116,35 @@ async function handleSubmit() {
 }
 
 async function handleDelete(row: Teacher) {
-  await ElMessageBox.confirm(`确定删除教师「${row.name}」吗？`, '提示', { type: 'warning' })
-  await deleteTeacher(row.id)
-  ElMessage.success('删除成功')
-  fetchData()
+  try {
+    await ElMessageBox.confirm(`确定删除教师「${row.name}」吗？`, '提示', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await deleteTeacher(row.id)
+    ElMessage.success('删除成功')
+    fetchData()
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '删除失败'))
+  }
 }
 
 async function handleStatusChange(row: Teacher) {
   const newStatus = row.status === 1 ? 0 : 1
   const action = newStatus === 1 ? '启用' : '停用'
-  await ElMessageBox.confirm(`确定${action}教师「${row.name}」吗？`, '提示', { type: 'warning' })
-  await updateTeacherStatus(row.id, newStatus)
-  ElMessage.success(`${action}成功`)
-  fetchData()
+  try {
+    await ElMessageBox.confirm(`确定${action}教师「${row.name}」吗？`, '提示', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await updateTeacherStatus(row.id, newStatus)
+    ElMessage.success(`${action}成功`)
+    fetchData()
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, `${action}失败`))
+  }
 }
 
 onMounted(fetchData)

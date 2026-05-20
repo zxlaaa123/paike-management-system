@@ -92,9 +92,11 @@ public class ScheduleRuleService {
         if (cached != null) return parseInt(cached, ruleKey);
         ScheduleRuleConfig rule = ruleConfigMapper.selectOne(new LambdaQueryWrapper<ScheduleRuleConfig>()
                 .eq(ScheduleRuleConfig::getRuleKey, ruleKey));
-        if (rule == null) return 0;
-        ruleCache.put(ruleKey, rule.getRuleValue());
-        return parseInt(rule.getRuleValue(), ruleKey);
+        // 规则不存在 / 已被停用：按"无限制 / 关闭"语义返回 0。
+        // 之前忽略 enabled 字段，导致管理端"停用"开关形同摆设。
+        String effective = (rule == null || isDisabled(rule)) ? "0" : rule.getRuleValue();
+        ruleCache.put(ruleKey, effective);
+        return parseInt(effective, ruleKey);
     }
 
     public boolean getBoolValue(String ruleKey) {
@@ -102,9 +104,13 @@ public class ScheduleRuleService {
         if (cached != null) return Boolean.parseBoolean(cached);
         ScheduleRuleConfig rule = ruleConfigMapper.selectOne(new LambdaQueryWrapper<ScheduleRuleConfig>()
                 .eq(ScheduleRuleConfig::getRuleKey, ruleKey));
-        if (rule == null) return false;
-        ruleCache.put(ruleKey, rule.getRuleValue());
-        return Boolean.parseBoolean(rule.getRuleValue());
+        String effective = (rule == null || isDisabled(rule)) ? "false" : rule.getRuleValue();
+        ruleCache.put(ruleKey, effective);
+        return Boolean.parseBoolean(effective);
+    }
+
+    private boolean isDisabled(ScheduleRuleConfig rule) {
+        return rule.getEnabled() != null && rule.getEnabled() == 0;
     }
 
     private int parseInt(String value, String key) {

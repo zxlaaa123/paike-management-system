@@ -1,99 +1,113 @@
-# 高校排课管理系统（Spring Boot + Vue）
+# 高校排课管理系统
 
-基于 `Spring Boot 3 + Vue 3 + MyBatis Plus + MySQL` 的高校排课管理系统。  
-当前代码主线版本：`V5（约束驱动的局部重排与智能修复优化版）`。
+基于 Spring Boot 3、Vue 3、MyBatis Plus、MySQL 的高校排课管理系统。
 
-## 1. 版本状态
+当前分支已完成 V1-V5 功能，并合入 bug 审计修复：登录安全、CSRF、排课并发冲突、学期唯一性、P3 前端鲁棒性等问题已修复。
 
-- V1：基础数据管理、教学任务、手动排课、冲突检测、课表查询
-- V2：自动排课、教师禁排、规则配置、未排任务、冲突报告、评分报告、Excel 导出
-- V3：学期管理、排课方案、多方案生成、评分明细、方案对比、应用方案、历史回滚、排课日志
-- V4：排课质量分析、评分解释、风险诊断、可视化图表、局部调整、课程锁定、报告导出、AI 辅助分析
-- V5：智能修复建议、候选位置推荐、试算方案、局部重排、优化前后对比、一致性检查、回归测试增强
+## 当前状态
 
-## 2. V5 开发硬约束（必须遵守）
+- 后端：Spring Boot 3.3.x、Java 17、Maven、MyBatis Plus、MySQL 8。
+- 前端：Vue 3、Vite、TypeScript、Element Plus、Pinia、Vue Router、Axios。
+- 包管理：前端使用 npm，提交 `frontend/package-lock.json`。不要提交 `frontend/pnpm-lock.yaml`，除非项目明确切换到 pnpm。
+- 默认后端端口：`8090`。
+- 默认前端端口：`5173`。
 
-1. 不重写 V1-V4 已稳定功能，只做增量扩展。
-2. 自动排课与局部重排不能直接覆盖正式课表。
-3. 修复/试算/重排结果必须先落到“排课方案或试算方案”。
-4. 应用到正式课表必须由用户显式触发，且后端二次校验。
-5. 锁定课程必须严格保护，局部重排不得改动锁定项。
-6. 风险诊断、AI 分析、修复建议仅辅助决策，不得直接改正式课表。
-7. 涉及正式课表写入必须事务化，并记录调整/修复日志。
-8. 新功能必须兼容：当前学期、排课方案、正式课表来源方案机制。
-9. 所有接口以后端校验为准，前端校验仅做体验增强。
-10. 每阶段完成后必须回归测试，确认旧功能未破坏。
+## 功能范围
 
-## 3. 当前代码中的关键机制（已存在）
+- V1：基础数据管理、教学任务、手动排课、冲突检测、课表查询。
+- V2：自动排课、教师禁排、规则配置、未排任务、冲突报告、评分报告、Excel 导出。
+- V3：学期管理、排课方案、多方案生成、评分明细、方案对比、方案应用、历史回滚、排课日志。
+- V4：排课质量分析、风险诊断、图表、局部调整、课程锁定、报告导出、AI 辅助分析。
+- V5：智能修复建议、候选位置推荐、试算方案、局部重排、优化前后对比、一致性检查。
 
-- 方案应用正式课表：`SchedulePlanService.applyPlan()`（事务）
-- 局部重排生成新方案：`V4ScheduleReplanService.createLocalReplanPlan()`
-- 课程锁定：`V4ScheduleLockService` + `schedule_locked_item`
-- 调整校验与应用：`V4ScheduleAdjustmentService`
-- 调整日志：`schedule_adjust_log`
-- 学期与历史兼容补表：`SemesterSchemaInitializer`
-
-## 4. 技术栈
-
-- 后端：Java 17、Spring Boot 3.3.x、MyBatis Plus、MySQL、JWT、Maven
-- 前端：Vue 3、Vite、TypeScript、Element Plus、Pinia、Vue Router、Axios
-- 测试：Playwright、Node API smoke test
-
-## 5. 目录结构
+## 目录结构
 
 ```text
 .
-├─ backend/                         # Spring Boot 后端
+├─ backend/                  # Spring Boot 后端
 │  ├─ src/main/java/com/paike/scheduler
-│  │  ├─ controller/                # V1-V5 REST 接口
-│  │  ├─ service/                   # 业务逻辑（含 V3/V4/V5 演进能力）
-│  │  ├─ mapper/                    # MyBatis Plus Mapper
-│  │  ├─ entity/                    # 实体模型
-│  │  ├─ config/                    # 配置与启动迁移初始化
-│  │  └─ common/                    # 响应/异常/枚举
+│  │  ├─ auth/               # JWT、登录、拦截器、CSRF 校验
+│  │  ├─ common/             # 响应、异常、枚举
+│  │  ├─ config/             # CORS、初始化配置
+│  │  ├─ controller/         # REST 接口
+│  │  ├─ entity/             # 实体
+│  │  ├─ mapper/             # MyBatis Mapper
+│  │  └─ service/            # 业务逻辑
 │  └─ src/main/resources
 │     ├─ application.yml
-│     └─ db/                        # schema 与阶段 SQL
-├─ frontend/                        # Vue 3 前端
+│     └─ db/                 # schema 与阶段 SQL
+├─ frontend/                 # Vue 前端
 │  └─ src
-│     ├─ views/                     # 页面（含 v4 视图）
-│     ├─ api/                       # API 封装
-│     ├─ router/                    # 路由
-│     ├─ stores/                    # Pinia
-│     └─ components/                # 组件
-├─ docs/                            # v1-v5 需求/设计/测试文档
-├─ tests/                           # Playwright E2E
-└─ scripts/                         # 脚本（如 API 冒烟）
+│     ├─ api/
+│     ├─ components/
+│     ├─ router/
+│     ├─ stores/
+│     ├─ utils/
+│     └─ views/
+├─ docs/                     # 需求、设计、测试文档
+├─ scripts/                  # 冒烟脚本
+└─ tests/                    # Playwright E2E
 ```
 
-## 6. 本地启动
+## 本地环境
 
-### 6.1 环境要求
+需要：
 
 - JDK 17+
 - Maven 3.9+
 - Node.js 18+
 - MySQL 8.x
+- PowerShell 7+ 推荐
 
-### 6.2 初始化数据库
+初始化数据库：
 
 ```sql
 CREATE DATABASE paike CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-后端启动会按 `application.yml` 自动执行 `db/*.sql`（幂等容错开启）。
+后端启动时会执行 `backend/src/main/resources/db/*.sql` 中配置到 `application.yml` 的脚本，`continue-on-error` 已开启，开发环境可重复启动。
 
-### 6.3 启动后端
+## 后端启动
+
+当前分支不再保留不安全默认值。启动前必须显式设置数据库账号、密码、JWT 密钥。
+
+PowerShell 示例：
 
 ```powershell
 cd D:\paike\backend
+
+$env:DB_USERNAME="root"
+$env:DB_PASSWORD="你的MySQL密码"
+$env:JWT_SECRET="dev_local_secret_please_change_32_chars_minimum"
+
 mvn spring-boot:run
 ```
 
-- 默认地址：`http://127.0.0.1:8090`
-- 健康检查：`GET /api/health`
+可选环境变量：
 
-### 6.4 启动前端
+```powershell
+$env:DB_URL="jdbc:mysql://127.0.0.1:3306/paike?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai"
+$env:JWT_EXPIRATION_MS="86400000"
+$env:ADMIN_DEFAULT_PASSWORD="仅本地开发可设置的管理员初始密码"
+$env:COOKIE_SECURE="false"
+$env:CORS_ALLOWED_ORIGINS="http://localhost:5173,http://127.0.0.1:5173"
+$env:CORS_ALLOW_CREDENTIALS="false"
+```
+
+说明：
+
+- `JWT_SECRET` 必须至少 32 字节，不能使用占位符。
+- `DB_USERNAME` 和 `DB_PASSWORD` 必须显式提供。
+- `ADMIN_DEFAULT_PASSWORD` 不设置时，首次创建 admin 会生成随机密码并打印到后端启动日志。
+- 生产 HTTPS 部署时应设置 `COOKIE_SECURE=true`。
+
+健康检查：
+
+```text
+GET http://127.0.0.1:8090/api/health
+```
+
+## 前端启动
 
 ```powershell
 cd D:\paike\frontend
@@ -101,62 +115,119 @@ npm install
 npm run dev
 ```
 
-- 默认地址：`http://127.0.0.1:5173`
+访问：
 
-## 7. 默认账号
+```text
+http://127.0.0.1:5173
+```
 
-- 用户名：`admin`
-- 密码：`123456`
+前端通过 Vite 代理访问后端 `/api`。如果后端端口变更，需要同步检查 `frontend/vite.config.ts`。
 
-## 8. 关键业务边界
+## 登录账号
 
-- 正式课表来源于“已应用方案”，不是任意算法结果直写。
-- 局部重排、智能修复、候选推荐默认只产出方案，不直接落正式课表。
-- 锁定项必须在候选过滤、试算、应用前后全链路校验。
-- 正式课表变更必须可审计（事务 + 日志 + 来源方案可追溯）。
+默认用户名：
 
-## 9. 测试与回归
+```text
+admin
+```
 
-### 9.1 后端测试
+密码来源：
+
+- 如果设置了 `ADMIN_DEFAULT_PASSWORD`，使用该值。
+- 如果未设置，查看后端首次启动日志中的随机密码。
+
+旧版 `admin / 123456` 已废弃。
+
+## 验证命令
+
+前端构建：
+
+```powershell
+cd D:\paike\frontend
+npm run build
+```
+
+后端编译打包：
 
 ```powershell
 cd D:\paike\backend
+mvn -DskipTests clean package
+```
+
+后端测试：
+
+```powershell
+cd D:\paike\backend
+$env:JWT_SECRET="dev_local_secret_please_change_32_chars_minimum"
+$env:DB_USERNAME="root"
+$env:DB_PASSWORD="你的MySQL密码"
 mvn test
 ```
 
-### 9.2 API 冒烟
+如果未设置 `JWT_SECRET`，`mvn test` 会因安全校验失败，这是预期行为。
+
+API 冒烟：
 
 ```powershell
 cd D:\paike
 npm run smoke:api
 ```
 
-### 9.3 E2E（Playwright）
+Playwright E2E：
 
 ```powershell
 cd D:\paike
 npx playwright test
 ```
 
-建议每次 V5 功能合并前至少执行：
+## 安全与部署注意
 
-- 既有排课主链路回归（V1-V4）
-- 方案生成/应用回归（V3）
-- 锁定与局部重排回归（V4/V5）
-- 修复建议与试算不落正式课表回归（V5）
+- JWT 使用 httpOnly Cookie；前端只把 localStorage token 作为兼容标志，不作为权威登录判断。
+- Cookie 登录下，POST、PUT、DELETE、PATCH 请求需要 `X-CSRF-Token`。
+- CORS origin 通过 `CORS_ALLOWED_ORIGINS` 配置，不要在生产中使用不受控的通配配置。
+- 正式课表写入路径已事务化，冲突检测仍以前端预检 + 后端保存时二次校验 + 数据库唯一约束兜底。
+- `semester.is_current` 已增加数据库唯一性兜底，避免多个当前学期。
 
-## 10. 文档入口
+## 关键业务边界
 
-- V1：`docs/v1/`
-- V2：`docs/v2/`
-- V3：`docs/v3/`
-- V4：`docs/v4/`
-- V5：`docs/v5/`
+- 自动排课、局部重排、智能修复默认产出方案，不直接覆盖正式课表。
+- 应用到正式课表必须由用户显式触发，并由后端二次校验。
+- 课程锁定项必须在候选过滤、试算、应用前后全链路保护。
+- AI 分析和修复建议只辅助决策，不直接修改正式课表。
+- 正式课表变更必须可追溯：事务、日志、来源方案。
 
-建议优先阅读：
+## 常见问题
 
-- `docs/v5/V5_01_版本需求说明.md`
-- `docs/v5/V5_04_API接口设计.md`
-- `docs/v5/V5_06_局部重排与智能修复规则设计.md`
-- `docs/v5/V5_08_测试与验收清单.md`
+后端启动报 `JWT_SECRET` 缺失：
 
+```powershell
+$env:JWT_SECRET="dev_local_secret_please_change_32_chars_minimum"
+```
+
+后端启动报数据库账号密码缺失：
+
+```powershell
+$env:DB_USERNAME="root"
+$env:DB_PASSWORD="你的MySQL密码"
+```
+
+不知道 admin 密码：
+
+- 看后端首次启动日志。
+- 或删除本地开发库后设置 `ADMIN_DEFAULT_PASSWORD` 再重新启动初始化。
+
+出现 `frontend/pnpm-lock.yaml`：
+
+- 这是 pnpm 锁文件。
+- 当前项目使用 npm，不要提交它。
+- 需要清理时直接删除该未跟踪文件即可。
+
+## 文档入口
+
+- `docs/v1/`
+- `docs/v2/`
+- `docs/v3/`
+- `docs/v4/`
+- `docs/v5/`
+- `claude-opus-4.7-bug验证报告.md`
+- `claude-opus-4.7-bug修复建议.md`
