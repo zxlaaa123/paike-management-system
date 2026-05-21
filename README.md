@@ -2,7 +2,7 @@
 
 基于 Spring Boot 3、Vue 3、MyBatis Plus、MySQL 的高校排课管理系统。
 
-当前分支已完成 V1-V5 功能，并合入 bug 审计修复：登录安全、CSRF、排课并发冲突、学期唯一性、P3 前端鲁棒性等问题已修复。
+当前 `main` 已完成 V1-V5 功能与 V5 阶段 11 验收，并合入 bug 审计修复：登录安全、CSRF、排课并发冲突、学期唯一性、P3 前端鲁棒性等问题已修复。
 
 ## 当前状态
 
@@ -11,6 +11,7 @@
 - 包管理：前端使用 npm，提交 `frontend/package-lock.json`。不要提交 `frontend/pnpm-lock.yaml`，除非项目明确切换到 pnpm。
 - 默认后端端口：`8090`。
 - 默认前端端口：`5173`。
+- 验收状态：API 冒烟、Playwright E2E、前端构建、后端测试已通过。
 
 ## 功能范围
 
@@ -18,7 +19,7 @@
 - V2：自动排课、教师禁排、规则配置、未排任务、冲突报告、评分报告、Excel 导出。
 - V3：学期管理、排课方案、多方案生成、评分明细、方案对比、方案应用、历史回滚、排课日志。
 - V4：排课质量分析、风险诊断、图表、局部调整、课程锁定、报告导出、AI 辅助分析。
-- V5：智能修复建议、候选位置推荐、试算方案、局部重排、优化前后对比、一致性检查。
+- V5：智能修复建议、候选位置推荐、试算方案、局部重排、优化前后对比、一致性检查、AI 修复解释、最终回归验收。
 
 ## 目录结构
 
@@ -179,6 +180,32 @@ Playwright E2E：
 cd D:\paike
 npx playwright test
 ```
+
+如果本机尚未安装 Playwright 浏览器：
+
+```powershell
+cd D:\paike
+npx playwright install chromium
+```
+
+当前 V5 阶段 11 已验证通过：
+
+```powershell
+cd D:\paike
+npm run smoke:api
+npx playwright test tests/stage6.spec.ts tests/stage7.spec.ts tests/stage9.spec.ts --reporter=line
+
+cd D:\paike\frontend
+npm run build
+
+cd D:\paike\backend
+$env:JWT_SECRET="dev_local_secret_please_change_32_chars_minimum"
+$env:DB_USERNAME="root"
+$env:DB_PASSWORD="你的MySQL密码"
+mvn test
+```
+
+说明：E2E 页面用例会复用 API 登录拿到的 token，避免连续 UI 登录触发后端登录限流。
 
 ## 安全与部署注意
 
