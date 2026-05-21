@@ -128,11 +128,13 @@ async function generatePlan(request: any, semesterId: number, strategyType: stri
 }
 
 async function loginAndGoTo(page: any, path: string) {
-  await page.goto(`${BASE_URL}/login`)
-  await page.fill('input[placeholder="请输入用户名"]', 'admin')
-  await page.fill('input[placeholder="请输入密码"]', '123456')
-  await page.click('button:has-text("登录")')
-  await page.waitForURL('**/dashboard', { timeout: 15000 })
+  if (!authToken) {
+    throw new Error('authToken 未初始化，请先执行登录用例')
+  }
+  await page.addInitScript(
+    ([key, token]) => window.localStorage.setItem(key, token),
+    ['paike_admin_token', authToken],
+  )
   await page.goto(`${BASE_URL}${path}`)
   await page.waitForTimeout(2000)
 }
@@ -307,12 +309,7 @@ test.describe.serial('V3 阶段 6：方案对比与应用回滚', () => {
 
   test('9. 方案详情页 - 查看详情并应用方案', async ({ page }) => {
     // 先登录再导航到方案1的详情页
-    await page.goto(`${BASE_URL}/login`)
-    await page.fill('input[placeholder="请输入用户名"]', 'admin')
-    await page.fill('input[placeholder="请输入密码"]', '123456')
-    await page.click('button:has-text("登录")')
-    await page.waitForURL('**/dashboard', { timeout: 15000 })
-    await page.goto(`${BASE_URL}/v3/schedule-plans/${ids.planId1}`)
+    await loginAndGoTo(page, `/v3/schedule-plans/${ids.planId1}`)
     await page.waitForTimeout(3000)
 
     // 检查是否被重定向到登录页
@@ -533,22 +530,8 @@ test.describe.serial('V3 阶段 6：方案对比与应用回滚', () => {
   // ====== 测试5：对比页面直接应用方案 ======
 
   test('14. 对比页面 - 直接从对比结果中应用方案', async ({ page }) => {
-    await page.goto(`${BASE_URL}/v3/schedule-compare`)
+    await loginAndGoTo(page, '/v3/schedule-compare')
     await page.waitForTimeout(2000)
-
-    // 先登录（可能需要）
-    if (await page.locator('input[placeholder="请输入用户名"]').isVisible().catch(() => false)) {
-      await page.fill('input[placeholder="请输入用户名"]', 'admin')
-      await page.fill('input[placeholder="请输入密码"]', '123456')
-      await page.click('button:has-text("登录")')
-      // 登录后可能直接跳转到原目标页面（redirect query param）
-      await page.waitForTimeout(3000)
-      const currentUrl = page.url()
-      if (!currentUrl.includes('schedule-compare')) {
-        await page.goto(`${BASE_URL}/v3/schedule-compare`)
-        await page.waitForTimeout(2000)
-      }
-    }
 
     // 等待表格加载
     await page.waitForTimeout(2000)
@@ -691,18 +674,8 @@ test.describe.serial('V3 阶段 6：方案对比与应用回滚', () => {
   // ====== 测试9：对比页面返回方案列表 ======
 
   test('18. 对比页面 - 返回方案列表', async ({ page }) => {
-    await page.goto(`${BASE_URL}/v3/schedule-compare`)
+    await loginAndGoTo(page, '/v3/schedule-compare')
     await page.waitForTimeout(2000)
-
-    // 如果需要登录
-    if (await page.locator('input[placeholder="请输入用户名"]').isVisible().catch(() => false)) {
-      await page.fill('input[placeholder="请输入用户名"]', 'admin')
-      await page.fill('input[placeholder="请输入密码"]', '123456')
-      await page.click('button:has-text("登录")')
-      await page.waitForTimeout(3000)
-      await page.goto(`${BASE_URL}/v3/schedule-compare`)
-      await page.waitForTimeout(2000)
-    }
 
     // 点击"返回方案列表"按钮
     const backBtn = page.locator('button:has-text("返回方案列表")')

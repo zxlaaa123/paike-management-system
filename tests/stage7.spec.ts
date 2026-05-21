@@ -28,6 +28,18 @@ const SLOT: Record<string, number> = {
   slots: 12,    // 周四1-2节 — scheduledSlots统计
 }
 
+async function loginAndGoTo(page: any, path: string) {
+  if (!authToken) {
+    throw new Error('authToken 未初始化，请先执行登录用例')
+  }
+  await page.addInitScript(
+    ([key, token]) => window.localStorage.setItem(key, token),
+    ['paike_admin_token', authToken],
+  )
+  await page.goto(`${BASE_URL}${path}`)
+  await page.waitForTimeout(1000)
+}
+
 test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   const ts = Date.now().toString().slice(-6)
   const T1_NO = `T${ts}`
@@ -411,12 +423,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('19. 前端排课页-列表', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`)
-    await page.waitForTimeout(500)
-    await page.fill('input[placeholder="请输入用户名"]', 'admin')
-    await page.fill('input[placeholder="请输入密码"]', '123456')
-    await page.click('button:has-text("登录")')
-    await page.waitForURL('**/dashboard', { timeout: 15000 })
+    await loginAndGoTo(page, '/dashboard')
     await page.locator('.el-sub-menu__title').filter({ hasText: '教学管理' }).click()
     await page.waitForTimeout(500)
     await page.locator('.el-menu-item').filter({ hasText: '手动排课' }).click()
@@ -438,12 +445,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
     if (cr.code !== 200) { console.log('Schedule create failed:', cr.message || JSON.stringify(cr)) }
     expect(cr.code).toBe(200)
 
-    await page.goto(`${BASE_URL}/login`)
-    await page.waitForTimeout(500)
-    await page.fill('input[placeholder="请输入用户名"]', 'admin')
-    await page.fill('input[placeholder="请输入密码"]', '123456')
-    await page.click('button:has-text("登录")')
-    await page.waitForURL('**/dashboard', { timeout: 15000 })
+    await loginAndGoTo(page, '/dashboard')
     await page.locator('.el-sub-menu__title').filter({ hasText: '教学管理' }).click()
     await page.waitForTimeout(500)
     await page.locator('.el-menu-item').filter({ hasText: '手动排课' }).click()
@@ -455,15 +457,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('21. 前端排课页-删除排课', async ({ page }) => {
-    // 清除 cookies 和 localStorage，确保能从 UI 重新登录
-    await page.context().clearCookies()
-    await page.goto(`${BASE_URL}/login`)
-    await page.evaluate(() => localStorage.clear())
-    await page.waitForTimeout(500)
-    await page.fill('input[placeholder="请输入用户名"]', 'admin')
-    await page.fill('input[placeholder="请输入密码"]', '123456')
-    await page.click('button:has-text("登录")')
-    await page.waitForURL('**/dashboard', { timeout: 15000 })
+    await loginAndGoTo(page, '/dashboard')
     await page.locator('.el-sub-menu__title').filter({ hasText: '教学管理' }).click()
     await page.waitForTimeout(500)
     await page.locator('.el-menu-item').filter({ hasText: '手动排课' }).click()
@@ -482,14 +476,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('22. 前端排课页-新增排课弹窗', async ({ page }) => {
-    await page.context().clearCookies()
-    await page.goto(`${BASE_URL}/login`)
-    await page.evaluate(() => localStorage.clear())
-    await page.waitForTimeout(500)
-    await page.fill('input[placeholder="请输入用户名"]', 'admin')
-    await page.fill('input[placeholder="请输入密码"]', '123456')
-    await page.click('button:has-text("登录")')
-    await page.waitForURL('**/dashboard', { timeout: 15000 })
+    await loginAndGoTo(page, '/dashboard')
     await page.locator('.el-sub-menu__title').filter({ hasText: '教学管理' }).click()
     await page.waitForTimeout(500)
     await page.locator('.el-menu-item').filter({ hasText: '手动排课' }).click()
