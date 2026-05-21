@@ -93,6 +93,7 @@ async function handleCreate() {
 }
 
 async function handleCancel(row: V5RepairTaskSummary) {
+  let reason: string | undefined
   try {
     const { value } = await ElMessageBox.prompt('请输入取消原因（可选）', '取消修复任务', {
       confirmButtonText: '确认取消',
@@ -100,11 +101,16 @@ async function handleCancel(row: V5RepairTaskSummary) {
       inputPlaceholder: '如：范围变更，重新建任务',
       inputValue: '',
     })
-    await cancelRepairTask(row.id, value || undefined)
+    reason = value || undefined
+  } catch {
+    return
+  }
+  try {
+    await cancelRepairTask(row.id, reason)
     ElMessage.success('任务已取消')
     await fetchData()
-  } catch {
-    // 用户取消
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '取消失败'))
   }
 }
 

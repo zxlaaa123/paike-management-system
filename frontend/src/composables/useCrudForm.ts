@@ -73,6 +73,8 @@ export function useCrudForm<T extends { id: number }, F extends object>(options:
       const res = await options.fetchList(params)
       tableData.value = options.transformRecords ? options.transformRecords(res.records) : res.records
       total.value = res.total
+    } catch (error: unknown) {
+      ElMessage.error(extractMessage(error, '数据加载失败'))
     } finally {
       loading.value = false
     }

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.enums.CourseType;
 import com.paike.scheduler.common.enums.RoomType;
+import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import lombok.Data;
@@ -65,7 +66,7 @@ public class ScheduleConflictReportService {
         return result;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public GenerateResult generate() {
         List<Schedule> schedules = scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getDeleted, 0));
@@ -97,10 +98,12 @@ public class ScheduleConflictReportService {
 
     @Transactional(rollbackFor = Exception.class)
     public void clear(String reportNo) {
-        LambdaQueryWrapper<ScheduleConflictReport> wrapper = new LambdaQueryWrapper<>();
-        if (reportNo != null && !reportNo.isBlank()) {
-            wrapper.likeRight(ScheduleConflictReport::getReportNo, normalizeReportNo(reportNo.trim()));
+        if (reportNo == null || reportNo.isBlank()) {
+            throw new BusinessException(400, "报告编号不能为空");
         }
+        LambdaQueryWrapper<ScheduleConflictReport> wrapper = new LambdaQueryWrapper<>();
+        String normalized = normalizeReportNo(reportNo.trim());
+        wrapper.apply("report_no LIKE {0} ESCAPE '\\\\'", escapeLikePattern(normalized) + "%");
         conflictReportMapper.delete(wrapper);
     }
 
@@ -584,6 +587,12 @@ public class ScheduleConflictReportService {
             }
         }
         return reportNo;
+    }
+
+    private String escapeLikePattern(String value) {
+        return value.replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 
     private List<Long> parseScheduleIds(String relatedScheduleIds) {

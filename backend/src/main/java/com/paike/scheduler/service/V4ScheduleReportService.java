@@ -42,7 +42,7 @@ public class V4ScheduleReportService {
     private final V4ScheduleAnalysisService scheduleAnalysisService;
     private final V4ScheduleRiskService scheduleRiskService;
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ScheduleReportItemVo generateReport(Long planId, V4ScheduleReportGenerateRequest request) {
         SchedulePlan plan = schedulePlanMapper.selectById(planId);
         if (plan == null) {

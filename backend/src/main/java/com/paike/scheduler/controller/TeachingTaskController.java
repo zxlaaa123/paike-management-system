@@ -156,7 +156,9 @@ public class TeachingTaskController {
         task.setClassId(form.getClassId());
         task.setWeeklyHours(form.getWeeklyHours());
         task.setNeedContinuous(form.getNeedContinuous() != null ? form.getNeedContinuous() : 0);
-        task.setStatus(form.getStatus());
+        if (form.getStatus() != null) {
+            task.setStatus(form.getStatus());
+        }
         task.setRemark(form.getRemark());
         task.setUpdateTime(LocalDateTime.now());
         teachingTaskMapper.updateById(task);

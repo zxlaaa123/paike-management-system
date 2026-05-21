@@ -13,6 +13,7 @@ import {
 import { getAllTeachers, type Teacher } from '../../api/teacher'
 import { getAllTimeSlots, type TimeSlot } from '../../api/timeSlot'
 import { statusText, statusTagType } from '../../utils/status'
+import { extractMessage } from '../../utils/errors'
 
 const loading = ref(false)
 const tableData = ref<TeacherUnavailableTime[]>([])
@@ -126,20 +127,36 @@ async function handleSubmit() {
 }
 
 async function handleDelete(row: TeacherUnavailableTime) {
-  await ElMessageBox.confirm(`确定删除「${row.teacherName}」在「${row.timeSlotName}」的禁排时间吗？`, '提示', { type: 'warning' })
-  await deleteUnavailableTime(row.id)
-  ElMessage.success('删除成功')
-  fetchData()
+  try {
+    await ElMessageBox.confirm(`确定删除「${row.teacherName}」在「${row.timeSlotName}」的禁排时间吗？`, '提示', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await deleteUnavailableTime(row.id)
+    ElMessage.success('删除成功')
+    await fetchData()
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '删除失败'))
+  }
 }
 
 async function handleStatusChange(row: TeacherUnavailableTime) {
   // 状态切换只决定该禁排规则是否参与排课约束，不删除原记录，便于后续临时恢复。
   const newStatus = row.status === 1 ? 0 : 1
   const action = newStatus === 1 ? '启用' : '停用'
-  await ElMessageBox.confirm(`确定${action}该禁排时间吗？`, '提示', { type: 'warning' })
-  await updateUnavailableTimeStatus(row.id, newStatus)
-  ElMessage.success(`${action}成功`)
-  fetchData()
+  try {
+    await ElMessageBox.confirm(`确定${action}该禁排时间吗？`, '提示', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await updateUnavailableTimeStatus(row.id, newStatus)
+    ElMessage.success(`${action}成功`)
+    await fetchData()
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, `${action}失败`))
+  }
 }
 
 onMounted(() => {

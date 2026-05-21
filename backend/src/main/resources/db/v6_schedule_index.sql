@@ -36,6 +36,12 @@ BEGIN
 
     IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule'
+                     AND INDEX_NAME = 'idx_schedule_semester') THEN
+        ALTER TABLE schedule ADD KEY idx_schedule_semester (semester_id, deleted);
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
+                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule'
                      AND INDEX_NAME = 'idx_schedule_task') THEN
         ALTER TABLE schedule ADD KEY idx_schedule_task (teaching_task_id, deleted);
     END IF;

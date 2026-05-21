@@ -4,7 +4,7 @@
 <mapper namespace="com.paike.scheduler.mapper.ScheduleMapper">
 
     <select id="selectFilteredSchedulePage" resultType="com.paike.scheduler.entity.Schedule">
-        SELECT DISTINCT s.*
+        SELECT s.*
         FROM schedule s
         INNER JOIN teaching_task tt ON s.teaching_task_id = tt.id AND tt.deleted = 0
         INNER JOIN course c ON s.course_id = c.id AND c.deleted = 0
@@ -45,6 +45,17 @@
           <foreach collection="daySlotIds" item="id" open="(" separator="," close=")">
               #{id}
           </foreach>
+          <if test="semesterId != null">
+              AND s.semester_id = #{semesterId}
+          </if>
+          <choose>
+              <when test="planId != null">
+                  AND s.plan_id = #{planId}
+              </when>
+              <otherwise>
+                  AND s.plan_id IS NULL
+              </otherwise>
+          </choose>
     </select>
 
 </mapper>

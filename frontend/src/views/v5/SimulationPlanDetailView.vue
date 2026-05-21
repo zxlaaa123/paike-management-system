@@ -241,15 +241,19 @@ async function applyPlan() {
     return
   }
   acting.value = true
+  let confirmedBeforeApply = false
   try {
     if (detail.value?.plan.status === 'SIMULATION') {
       detail.value = await confirmSimulation(taskId.value, planId.value)
+      confirmedBeforeApply = true
     }
     await applySimulation(taskId.value, planId.value)
     ElMessage.success('试算方案已应用')
     await fetchData()
   } catch (error: unknown) {
-    ElMessage.error(extractMessage(error, '应用失败'))
+    const fallback = confirmedBeforeApply ? '方案已确认但应用失败，请刷新后重试' : '应用失败'
+    ElMessage.error(extractMessage(error, fallback))
+    await fetchData()
     await refreshConsistencyLatest()
   } finally {
     acting.value = false

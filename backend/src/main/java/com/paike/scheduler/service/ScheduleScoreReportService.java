@@ -67,7 +67,7 @@ public class ScheduleScoreReportService {
     /**
      * 生成一次完整评分，并把结果持久化，供列表和详情页直接查询。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ScoreResult generate() {
         List<Schedule> schedules = scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getDeleted, 0));

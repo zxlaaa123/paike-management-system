@@ -67,6 +67,9 @@ public class ScheduleScoreService {
         return details;
     }
 
+    /**
+     * Recomputes score details and persists the summary fields back to the given plan.
+     */
     @Transactional(rollbackFor = Exception.class)
     public void rescore(SchedulePlan plan) {
         scoreDetailMapper.delete(

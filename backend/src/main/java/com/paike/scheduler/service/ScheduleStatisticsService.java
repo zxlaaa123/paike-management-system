@@ -37,13 +37,14 @@ public class ScheduleStatisticsService {
         Map<Long, Teacher> teacherCache = new HashMap<>();
         Map<Long, Course> courseCache = new HashMap<>();
         Map<Long, ClassInfo> classCache = new HashMap<>();
+        Map<Long, TimeSlot> timeSlotCache = loadTimeSlotMap(rawItems);
 
         for (Object obj : rawItems) {
             Long teacherId = getTeacherId(obj);
             Long courseId = getCourseId(obj);
             Long classId = getClassId(obj);
             int periods = getPeriodCount(obj);
-            int weekday = getWeekday(obj);
+            int weekday = getWeekday(obj, timeSlotCache);
             if (weekday <= 0 || weekday > 7) continue;
 
             teacherMap.computeIfAbsent(teacherId, k -> {
@@ -157,10 +158,11 @@ public class ScheduleStatisticsService {
 
         Map<Long, Map<String, Object>> classMap = new LinkedHashMap<>();
         Map<Long, ClassInfo> classCache = new HashMap<>();
+        Map<Long, TimeSlot> timeSlotCache = loadTimeSlotMap(rawItems);
 
         for (Object obj : rawItems) {
             Long classId = getClassId(obj);
-            int weekday = getWeekday(obj);
+            int weekday = getWeekday(obj, timeSlotCache);
             int periods = getPeriodCount(obj);
             if (weekday <= 0 || weekday > 7) continue;
 
@@ -345,13 +347,26 @@ public class ScheduleStatisticsService {
         return null;
     }
 
-    private int getWeekday(Object obj) {
+    private Map<Long, TimeSlot> loadTimeSlotMap(List<?> rawItems) {
+        List<Long> timeSlotIds = rawItems.stream()
+                .filter(Schedule.class::isInstance)
+                .map(item -> ((Schedule) item).getTimeSlotId())
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (timeSlotIds.isEmpty()) {
+            return Map.of();
+        }
+        return timeSlotMapper.selectBatchIds(timeSlotIds).stream()
+                .collect(Collectors.toMap(TimeSlot::getId, Function.identity(), (a, b) -> a));
+    }
+
+    private int getWeekday(Object obj, Map<Long, TimeSlot> timeSlotMap) {
         if (obj instanceof SchedulePlanItem) return ((SchedulePlanItem) obj).getWeekday();
         if (obj instanceof Schedule) {
-            // Schedule 需要通过 timeSlotId 查 weekday
             Long timeSlotId = ((Schedule) obj).getTimeSlotId();
             if (timeSlotId != null) {
-                TimeSlot slot = timeSlotMapper.selectById(timeSlotId);
+                TimeSlot slot = timeSlotMap.get(timeSlotId);
                 return slot != null ? slot.getDayOfWeek() : 0;
             }
         }

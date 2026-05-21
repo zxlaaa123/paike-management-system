@@ -75,9 +75,21 @@ function weekdayText(weekday: number) {
 
 function jumpToRepairFlow() {
   if (!selected.value || !result.value) return
-  router.push(
-    `/v5/repair-tasks?planId=${result.value.planId}&planItemId=${result.value.planItemId}&weekday=${selected.value.weekday}&start=${selected.value.startPeriod}&end=${selected.value.endPeriod}&roomId=${selected.value.classroomId}`,
-  )
+  const params = {
+    planId: result.value.planId,
+    planItemId: result.value.planItemId,
+    weekday: selected.value.weekday,
+    start: selected.value.startPeriod,
+    end: selected.value.endPeriod,
+    roomId: selected.value.classroomId,
+  }
+  if (Object.values(params).some((value) => value == null)) {
+    ElMessage.error('候选位置数据不完整')
+    return
+  }
+  router.push(`/v5/repair-tasks?${new URLSearchParams(
+    Object.fromEntries(Object.entries(params).map(([key, value]) => [key, String(value)])),
+  ).toString()}`)
 }
 
 onMounted(loadData)

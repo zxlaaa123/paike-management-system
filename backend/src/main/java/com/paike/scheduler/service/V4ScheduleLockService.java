@@ -35,7 +35,7 @@ public class V4ScheduleLockService {
     private final ClassroomMapper classroomMapper;
     private final TimeSlotMapper timeSlotMapper;
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ScheduleLockActionVo lock(ScheduleLockRequest request) {
         String targetType = normalizeTargetType(request.getTargetType());
         ResolvedTarget target = resolveTarget(request, targetType);
@@ -69,7 +69,7 @@ public class V4ScheduleLockService {
         return result;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ScheduleLockActionVo unlock(ScheduleLockRequest request) {
         String targetType = normalizeTargetType(request.getTargetType());
         ResolvedTarget target = resolveTarget(request, targetType);

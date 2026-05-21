@@ -306,15 +306,25 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
 
     private void ensureIndex(String tableName, String indexName, String createSql) {
         try {
+            validateSqlIdentifier(tableName);
+            validateSqlIdentifier(indexName);
             Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.STATISTICS " +
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + tableName + "' AND INDEX_NAME = '" + indexName + "'",
-                Integer.class);
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?",
+                Integer.class,
+                tableName,
+                indexName);
             if (count != null && count == 0) {
                 jdbcTemplate.execute(createSql);
             }
         } catch (Exception e) {
             log.warn("Failed to ensure index {} on {}: {}", indexName, tableName, e.getMessage());
+        }
+    }
+
+    private void validateSqlIdentifier(String value) {
+        if (value == null || !value.matches("[A-Za-z0-9_]+")) {
+            throw new IllegalArgumentException("Invalid SQL identifier: " + value);
         }
     }
 }

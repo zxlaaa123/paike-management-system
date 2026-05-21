@@ -150,7 +150,8 @@ CREATE TABLE IF NOT EXISTS teacher_unavailable_time (
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删 1已删',
-    UNIQUE KEY uk_teacher_timeslot (teacher_id, time_slot_id, deleted)
+    active_key BIGINT GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN 0 ELSE id END) STORED,
+    UNIQUE KEY uk_teacher_timeslot (teacher_id, time_slot_id, active_key)
 ) COMMENT='教师禁排时间表';
 
 -- -----------------------------------
@@ -385,6 +386,7 @@ CREATE TABLE IF NOT EXISTS schedule_plan_item (
     source_type VARCHAR(20) NOT NULL DEFAULT 'AUTO' COMMENT '来源：AUTO自动、MANUAL手动',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uk_plan_task_slot (plan_id, teaching_task_id, weekday, start_period, end_period),
     INDEX idx_plan_item_plan (plan_id),
     INDEX idx_plan_item_semester (semester_id),
     INDEX idx_plan_item_teacher_time (teacher_id, weekday, start_period, end_period),
@@ -623,4 +625,3 @@ UPDATE schedule s
 SET s.semester_id = (SELECT id FROM semester WHERE is_current = 1 LIMIT 1)
 WHERE s.semester_id IS NULL
   AND EXISTS (SELECT 1 FROM semester WHERE is_current = 1 LIMIT 1);
-

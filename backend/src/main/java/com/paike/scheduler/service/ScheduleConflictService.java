@@ -107,7 +107,9 @@ public class ScheduleConflictService {
         // 只查询同一时间段的排课记录,避免全表扫描
         LambdaQueryWrapper<Schedule> baseWrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getDeleted, 0)
-                .eq(Schedule::getTimeSlotId, timeSlotId);
+                .eq(Schedule::getTimeSlotId, timeSlotId)
+                .eq(task.getSemesterId() != null, Schedule::getSemesterId, task.getSemesterId())
+                .isNull(Schedule::getPlanId);
         if (excludeScheduleId != null) {
             baseWrapper.ne(Schedule::getId, excludeScheduleId);
         }
@@ -153,7 +155,9 @@ public class ScheduleConflictService {
         // 统计该任务已排的大节数
         LambdaQueryWrapper<Schedule> taskWrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getTeachingTaskId, taskId)
-                .eq(Schedule::getDeleted, 0);
+                .eq(Schedule::getDeleted, 0)
+                .eq(task.getSemesterId() != null, Schedule::getSemesterId, task.getSemesterId())
+                .isNull(Schedule::getPlanId);
         if (excludeScheduleId != null) {
             taskWrapper.ne(Schedule::getId, excludeScheduleId);
         }
@@ -178,7 +182,7 @@ public class ScheduleConflictService {
 
         // 批量统计每日冲突计数,一次查询替代之前的三次 selectCount
         Map<String, Long> dailyCounts = scheduleMapper.selectDailyConflictCounts(
-                teacherId, classId, task.getCourseId(), daySlotIds);
+                teacherId, classId, task.getCourseId(), daySlotIds, task.getSemesterId(), null);
         long teacherDailyCount = dailyCounts.getOrDefault("teacherDaily", 0L);
         long classDailyCount = dailyCounts.getOrDefault("classDaily", 0L);
         long sameCourseCount = dailyCounts.getOrDefault("sameCourse", 0L);

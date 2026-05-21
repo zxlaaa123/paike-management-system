@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS teacher_unavailable_time (
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删 1已删',
-    UNIQUE KEY uk_teacher_timeslot (teacher_id, time_slot_id, deleted)
+    active_key BIGINT GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN 0 ELSE id END) STORED,
+    UNIQUE KEY uk_teacher_timeslot (teacher_id, time_slot_id, active_key)
 ) COMMENT='教师禁排时间表';
 
 -- -----------------------------------

@@ -11,6 +11,8 @@ import com.paike.scheduler.service.ScheduleCompareService;
 import com.paike.scheduler.service.SchedulePlanExplainService;
 import com.paike.scheduler.service.SchedulePlanService;
 import com.paike.scheduler.service.SemesterService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -73,17 +75,12 @@ public class SchedulePlanController {
      * 方案对比
      */
     @PostMapping("/compare")
-    public Result<Map<String, Object>> compare(@RequestBody Map<String, Object> request) {
-        Long semesterId = request.get("semesterId") != null ? ((Number) request.get("semesterId")).longValue() : null;
-        @SuppressWarnings("unchecked")
-        List<Long> planIds = request.get("planIds") != null
-                ? ((List<Object>) request.get("planIds")).stream().map(o -> ((Number) o).longValue()).toList()
-                : null;
-
-        if (semesterId == null) {
-            semesterId = semesterService.getCurrentSemester().getId();
+    public Result<Map<String, Object>> compare(@Valid @RequestBody CompareRequest request) {
+        Long resolvedSemesterId = request.getSemesterId();
+        if (resolvedSemesterId == null) {
+            resolvedSemesterId = semesterService.getCurrentSemester().getId();
         }
-        return Result.success(compareService.compare(semesterId, planIds));
+        return Result.success(compareService.compare(resolvedSemesterId, request.getPlanIds()));
     }
 
     /**
@@ -125,5 +122,13 @@ public class SchedulePlanController {
     @GetMapping("/{planId}/unassigned-summary")
     public Result<List<Map<String, Object>>> getUnassignedSummary(@PathVariable Long planId) {
         return Result.success(explainService.summarizeUnassignedTasks(planId));
+    }
+
+    @lombok.Data
+    public static class CompareRequest {
+        private Long semesterId;
+
+        @NotEmpty(message = "方案ID不能为空")
+        private List<Long> planIds;
     }
 }

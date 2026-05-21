@@ -5,7 +5,6 @@ import com.paike.scheduler.auth.dto.LoginRequest;
 import com.paike.scheduler.auth.vo.LoginResponse;
 import com.paike.scheduler.auth.vo.UserInfoVo;
 import com.paike.scheduler.common.response.Result;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -72,17 +71,23 @@ public class AuthController {
 
     @PostMapping("/logout")
     public Result<Map<String, Object>> logout(HttpServletResponse response) {
-        // 清除认证 Cookie
-        Cookie clearJwt = new Cookie("paike_token", "");
-        clearJwt.setHttpOnly(true);
-        clearJwt.setPath("/api");
-        clearJwt.setMaxAge(0);
-        response.addCookie(clearJwt);
+        ResponseCookie clearJwt = ResponseCookie.from("paike_token", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .path("/api")
+                .maxAge(0)
+                .sameSite("Strict")
+                .build();
+        response.addHeader("Set-Cookie", clearJwt.toString());
 
-        Cookie clearCsrf = new Cookie("XSRF-TOKEN", "");
-        clearCsrf.setPath("/");
-        clearCsrf.setMaxAge(0);
-        response.addCookie(clearCsrf);
+        ResponseCookie clearCsrf = ResponseCookie.from("XSRF-TOKEN", "")
+                .httpOnly(false)
+                .secure(cookieSecure)
+                .path("/")
+                .maxAge(0)
+                .sameSite("Strict")
+                .build();
+        response.addHeader("Set-Cookie", clearCsrf.toString());
 
         return Result.success(Map.of("success", true));
     }

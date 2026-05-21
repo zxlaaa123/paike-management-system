@@ -23,6 +23,7 @@ public class RateLimiterService {
      */
     public boolean isRateLimited(String key, int maxAttempts, long windowMs) {
         long now = System.currentTimeMillis();
+        cleanupExpiredKeys(now, windowMs);
         Deque<Long> timestamps = attempts.computeIfAbsent(key, k -> new ConcurrentLinkedDeque<>());
         synchronized (timestamps) {
             while (!timestamps.isEmpty() && now - timestamps.peekFirst() > windowMs) {
@@ -34,5 +35,18 @@ public class RateLimiterService {
             timestamps.offerLast(now);
             return false;
         }
+    }
+
+    private void cleanupExpiredKeys(long now, long windowMs) {
+        attempts.forEach((attemptKey, timestamps) -> {
+            synchronized (timestamps) {
+                while (!timestamps.isEmpty() && now - timestamps.peekFirst() > windowMs) {
+                    timestamps.pollFirst();
+                }
+                if (timestamps.isEmpty()) {
+                    attempts.remove(attemptKey, timestamps);
+                }
+            }
+        });
     }
 }

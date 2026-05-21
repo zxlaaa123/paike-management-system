@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS schedule_plan_item (
     source_type VARCHAR(20) NOT NULL DEFAULT 'AUTO' COMMENT '来源：AUTO自动、MANUAL手动',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uk_plan_task_slot (plan_id, teaching_task_id, weekday, start_period, end_period),
     INDEX idx_plan_item_plan (plan_id),
     INDEX idx_plan_item_semester (semester_id),
     INDEX idx_plan_item_teacher_time (teacher_id, weekday, start_period, end_period),

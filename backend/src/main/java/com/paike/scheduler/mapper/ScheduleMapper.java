@@ -32,6 +32,8 @@ public interface ScheduleMapper extends BaseMapper<Schedule> {
         @Param("teacherId") Long teacherId,
         @Param("classId") Long classId,
         @Param("courseId") Long courseId,
-        @Param("daySlotIds") List<Long> daySlotIds
+        @Param("daySlotIds") List<Long> daySlotIds,
+        @Param("semesterId") Long semesterId,
+        @Param("planId") Long planId
     );
 }

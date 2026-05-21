@@ -32,7 +32,7 @@ public class ScheduleConflictReportController {
     }
 
     @DeleteMapping
-    public Result<Void> clear(@RequestParam(required = false) String reportNo) {
+    public Result<Void> clear(@RequestParam String reportNo) {
         scheduleConflictReportService.clear(reportNo);
         return Result.success("清空成功", null);
     }

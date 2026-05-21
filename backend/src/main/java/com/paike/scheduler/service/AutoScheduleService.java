@@ -105,8 +105,17 @@ public class AutoScheduleService {
                 .map(ut -> ut.getTeacherId() + "_" + ut.getTimeSlotId())
                 .collect(Collectors.toSet());
 
+        Map<Long, Course> courseMap = courseMapper.selectList(new LambdaQueryWrapper<Course>()
+                        .eq(Course::getDeleted, 0))
+                .stream()
+                .collect(Collectors.toMap(Course::getId, c -> c, (a, b) -> a));
+        Map<Long, ClassInfo> classMap = classInfoMapper.selectList(new LambdaQueryWrapper<ClassInfo>()
+                        .eq(ClassInfo::getDeleted, 0))
+                .stream()
+                .collect(Collectors.toMap(ClassInfo::getId, c -> c, (a, b) -> a));
+
         // 8. 对教学任务排序（难排优先）
-        targetTasks = sortTasks(targetTasks, unavailableTimes);
+        targetTasks = sortTasks(targetTasks, unavailableTimes, courseMap, classMap);
 
         // 9. 遍历排课
         int generatedCount = 0;
@@ -126,8 +135,22 @@ public class AutoScheduleService {
             }
 
             // 预过滤：符合课程类型+容量+停用的教室
-            String courseType = getCourseType(task.getCourseId());
-            int studentCount = getClassStudentCount(task.getClassId());
+            Course course = courseMap.get(task.getCourseId());
+            if (course == null) {
+                unscheduledTaskService.addUnscheduledTask(batch.getId(), task.getId(), requiredSlots,
+                        scheduledSlots, remainingSlots, "COURSE_NOT_FOUND", "关联课程不存在或已删除");
+                failedTaskCount++;
+                continue;
+            }
+            ClassInfo classInfo = classMap.get(task.getClassId());
+            if (classInfo == null) {
+                unscheduledTaskService.addUnscheduledTask(batch.getId(), task.getId(), requiredSlots,
+                        scheduledSlots, remainingSlots, "CLASS_NOT_FOUND", "关联班级不存在或已删除");
+                failedTaskCount++;
+                continue;
+            }
+            String courseType = course.getCourseType();
+            int studentCount = classInfo.getStudentCount();
             List<Classroom> matchedRooms = classrooms.stream()
                     .filter(r -> r.getCapacity() >= studentCount)
                     .filter(r -> isRoomTypeMatched(courseType, r.getRoomType()))
@@ -251,21 +274,26 @@ public class AutoScheduleService {
      * 难排任务优先。
      * 先排对资源要求高、班级人数多、周课时多、教师禁排更多的任务，能减少后续无解概率。
      */
-    private List<TeachingTask> sortTasks(List<TeachingTask> tasks, List<TeacherUnavailableTime> unavailableTimes) {
+    private List<TeachingTask> sortTasks(
+            List<TeachingTask> tasks,
+            List<TeacherUnavailableTime> unavailableTimes,
+            Map<Long, Course> courseMap,
+            Map<Long, ClassInfo> classMap
+    ) {
         Map<Long, Long> unavailableCount = unavailableTimes.stream()
                 .collect(Collectors.groupingBy(TeacherUnavailableTime::getTeacherId, Collectors.counting()));
 
         return tasks.stream().sorted((a, b) -> {
             // 1. 实验课、机房课优先
-            String typeA = getCourseType(a.getCourseId());
-            String typeB = getCourseType(b.getCourseId());
+            String typeA = getCourseType(a.getCourseId(), courseMap);
+            String typeB = getCourseType(b.getCourseId(), courseMap);
             int priorityA = (CourseType.EXPERIMENT.getCode().equals(typeA) || CourseType.COMPUTER.getCode().equals(typeA)) ? 0 : 1;
             int priorityB = (CourseType.EXPERIMENT.getCode().equals(typeB) || CourseType.COMPUTER.getCode().equals(typeB)) ? 0 : 1;
             if (priorityA != priorityB) return priorityA - priorityB;
 
             // 2. 班级人数多的优先
-            int countA = getClassStudentCount(a.getClassId());
-            int countB = getClassStudentCount(b.getClassId());
+            int countA = getClassStudentCount(a.getClassId(), classMap);
+            int countB = getClassStudentCount(b.getClassId(), classMap);
             if (countB != countA) return countB - countA;
 
             // 3. 每周课时多的优先（Integer 比较走 intValue，避免对象引用比较 + null 拆箱）
@@ -385,13 +413,13 @@ public class AutoScheduleService {
         scheduleMapper.insert(schedule);
     }
 
-    private String getCourseType(Long courseId) {
-        Course course = courseMapper.selectById(courseId);
+    private String getCourseType(Long courseId, Map<Long, Course> courseMap) {
+        Course course = courseMap.get(courseId);
         return course != null ? course.getCourseType() : CourseType.NORMAL.getCode();
     }
 
-    private int getClassStudentCount(Long classId) {
-        ClassInfo classInfo = classInfoMapper.selectById(classId);
+    private int getClassStudentCount(Long classId, Map<Long, ClassInfo> classMap) {
+        ClassInfo classInfo = classMap.get(classId);
         return classInfo != null ? classInfo.getStudentCount() : 0;
     }
 
