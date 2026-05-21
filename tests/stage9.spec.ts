@@ -9,6 +9,18 @@ let ids: {
   task?: number; schedule?: number
 } = {}
 
+async function loginAndGoTo(page: any, path: string) {
+  if (!authToken) {
+    throw new Error('authToken 未初始化，请先执行登录用例')
+  }
+  await page.addInitScript(
+    ([key, token]) => window.localStorage.setItem(key, token),
+    ['paike_admin_token', authToken],
+  )
+  await page.goto(`${BASE_URL}${path}`)
+  await page.waitForTimeout(1000)
+}
+
 test.describe.serial('阶段 9：课表查询', () => {
   const ts = Date.now().toString().slice(-6)
   const T_NO = `T${ts}`
@@ -89,11 +101,7 @@ test.describe.serial('阶段 9：课表查询', () => {
   })
 
   test('6. 班级课表页面', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`)
-    await page.fill('input[placeholder="请输入用户名"]', 'admin')
-    await page.fill('input[placeholder="请输入密码"]', '123456')
-    await page.click('button:has-text("登录")')
-    await page.waitForURL('**/dashboard', { timeout: 15000 })
+    await loginAndGoTo(page, '/dashboard')
 
     // 展开课表查询子菜单
     await page.locator('.el-sub-menu__title').filter({ hasText: '课表查询' }).click()
@@ -118,11 +126,7 @@ test.describe.serial('阶段 9：课表查询', () => {
   })
 
   test('7. 教师课表页面', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`)
-    await page.fill('input[placeholder="请输入用户名"]', 'admin')
-    await page.fill('input[placeholder="请输入密码"]', '123456')
-    await page.click('button:has-text("登录")')
-    await page.waitForURL('**/dashboard', { timeout: 15000 })
+    await loginAndGoTo(page, '/dashboard')
 
     await page.locator('.el-sub-menu__title').filter({ hasText: '课表查询' }).click()
     await page.waitForTimeout(500)
@@ -146,11 +150,7 @@ test.describe.serial('阶段 9：课表查询', () => {
   })
 
   test('8. 教室课表页面', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`)
-    await page.fill('input[placeholder="请输入用户名"]', 'admin')
-    await page.fill('input[placeholder="请输入密码"]', '123456')
-    await page.click('button:has-text("登录")')
-    await page.waitForURL('**/dashboard', { timeout: 15000 })
+    await loginAndGoTo(page, '/dashboard')
 
     await page.locator('.el-sub-menu__title').filter({ hasText: '课表查询' }).click()
     await page.waitForTimeout(500)
