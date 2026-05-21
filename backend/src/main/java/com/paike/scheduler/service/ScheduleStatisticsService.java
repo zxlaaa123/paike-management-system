@@ -362,12 +362,17 @@ public class ScheduleStatisticsService {
     }
 
     private int getWeekday(Object obj, Map<Long, TimeSlot> timeSlotMap) {
-        if (obj instanceof SchedulePlanItem) return ((SchedulePlanItem) obj).getWeekday();
+        if (obj instanceof SchedulePlanItem) {
+            Integer weekday = ((SchedulePlanItem) obj).getWeekday();
+            return weekday != null ? weekday : 0;
+        }
         if (obj instanceof Schedule) {
             Long timeSlotId = ((Schedule) obj).getTimeSlotId();
             if (timeSlotId != null) {
                 TimeSlot slot = timeSlotMap.get(timeSlotId);
-                return slot != null ? slot.getDayOfWeek() : 0;
+                if (slot != null && slot.getDayOfWeek() != null) {
+                    return slot.getDayOfWeek();
+                }
             }
         }
         return 0;

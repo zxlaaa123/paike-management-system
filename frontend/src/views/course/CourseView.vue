@@ -9,6 +9,7 @@ import {
   type Course,
   type CourseForm,
 } from '../../api/course'
+import { extractMessage } from '../../utils/errors'
 
 const loading = ref(false)
 const tableData = ref<Course[]>([])
@@ -127,10 +128,18 @@ async function handleSubmit() {
 }
 
 async function handleDelete(row: Course) {
-  await ElMessageBox.confirm(`确定删除课程「${row.courseName}」吗？`, '提示', { type: 'warning' })
-  await deleteCourse(row.id)
-  ElMessage.success('删除成功')
-  fetchData()
+  try {
+    await ElMessageBox.confirm(`确定删除课程「${row.courseName}」吗？`, '提示', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await deleteCourse(row.id)
+    ElMessage.success('删除成功')
+    await fetchData()
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '删除失败'))
+  }
 }
 
 onMounted(fetchData)

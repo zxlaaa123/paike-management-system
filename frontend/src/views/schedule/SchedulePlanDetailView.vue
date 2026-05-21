@@ -75,8 +75,8 @@ async function fetchData() {
     ])
     plan.value = planData
     items.value = itemsData
-  } catch (e) {
-    console.error(e)
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '加载方案详情失败'))
   } finally {
     loading.value = false
   }
@@ -90,8 +90,8 @@ async function fetchScoreData() {
     ])
     scoreDetails.value = details
     scoreSummary.value = summary
-  } catch (e) {
-    console.error(e)
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '加载评分数据失败'))
   }
 }
 
@@ -103,8 +103,8 @@ async function loadLogs() {
   logLoading.value = true
   try {
     generateLogs.value = await getSchedulePlanLogs(planId.value)
-  } catch (e) {
-    console.error(e)
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '加载排课日志失败'))
   } finally {
     logLoading.value = false
   }
@@ -119,8 +119,8 @@ async function loadUnassigned() {
     ])
     unassignedTasks.value = tasks
     unassignedSummary.value = summary
-  } catch (e) {
-    console.error(e)
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '加载未排任务失败'))
   } finally {
     unassignedLoading.value = false
   }
@@ -138,8 +138,8 @@ async function loadAdjustLogs() {
     adjustLogTotal.value = page.total || 0
     adjustLogPageNum.value = page.current || 1
     adjustLogPageSize.value = page.size || 10
-  } catch (e) {
-    console.error(e)
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '加载调整日志失败'))
   } finally {
     adjustLogLoading.value = false
   }
@@ -152,8 +152,8 @@ async function handleRescore() {
     ElMessage.success(`重新评分完成，总分：${result.totalScore}，冲突：${result.conflictCount}`)
     await fetchScoreData()
     await fetchData()
-  } catch (e) {
-    console.error(e)
+  } catch (e: unknown) {
+    ElMessage.error(extractMessage(e, '重新评分失败'))
   } finally {
     scoring.value = false
   }
@@ -229,9 +229,9 @@ async function openTaskLogs(item: SchedulePlanItem) {
   taskLogDialogVisible.value = true
   try {
     currentTaskLogs.value = await getSchedulePlanTaskLogs(planId.value, item.teachingTaskId)
-  } catch (e) {
-    console.error(e)
+  } catch (e: unknown) {
     currentTaskLogs.value = []
+    ElMessage.error(extractMessage(e, '加载任务日志失败'))
   } finally {
     taskLogLoading.value = false
   }
