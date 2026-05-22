@@ -339,6 +339,12 @@ public class V5SimulationService {
             planMapper.updateById(plan);
         }
         Map<String, Object> result = schedulePlanService.applySimulationPlan(planId);
+        plan = planMapper.selectById(planId);
+        if (plan != null && !"APPLIED".equals(plan.getStatus())) {
+            plan.setStatus("APPLIED");
+            plan.setUpdatedAt(LocalDateTime.now());
+            planMapper.updateById(plan);
+        }
         task.setStatus(V5RepairTaskStatus.APPLIED.getCode());
         task.setResultPlanId(planId);
         task.setFinishedAt(LocalDateTime.now());
@@ -352,6 +358,9 @@ public class V5SimulationService {
         SchedulePlan plan = requireSimulationPlan(task, planId);
         if ("APPLIED".equals(plan.getStatus())) {
             throw new BusinessException("已应用试算方案不能放弃");
+        }
+        if ("DISCARDED".equals(plan.getStatus())) {
+            throw new BusinessException("试算方案已放弃，不能重复操作");
         }
         plan.setStatus("DISCARDED");
         plan.setUpdatedAt(LocalDateTime.now());
@@ -530,9 +539,17 @@ public class V5SimulationService {
     }
 
     private void copyLocks(List<ScheduleLockedItem> locks, Map<Long, Long> copiedItemIds, Long newPlanId) {
+        Set<Long> copiedTargets = new LinkedHashSet<>();
         for (ScheduleLockedItem source : locks) {
             Long newItemId = copiedItemIds.get(source.getPlanItemId());
             if (newItemId == null) continue;
+            if (!copiedTargets.add(newItemId)) continue;
+            Long existing = lockedItemMapper.selectCount(new LambdaQueryWrapper<ScheduleLockedItem>()
+                    .eq(ScheduleLockedItem::getTargetType, "PLAN")
+                    .eq(ScheduleLockedItem::getPlanId, newPlanId)
+                    .eq(ScheduleLockedItem::getPlanItemId, newItemId)
+                    .eq(ScheduleLockedItem::getActiveFlag, 1));
+            if (existing != null && existing > 0) continue;
             ScheduleLockedItem target = new ScheduleLockedItem();
             target.setTargetType("PLAN");
             target.setPlanId(newPlanId);

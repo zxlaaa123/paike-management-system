@@ -14,6 +14,7 @@ import com.paike.scheduler.service.vo.ScheduleAdjustmentIssueVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
@@ -46,6 +48,8 @@ public class V4ScheduleAdjustmentService {
     private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
     private final TeacherUnavailableTimeService unavailableTimeService;
+    private final TransactionTemplate transactionTemplate;
+    private final Object adjustmentMutationMutex = new Object();
 
     public ScheduleAdjustmentCheckVo checkAdjustment(V4ScheduleAdjustmentRequest request) {
         AdjustmentContext context = resolveContext(request);
@@ -92,6 +96,10 @@ public class V4ScheduleAdjustmentService {
 
     @Transactional(rollbackFor = Exception.class)
     public ScheduleAdjustmentApplyVo applyAdjustment(V4ScheduleAdjustmentRequest request) {
+        return runAdjustmentMutation(() -> applyAdjustmentInternal(request));
+    }
+
+    private ScheduleAdjustmentApplyVo applyAdjustmentInternal(V4ScheduleAdjustmentRequest request) {
         if (request.getAdjustReason() == null || request.getAdjustReason().trim().isEmpty()) {
             throw new BusinessException("调整原因不能为空");
         }
@@ -135,6 +143,12 @@ public class V4ScheduleAdjustmentService {
                 ? "已强制保存正式课表调整，并记录调整日志"
                 : "正式课表调整成功");
         return result;
+    }
+
+    private <T> T runAdjustmentMutation(Supplier<T> action) {
+        synchronized (adjustmentMutationMutex) {
+            return Objects.requireNonNull(transactionTemplate.execute(status -> action.get()));
+        }
     }
 
     private void applyToSchedule(AdjustmentContext context, V4ScheduleAdjustmentRequest request, ScheduleAdjustmentCheckVo checkResult) {
