@@ -1,6 +1,7 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
@@ -16,7 +17,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,10 +37,9 @@ public class V4ScheduleLockService {
     private final ClassroomMapper classroomMapper;
     private final TimeSlotMapper timeSlotMapper;
     private final TransactionTemplate transactionTemplate;
-    private final Object lockMutationMutex = new Object();
 
     public ScheduleLockActionVo lock(ScheduleLockRequest request) {
-        return runLockMutation(() -> lockInternal(request));
+        return Objects.requireNonNull(transactionTemplate.execute(status -> lockInternal(request)));
     }
 
     private ScheduleLockActionVo lockInternal(ScheduleLockRequest request) {
@@ -81,7 +80,7 @@ public class V4ScheduleLockService {
     }
 
     public ScheduleLockActionVo unlock(ScheduleLockRequest request) {
-        return runLockMutation(() -> unlockInternal(request));
+        return Objects.requireNonNull(transactionTemplate.execute(status -> unlockInternal(request)));
     }
 
     private ScheduleLockActionVo unlockInternal(ScheduleLockRequest request) {
@@ -92,9 +91,15 @@ public class V4ScheduleLockService {
             throw new BusinessException("该课程当前未锁定");
         }
 
-        existing.setActiveFlag(0);
-        existing.setUnlockedAt(LocalDateTime.now());
-        scheduleLockedItemMapper.updateById(existing);
+        LambdaUpdateWrapper<ScheduleLockedItem> updateWrapper = new LambdaUpdateWrapper<ScheduleLockedItem>()
+                .eq(ScheduleLockedItem::getId, existing.getId())
+                .eq(ScheduleLockedItem::getActiveFlag, 1)
+                .set(ScheduleLockedItem::getActiveFlag, 0)
+                .set(ScheduleLockedItem::getUnlockedAt, LocalDateTime.now());
+        int rows = scheduleLockedItemMapper.update(null, updateWrapper);
+        if (rows == 0) {
+            throw new BusinessException("该课程当前未锁定");
+        }
 
         ScheduleLockActionVo result = new ScheduleLockActionVo();
         result.setLocked(false);
@@ -105,12 +110,6 @@ public class V4ScheduleLockService {
         result.setScheduleId(existing.getScheduleId());
         result.setMessage("课程已取消锁定");
         return result;
-    }
-
-    private <T> T runLockMutation(Supplier<T> action) {
-        synchronized (lockMutationMutex) {
-            return Objects.requireNonNull(transactionTemplate.execute(status -> action.get()));
-        }
     }
 
     public ScheduleLockListVo listPlanLocks(Long planId) {
