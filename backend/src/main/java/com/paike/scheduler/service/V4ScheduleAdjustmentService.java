@@ -19,7 +19,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -46,7 +45,7 @@ public class V4ScheduleAdjustmentService {
     private final CourseMapper courseMapper;
     private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
-    private final ScheduleLockedItemMapper scheduleLockedItemMapper;
+    private final ScheduleLockGuardService lockGuardService;
     private final TeacherUnavailableTimeService unavailableTimeService;
     private final TransactionTemplate transactionTemplate;
     private final Object adjustmentMutationMutex = new Object();
@@ -450,45 +449,6 @@ public class V4ScheduleAdjustmentService {
         return value == null ? fallback : String.valueOf(value);
     }
 
-    private void ensureTargetUnlocked(AdjustmentContext context) {
-        boolean locked = false;
-        if (TARGET_PLAN_ITEM.equals(context.targetType) && context.planItem != null) {
-            locked = hasPlanItemLock(context.planItem.getId());
-        } else if (TARGET_SCHEDULE.equals(context.targetType) && context.schedule != null) {
-            locked = hasScheduleLock(context.schedule.getId());
-            if (!locked && context.schedule.getPlanId() != null) {
-                SchedulePlanItem linkedItem = matchPlanItem(context);
-                locked = linkedItem != null && hasPlanItemLock(linkedItem.getId());
-            }
-        }
-
-        if (locked) {
-            throw new BusinessException("该课程已锁定，不能调整");
-        }
-    }
-
-    private boolean hasPlanItemLock(Long planItemId) {
-        if (planItemId == null) {
-            return false;
-        }
-        Long count = scheduleLockedItemMapper.selectCount(new LambdaQueryWrapper<ScheduleLockedItem>()
-                .eq(ScheduleLockedItem::getTargetType, "PLAN")
-                .eq(ScheduleLockedItem::getPlanItemId, planItemId)
-                .eq(ScheduleLockedItem::getActiveFlag, 1));
-        return count != null && count > 0;
-    }
-
-    private boolean hasScheduleLock(Long scheduleId) {
-        if (scheduleId == null) {
-            return false;
-        }
-        Long count = scheduleLockedItemMapper.selectCount(new LambdaQueryWrapper<ScheduleLockedItem>()
-                .eq(ScheduleLockedItem::getTargetType, "SCHEDULE")
-                .eq(ScheduleLockedItem::getScheduleId, scheduleId)
-                .eq(ScheduleLockedItem::getActiveFlag, 1));
-        return count != null && count > 0;
-    }
-
     private SchedulePlanItem matchPlanItem(AdjustmentContext context) {
         if (context.schedule == null || context.schedule.getPlanId() == null) {
             return null;
@@ -504,13 +464,23 @@ public class V4ScheduleAdjustmentService {
                     .filter(item -> Objects.equals(item.getWeekday(), context.currentWeekDay)
                             && Objects.equals(item.getStartPeriod(), context.currentStartPeriod)
                             && Objects.equals(item.getEndPeriod(), context.currentPeriodEnd))
-                    .sorted(Comparator.comparing(item -> Objects.equals(item.getClassroomId(), context.schedule.getClassroomId()) ? 0 : 1))
                     .toList();
             if (!exactMatches.isEmpty()) {
-                return exactMatches.get(0);
+                return exactMatches.stream()
+                        .filter(item -> Objects.equals(item.getClassroomId(), context.schedule.getClassroomId()))
+                        .findFirst()
+                        .orElse(exactMatches.get(0));
             }
         }
         return items.size() == 1 ? items.get(0) : null;
+    }
+
+    private void ensureTargetUnlocked(AdjustmentContext context) {
+        if (TARGET_PLAN_ITEM.equals(context.targetType) && context.planItem != null) {
+            lockGuardService.ensurePlanItemUnlocked(context.planItem.getId(), "该课程已锁定，不能调整");
+        } else if (TARGET_SCHEDULE.equals(context.targetType) && context.schedule != null) {
+            lockGuardService.ensureScheduleAndLinkedPlanUnlocked(context.schedule, "该课程已锁定，不能调整");
+        }
     }
 
     private static class AdjustmentContext {

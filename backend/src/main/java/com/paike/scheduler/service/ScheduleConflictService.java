@@ -108,8 +108,7 @@ public class ScheduleConflictService {
         LambdaQueryWrapper<Schedule> baseWrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getDeleted, 0)
                 .eq(Schedule::getTimeSlotId, timeSlotId)
-                .eq(task.getSemesterId() != null, Schedule::getSemesterId, task.getSemesterId())
-                .isNull(Schedule::getPlanId);
+                .eq(task.getSemesterId() != null, Schedule::getSemesterId, task.getSemesterId());
         if (excludeScheduleId != null) {
             baseWrapper.ne(Schedule::getId, excludeScheduleId);
         }
@@ -156,8 +155,7 @@ public class ScheduleConflictService {
         LambdaQueryWrapper<Schedule> taskWrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getTeachingTaskId, taskId)
                 .eq(Schedule::getDeleted, 0)
-                .eq(task.getSemesterId() != null, Schedule::getSemesterId, task.getSemesterId())
-                .isNull(Schedule::getPlanId);
+                .eq(task.getSemesterId() != null, Schedule::getSemesterId, task.getSemesterId());
         if (excludeScheduleId != null) {
             taskWrapper.ne(Schedule::getId, excludeScheduleId);
         }

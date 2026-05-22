@@ -28,13 +28,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SchedulePlanService {
 
-    private static final String LOCK_TARGET_PLAN = "PLAN";
-    private static final String LOCK_TARGET_SCHEDULE = "SCHEDULE";
-
     private final SchedulePlanMapper planMapper;
     private final SchedulePlanItemMapper planItemMapper;
     private final ScheduleMapper scheduleMapper;
     private final ScheduleLockedItemMapper scheduleLockedItemMapper;
+    private final ScheduleLockGuardService lockGuardService;
     private final CourseMapper courseMapper;
     private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
@@ -482,23 +480,11 @@ public class SchedulePlanService {
     }
 
     private void ensurePlanItemUnlocked(Long planItemId, String message) {
-        Long count = scheduleLockedItemMapper.selectCount(new LambdaQueryWrapper<ScheduleLockedItem>()
-                .eq(ScheduleLockedItem::getTargetType, LOCK_TARGET_PLAN)
-                .eq(ScheduleLockedItem::getPlanItemId, planItemId)
-                .eq(ScheduleLockedItem::getActiveFlag, 1));
-        if (count != null && count > 0) {
-            throw new BusinessException(message);
-        }
+        lockGuardService.ensurePlanItemUnlocked(planItemId, message);
     }
 
     private void ensureScheduleUnlocked(Long scheduleId, String message) {
-        Long count = scheduleLockedItemMapper.selectCount(new LambdaQueryWrapper<ScheduleLockedItem>()
-                .eq(ScheduleLockedItem::getTargetType, LOCK_TARGET_SCHEDULE)
-                .eq(ScheduleLockedItem::getScheduleId, scheduleId)
-                .eq(ScheduleLockedItem::getActiveFlag, 1));
-        if (count != null && count > 0) {
-            throw new BusinessException(message);
-        }
+        lockGuardService.ensureScheduleUnlocked(scheduleId, message);
     }
 
     private void ensurePlansUnlocked(List<SchedulePlan> plans, String message) {

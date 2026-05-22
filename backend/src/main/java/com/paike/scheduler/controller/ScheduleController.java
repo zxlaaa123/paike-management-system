@@ -9,6 +9,7 @@ import com.paike.scheduler.entity.*;
 import com.paike.scheduler.service.SemesterService;
 import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.ScheduleConflictService;
+import com.paike.scheduler.service.ScheduleLockGuardService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -37,6 +38,7 @@ public class ScheduleController {
     private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
     private final ScheduleConflictService conflictService;
+    private final ScheduleLockGuardService lockGuardService;
     private final AutoScheduleBatchMapper autoScheduleBatchMapper;
     private final SemesterService semesterService;
 
@@ -125,6 +127,7 @@ public class ScheduleController {
         if (schedule == null || schedule.getDeleted() == 1) {
             throw new BusinessException(404, "排课记录不存在");
         }
+        lockGuardService.ensureScheduleAndLinkedPlanUnlocked(schedule, "该课程已锁定，不能删除");
         scheduleMapper.deleteById(id);
         return Result.success("删除成功", null);
     }

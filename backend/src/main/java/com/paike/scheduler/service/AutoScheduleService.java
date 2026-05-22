@@ -46,17 +46,25 @@ public class AutoScheduleService {
     private final CourseMapper courseMapper;
     private final ClassInfoMapper classInfoMapper;
     private final SemesterService semesterService;
+    private final ScheduleLockGuardService lockGuardService;
 
     @Transactional(rollbackFor = Exception.class)
     public AutoScheduleResult run(AutoScheduleRequest request) {
         Long semesterId = resolveSemesterId(request);
         // 1. 清空旧排课（如需要）
         if (request.isClearAllSchedule()) {
+            ensureSchedulesUnlocked(new LambdaQueryWrapper<Schedule>()
+                    .eq(Schedule::getDeleted, 0)
+                    .eq(Schedule::getSemesterId, semesterId));
             scheduleMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Schedule>()
                     .eq(Schedule::getDeleted, 0)
                     .eq(Schedule::getSemesterId, semesterId));
             unscheduledTaskService.clearAll();
         } else if (request.isClearOldAutoSchedule()) {
+            ensureSchedulesUnlocked(new LambdaQueryWrapper<Schedule>()
+                    .eq(Schedule::getSourceType, ScheduleSourceType.AUTO.getCode())
+                    .eq(Schedule::getDeleted, 0)
+                    .eq(Schedule::getSemesterId, semesterId));
             scheduleMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Schedule>()
                     .eq(Schedule::getSourceType, ScheduleSourceType.AUTO.getCode())
                     .eq(Schedule::getDeleted, 0)
@@ -404,6 +412,13 @@ public class AutoScheduleService {
                         .eq(Schedule::getDeleted, 0)
                         .in(Schedule::getTimeSlotId, slotIds));
         return count > 0;
+    }
+
+    private void ensureSchedulesUnlocked(LambdaQueryWrapper<Schedule> wrapper) {
+        List<Schedule> schedules = scheduleMapper.selectList(wrapper);
+        for (Schedule schedule : schedules) {
+            lockGuardService.ensureScheduleAndLinkedPlanUnlocked(schedule, "存在已锁定课程，不能清空当前排课结果");
+        }
     }
 
     private void saveSchedule(TeachingTask task, TimeSlot slot, Classroom room, Long batchId) {
