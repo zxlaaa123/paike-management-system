@@ -111,7 +111,9 @@ public class ScheduleConflictReportService {
         }
         LambdaQueryWrapper<ScheduleConflictReport> wrapper = new LambdaQueryWrapper<>();
         String normalized = normalizeReportNo(reportNo.trim());
-        wrapper.apply("report_no LIKE {0} ESCAPE '\\\\'", escapeLikePattern(normalized) + "%");
+        wrapper.and(w -> w.eq(ScheduleConflictReport::getReportNo, normalized)
+                .or()
+                .apply("report_no REGEXP {0}", "^" + escapeRegex(normalized) + "-[0-9]+$"));
         conflictReportMapper.delete(wrapper);
     }
 
@@ -599,10 +601,21 @@ public class ScheduleConflictReportService {
         return reportNo;
     }
 
-    private String escapeLikePattern(String value) {
+    private String escapeRegex(String value) {
         return value.replace("\\", "\\\\")
-                .replace("%", "\\%")
-                .replace("_", "\\_");
+                .replace(".", "\\.")
+                .replace("^", "\\^")
+                .replace("$", "\\$")
+                .replace("|", "\\|")
+                .replace("?", "\\?")
+                .replace("*", "\\*")
+                .replace("+", "\\+")
+                .replace("(", "\\(")
+                .replace(")", "\\)")
+                .replace("[", "\\[")
+                .replace("]", "\\]")
+                .replace("{", "\\{")
+                .replace("}", "\\}");
     }
 
     private List<Long> parseScheduleIds(String relatedScheduleIds) {

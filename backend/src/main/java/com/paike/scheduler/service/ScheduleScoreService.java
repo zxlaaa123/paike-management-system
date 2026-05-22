@@ -184,9 +184,9 @@ public class ScheduleScoreService {
         int teacherConflictCount = countConflicts(teacherSlotMap);
         int classConflictCount = countConflicts(classSlotMap);
         int roomConflictCount = countConflicts(roomSlotMap);
-        int teacherUnavailableCount = items.stream().mapToInt(item -> item.getConflictReason() != null && item.getConflictReason().contains("禁排") ? 1 : 0).sum();
-        int capacityViolationCount = items.stream().mapToInt(item -> item.getConflictReason() != null && item.getConflictReason().contains("容量") ? 1 : 0).sum();
-        int roomTypeMismatchCount = items.stream().mapToInt(item -> item.getConflictReason() != null && item.getConflictReason().contains("类型") ? 1 : 0).sum();
+        int teacherUnavailableCount = countConflictReason(items, PlanConflictType.TEACHER_UNAVAILABLE);
+        int capacityViolationCount = countConflictReason(items, PlanConflictType.CLASSROOM_CAPACITY);
+        int roomTypeMismatchCount = countConflictReason(items, PlanConflictType.CLASSROOM_TYPE_MISMATCH);
 
         BigDecimal classBalancePenalty = variancePenalty(classDayCounts);
         BigDecimal teacherLoadPenalty = variancePenalty(teacherDayCounts);
@@ -331,6 +331,43 @@ public class ScheduleScoreService {
             totalScore = FULL_SCORE;
         }
         return totalScore.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private int countConflictReason(List<SchedulePlanItem> items, PlanConflictType targetType) {
+        return (int) items.stream()
+                .filter(item -> hasConflictReason(item, targetType))
+                .count();
+    }
+
+    private boolean hasConflictReason(SchedulePlanItem item, PlanConflictType targetType) {
+        if (item.getConflictReason() == null || item.getConflictReason().isBlank()) {
+            return false;
+        }
+        return Arrays.stream(item.getConflictReason().split("；"))
+                .map(String::trim)
+                .map(this::normalizeConflictReason)
+                .anyMatch(targetType::matches);
+    }
+
+    private String normalizeConflictReason(String reason) {
+        int detailIndex = reason.indexOf('：');
+        return detailIndex >= 0 ? reason.substring(0, detailIndex) : reason;
+    }
+
+    private enum PlanConflictType {
+        TEACHER_UNAVAILABLE("教师禁排时间冲突"),
+        CLASSROOM_CAPACITY("教室容量不足"),
+        CLASSROOM_TYPE_MISMATCH("教室类型不匹配");
+
+        private final String legacyLabel;
+
+        PlanConflictType(String legacyLabel) {
+            this.legacyLabel = legacyLabel;
+        }
+
+        private boolean matches(String reason) {
+            return name().equals(reason) || legacyLabel.equals(reason);
+        }
     }
 
     private record MetricResult(BigDecimal score, int violationCount, String message) {

@@ -95,7 +95,7 @@ export function useCrudForm<T extends { id: number }, F extends object>(options:
   function openAdd() {
     dialogTitle.value = `新增${options.entityName}`
     editingId.value = null
-    Object.assign(form, options.formDefaults)
+    Object.assign(form, structuredClone(options.formDefaults))
     dialogVisible.value = true
   }
 
