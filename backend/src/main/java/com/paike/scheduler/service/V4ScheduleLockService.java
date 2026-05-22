@@ -10,11 +10,12 @@ import com.paike.scheduler.service.vo.ScheduleLockItemVo;
 import com.paike.scheduler.service.vo.ScheduleLockListVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,9 +35,14 @@ public class V4ScheduleLockService {
     private final ClassInfoMapper classInfoMapper;
     private final ClassroomMapper classroomMapper;
     private final TimeSlotMapper timeSlotMapper;
+    private final TransactionTemplate transactionTemplate;
+    private final Object lockMutationMutex = new Object();
 
-    @Transactional(rollbackFor = Exception.class)
     public ScheduleLockActionVo lock(ScheduleLockRequest request) {
+        return runLockMutation(() -> lockInternal(request));
+    }
+
+    private ScheduleLockActionVo lockInternal(ScheduleLockRequest request) {
         String targetType = normalizeTargetType(request.getTargetType());
         ResolvedTarget target = resolveTarget(request, targetType);
         String lockReason = trimToNull(request.getLockReason());
@@ -69,8 +75,11 @@ public class V4ScheduleLockService {
         return result;
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public ScheduleLockActionVo unlock(ScheduleLockRequest request) {
+        return runLockMutation(() -> unlockInternal(request));
+    }
+
+    private ScheduleLockActionVo unlockInternal(ScheduleLockRequest request) {
         String targetType = normalizeTargetType(request.getTargetType());
         ResolvedTarget target = resolveTarget(request, targetType);
         ScheduleLockedItem existing = findActiveLock(targetType, target.planItemId, target.scheduleId);
@@ -91,6 +100,12 @@ public class V4ScheduleLockService {
         result.setScheduleId(existing.getScheduleId());
         result.setMessage("课程已取消锁定");
         return result;
+    }
+
+    private <T> T runLockMutation(Supplier<T> action) {
+        synchronized (lockMutationMutex) {
+            return Objects.requireNonNull(transactionTemplate.execute(status -> action.get()));
+        }
     }
 
     public ScheduleLockListVo listPlanLocks(Long planId) {

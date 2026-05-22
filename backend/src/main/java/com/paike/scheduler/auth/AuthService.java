@@ -45,19 +45,11 @@ public class AuthService {
         SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
             .eq(SysUser::getUsername, request.getUsername()));
 
-        // 常量时间认证：用户不存在时也跑一次 BCrypt，使两条路径耗时一致
-        boolean passwordOk;
-        if (user == null) {
-            passwordEncoder.matches(request.getPassword(), dummyHash);
-            passwordOk = false;
-        } else {
-            passwordOk = passwordEncoder.matches(request.getPassword(), user.getPassword());
-        }
-        if (!passwordOk) {
+        boolean activeUser = user != null && Integer.valueOf(1).equals(user.getStatus());
+        String passwordHash = activeUser ? user.getPassword() : dummyHash;
+        boolean passwordOk = passwordEncoder.matches(request.getPassword(), passwordHash);
+        if (!activeUser || !passwordOk) {
             throw new BusinessException(401, "用户名或密码错误");
-        }
-        if (!Integer.valueOf(1).equals(user.getStatus())) {
-            throw new BusinessException(403, "账号已停用，无法登录");
         }
 
         String token = jwtService.generateToken(user.getId(), user.getUsername());
