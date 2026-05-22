@@ -46,12 +46,14 @@ public class V4ScheduleAdjustmentService {
     private final CourseMapper courseMapper;
     private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
+    private final ScheduleLockedItemMapper scheduleLockedItemMapper;
     private final TeacherUnavailableTimeService unavailableTimeService;
     private final TransactionTemplate transactionTemplate;
     private final Object adjustmentMutationMutex = new Object();
 
     public ScheduleAdjustmentCheckVo checkAdjustment(V4ScheduleAdjustmentRequest request) {
         AdjustmentContext context = resolveContext(request);
+        ensureTargetUnlocked(context);
         Classroom newRoom = loadAvailableRoom(request.getNewRoomId());
         TimeSlot newSlot = resolveTimeSlot(request.getNewWeekDay(), request.getNewPeriodStart(), request.getNewPeriodEnd());
         if (newSlot == null) {
@@ -446,6 +448,45 @@ public class V4ScheduleAdjustmentService {
 
     private String asString(Object value, String fallback) {
         return value == null ? fallback : String.valueOf(value);
+    }
+
+    private void ensureTargetUnlocked(AdjustmentContext context) {
+        boolean locked = false;
+        if (TARGET_PLAN_ITEM.equals(context.targetType) && context.planItem != null) {
+            locked = hasPlanItemLock(context.planItem.getId());
+        } else if (TARGET_SCHEDULE.equals(context.targetType) && context.schedule != null) {
+            locked = hasScheduleLock(context.schedule.getId());
+            if (!locked && context.schedule.getPlanId() != null) {
+                SchedulePlanItem linkedItem = matchPlanItem(context);
+                locked = linkedItem != null && hasPlanItemLock(linkedItem.getId());
+            }
+        }
+
+        if (locked) {
+            throw new BusinessException("该课程已锁定，不能调整");
+        }
+    }
+
+    private boolean hasPlanItemLock(Long planItemId) {
+        if (planItemId == null) {
+            return false;
+        }
+        Long count = scheduleLockedItemMapper.selectCount(new LambdaQueryWrapper<ScheduleLockedItem>()
+                .eq(ScheduleLockedItem::getTargetType, "PLAN")
+                .eq(ScheduleLockedItem::getPlanItemId, planItemId)
+                .eq(ScheduleLockedItem::getActiveFlag, 1));
+        return count != null && count > 0;
+    }
+
+    private boolean hasScheduleLock(Long scheduleId) {
+        if (scheduleId == null) {
+            return false;
+        }
+        Long count = scheduleLockedItemMapper.selectCount(new LambdaQueryWrapper<ScheduleLockedItem>()
+                .eq(ScheduleLockedItem::getTargetType, "SCHEDULE")
+                .eq(ScheduleLockedItem::getScheduleId, scheduleId)
+                .eq(ScheduleLockedItem::getActiveFlag, 1));
+        return count != null && count > 0;
     }
 
     private SchedulePlanItem matchPlanItem(AdjustmentContext context) {
