@@ -13,7 +13,7 @@ BEGIN
                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'teacher_unavailable_time'
                      AND COLUMN_NAME = 'active_key') THEN
         ALTER TABLE teacher_unavailable_time
-            ADD COLUMN active_key BIGINT GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN 0 ELSE id END) STORED;
+            ADD COLUMN active_key BIGINT GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN 0 ELSE NULL END) STORED;
     END IF;
 
     IF EXISTS (SELECT 1 FROM information_schema.STATISTICS
@@ -34,6 +34,27 @@ BEGIN
                      AND INDEX_NAME = 'uk_plan_task_slot') THEN
         ALTER TABLE schedule_plan_item
             ADD UNIQUE KEY uk_plan_task_slot (plan_id, teaching_task_id, weekday, start_period, end_period);
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS
+                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_locked_item'
+                     AND COLUMN_NAME = 'active_key') THEN
+        ALTER TABLE schedule_locked_item
+            ADD COLUMN active_key BIGINT GENERATED ALWAYS AS (CASE WHEN active_flag = 1 THEN 0 ELSE NULL END) STORED;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
+                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_locked_item'
+                     AND INDEX_NAME = 'uk_locked_plan_item') THEN
+        ALTER TABLE schedule_locked_item
+            ADD UNIQUE KEY uk_locked_plan_item (plan_item_id, active_key);
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
+                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_locked_item'
+                     AND INDEX_NAME = 'uk_locked_schedule') THEN
+        ALTER TABLE schedule_locked_item
+            ADD UNIQUE KEY uk_locked_schedule (schedule_id, active_key);
     END IF;
 END //
 DELIMITER ;

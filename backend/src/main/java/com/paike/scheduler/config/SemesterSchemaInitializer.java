@@ -261,11 +261,23 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
                     schedule_id BIGINT NULL COMMENT '正式课表ID',
                     lock_reason VARCHAR(500) NOT NULL COMMENT '锁定原因',
                     active_flag TINYINT NOT NULL DEFAULT 1 COMMENT '是否当前生效',
+                    active_key BIGINT GENERATED ALWAYS AS (CASE WHEN active_flag = 1 THEN 0 ELSE NULL END) STORED,
                     unlocked_at DATETIME NULL COMMENT '取消锁定时间',
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
                 ) COMMENT='课程锁定记录表'
                 """);
+            Integer activeKeyCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS " +
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_locked_item' AND COLUMN_NAME = 'active_key'",
+                Integer.class);
+            if (activeKeyCount != null && activeKeyCount == 0) {
+                jdbcTemplate.execute(
+                    "ALTER TABLE schedule_locked_item " +
+                        "ADD COLUMN active_key BIGINT GENERATED ALWAYS AS (CASE WHEN active_flag = 1 THEN 0 ELSE NULL END) STORED");
+            }
+            ensureIndex("schedule_locked_item", "uk_locked_plan_item", "CREATE UNIQUE INDEX uk_locked_plan_item ON schedule_locked_item(plan_item_id, active_key)");
+            ensureIndex("schedule_locked_item", "uk_locked_schedule", "CREATE UNIQUE INDEX uk_locked_schedule ON schedule_locked_item(schedule_id, active_key)");
             ensureIndex("schedule_locked_item", "idx_locked_plan", "CREATE INDEX idx_locked_plan ON schedule_locked_item(plan_id)");
             ensureIndex("schedule_locked_item", "idx_locked_plan_item", "CREATE INDEX idx_locked_plan_item ON schedule_locked_item(plan_item_id)");
             ensureIndex("schedule_locked_item", "idx_locked_schedule", "CREATE INDEX idx_locked_schedule ON schedule_locked_item(schedule_id)");

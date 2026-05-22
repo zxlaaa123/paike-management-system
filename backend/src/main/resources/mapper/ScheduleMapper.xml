@@ -48,6 +48,9 @@
           <if test="semesterId != null">
               AND s.semester_id = #{semesterId}
           </if>
+          <if test="excludeScheduleId != null">
+              AND s.id &lt;&gt; #{excludeScheduleId}
+          </if>
           <choose>
               <when test="planId != null">
                   AND s.plan_id = #{planId}

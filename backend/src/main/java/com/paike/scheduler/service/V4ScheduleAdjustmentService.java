@@ -13,7 +13,6 @@ import com.paike.scheduler.service.vo.ScheduleAdjustmentCheckVo;
 import com.paike.scheduler.service.vo.ScheduleAdjustmentIssueVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
@@ -94,7 +93,6 @@ public class V4ScheduleAdjustmentService {
         return result;
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public ScheduleAdjustmentApplyVo applyAdjustment(V4ScheduleAdjustmentRequest request) {
         return runAdjustmentMutation(() -> applyAdjustmentInternal(request));
     }

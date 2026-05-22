@@ -9,6 +9,7 @@ import com.paike.scheduler.service.vo.ScheduleLockActionVo;
 import com.paike.scheduler.service.vo.ScheduleLockItemVo;
 import com.paike.scheduler.service.vo.ScheduleLockListVo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -62,7 +63,11 @@ public class V4ScheduleLockService {
         record.setScheduleId(target.scheduleId);
         record.setLockReason(lockReason);
         record.setActiveFlag(1);
-        scheduleLockedItemMapper.insert(record);
+        try {
+            scheduleLockedItemMapper.insert(record);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException("该课程已处于锁定状态");
+        }
 
         ScheduleLockActionVo result = new ScheduleLockActionVo();
         result.setLocked(true);

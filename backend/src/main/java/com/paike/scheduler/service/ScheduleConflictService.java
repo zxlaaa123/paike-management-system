@@ -182,7 +182,7 @@ public class ScheduleConflictService {
 
         // 批量统计每日冲突计数,一次查询替代之前的三次 selectCount
         Map<String, Long> dailyCounts = scheduleMapper.selectDailyConflictCounts(
-                teacherId, classId, task.getCourseId(), daySlotIds, task.getSemesterId(), null);
+                teacherId, classId, task.getCourseId(), daySlotIds, task.getSemesterId(), null, excludeScheduleId);
         long teacherDailyCount = dailyCounts.getOrDefault("teacherDaily", 0L);
         long classDailyCount = dailyCounts.getOrDefault("classDaily", 0L);
         long sameCourseCount = dailyCounts.getOrDefault("sameCourse", 0L);
