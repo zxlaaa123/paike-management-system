@@ -97,7 +97,7 @@ public class ScheduleController {
         TeachingTask task = teachingTaskMapper.selectById(form.getTeachingTaskId());
 
         Schedule schedule = new Schedule();
-        schedule.setSemesterId(semesterService.getCurrentSemester().getId());
+        schedule.setSemesterId(task.getSemesterId());
         schedule.setTeachingTaskId(form.getTeachingTaskId());
         schedule.setCourseId(task.getCourseId());
         schedule.setTeacherId(task.getTeacherId());

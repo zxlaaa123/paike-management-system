@@ -43,6 +43,7 @@ public class ScheduleConflictReportService {
     private final TimeSlotMapper timeSlotMapper;
     private final TeacherUnavailableTimeMapper unavailableTimeMapper;
     private final ScheduleRuleService ruleService;
+    private final SemesterService semesterService;
 
     public Page<ScheduleConflictReport> list(String reportNo, String conflictType, String objectType, String objectName, int page, int size) {
         LambdaQueryWrapper<ScheduleConflictReport> wrapper = new LambdaQueryWrapper<ScheduleConflictReport>()
@@ -68,12 +69,19 @@ public class ScheduleConflictReportService {
 
     @Transactional(rollbackFor = Exception.class)
     public GenerateResult generate() {
+        return generate(null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public GenerateResult generate(Long semesterId) {
+        Long resolvedSemesterId = resolveSemesterId(semesterId);
         List<Schedule> schedules = scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
-                .eq(Schedule::getDeleted, 0));
+                .eq(Schedule::getDeleted, 0)
+                .eq(Schedule::getSemesterId, resolvedSemesterId));
 
         String baseReportNo = "CR" + REPORT_NO_TIME_FORMATTER.format(LocalDateTime.now());
 
-        Context context = buildContext(schedules);
+        Context context = buildContext(schedules, resolvedSemesterId);
         List<ScheduleConflictReport> reports = new ArrayList<>();
 
         detectTeacherConflicts(baseReportNo, context, reports);
@@ -107,8 +115,9 @@ public class ScheduleConflictReportService {
         conflictReportMapper.delete(wrapper);
     }
 
-    private Context buildContext(List<Schedule> schedules) {
+    private Context buildContext(List<Schedule> schedules, Long semesterId) {
         Context context = new Context();
+        context.semesterId = semesterId;
         context.schedules = schedules;
         context.scheduleById = schedules.stream().collect(Collectors.toMap(Schedule::getId, Function.identity(), (a, b) -> a));
 
@@ -120,7 +129,8 @@ public class ScheduleConflictReportService {
 
         List<TeachingTask> allTasks = teachingTaskMapper.selectList(new LambdaQueryWrapper<TeachingTask>()
                 .eq(TeachingTask::getDeleted, 0)
-                .eq(TeachingTask::getStatus, 1));
+                .eq(TeachingTask::getStatus, 1)
+                .eq(TeachingTask::getSemesterId, semesterId));
         context.taskMap = allTasks.stream().collect(Collectors.toMap(TeachingTask::getId, Function.identity(), (a, b) -> a));
         teacherIds = new ArrayList<>(teacherIds);
         classIds = new ArrayList<>(classIds);
@@ -644,7 +654,19 @@ public class ScheduleConflictReportService {
         return WEEKDAY_TEXT.getOrDefault(dayOfWeek, "未知日期");
     }
 
+    private Long resolveSemesterId(Long semesterId) {
+        if (semesterId != null) {
+            return semesterId;
+        }
+        try {
+            return semesterService.getCurrentSemester().getId();
+        } catch (BusinessException e) {
+            throw new BusinessException("未找到当前学期，无法生成冲突报告");
+        }
+    }
+
     private static class Context {
+        private Long semesterId;
         private List<Schedule> schedules;
         private Map<Long, Schedule> scheduleById;
         private Map<Long, TeachingTask> taskMap;

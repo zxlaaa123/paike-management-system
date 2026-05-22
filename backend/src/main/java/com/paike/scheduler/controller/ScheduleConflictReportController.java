@@ -15,8 +15,10 @@ public class ScheduleConflictReportController {
     private final ScheduleConflictReportService scheduleConflictReportService;
 
     @PostMapping("/generate")
-    public Result<ScheduleConflictReportService.GenerateResult> generate() {
-        return Result.success(scheduleConflictReportService.generate());
+    public Result<ScheduleConflictReportService.GenerateResult> generate(
+            @RequestParam(required = false) Long semesterId
+    ) {
+        return Result.success(scheduleConflictReportService.generate(semesterId));
     }
 
     @GetMapping
