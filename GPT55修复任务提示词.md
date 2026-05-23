@@ -20,10 +20,13 @@
 
 ---
 
-## 阶段 A 提示词：立即修复（5 项安全/数据风险）
+## 阶段 A 提示词：立即修复（A1-A5 整批 + 4 项 review 补丁，单次交付）
+
+> 上一轮 GPT-5.5 已执行过 A 批次但工作区被 `git restore` 清空，未进 commit，整批改动已丢失。
+> 当前 fix/audit-2026-05 分支 HEAD = 470e69c，工作区干净。本次按下面这份单一提示词从零重做，并把之前 Claude review 出的 4 项遗漏一并合并。
 
 ```
-你是一位资深 Java + Vue 全栈工程师。请在 D:\paike 这个 Spring Boot 3 + Vue 3 + MyBatis Plus 项目里完成 5 项 P0 安全/数据修复。
+你是一位资深 Java + Vue 全栈工程师。请在 D:\paike 这个 Spring Boot 3 + Vue 3 + MyBatis Plus 项目里完成 P0 安全/数据修复。当前分支 fix/audit-2026-05，HEAD 提交 470e69c，工作区干净，没有任何未提交改动。本次按下面任务清单一次性完成所有改动。
 
 【项目关键信息】
 - 后端：Spring Boot 3.x、Java 17、MyBatis Plus、jjwt、Lombok
@@ -31,74 +34,125 @@
 - 数据库：MySQL 8.x，schema 通过 spring.sql.init 加载多个 .sql 脚本（v2-v7）
 - 包名：com.paike.scheduler
 - 端口：后端 8090，前端 5173
-- 重要：所有 shell 命令必须用 PowerShell；不要用 bash 风格（$null / Start-Process 用 PS 写法）
-- 重要：不要尝试启动 Spring Boot，会卡死。需要联调时告诉操作者，让他在独立终端跑 mvn spring-boot:run
+- 所有 shell 命令必须用 PowerShell（pwsh 7+）；不要用 bash 风格
+- 不要尝试启动 Spring Boot，会卡死。需要联调时告诉操作者让他在独立终端跑 mvn spring-boot:run
+
+【硬约束 —— 违反任何一条都视为失败】
+- 不允许执行任何破坏性 git 命令：禁用 git restore / git reset / git checkout -- / git stash drop / git clean -f / git rm。即使为了"收敛 diff 范围"也禁止。任何想 revert 的冲动都要先停下来，把情况报告给操作者，让他来决定。
+- 不允许自动 commit。改完留 working tree 给操作者 review。
+- 不允许动本任务清单以外的文件。看到顺手能"优化"的代码也别动，包括重命名、调整 import 顺序、改空行、补缺失的 final 等。
+- 不允许碰下列已被验证为误报的位置（哪怕觉得它们有问题）：
+  · WebMvcConfig.java（误报：所有 v3 接口实际是 /api/v3/）
+  · LoginResponse.java 的 @JsonIgnore（误报：HttpOnly Cookie 是 by design）
+  · AutoScheduleService 的事务隔离逻辑（误报：MySQL 支持 read-own-writes）
+  · SchedulePlanService.adjustPlanItem 的 adjustReason null 检查（已被 @Valid 挡住）
 
 【任务清单】
 
-A1. 修复 AutoScheduleService.clearAll 跨学期误删
-- 文件：backend/src/main/java/com/paike/scheduler/service/UnscheduledTaskService.java
-- 把 clearAll() 方法改名为 clearBySemester(Long semesterId)，删除 WHERE 加上 semester_id 过滤
-- 同步修改调用点：AutoScheduleService.java:62, 72
-- 如果 UnscheduledTask 实体没有 semesterId 字段：
-  · 先检查 unscheduled_task 表是否有 semester_id 列（查 db/schema.sql + 各 v?_schema.sql 文件）
-  · 没有则新建迁移脚本 db/v8_unscheduled_task_semester.sql，用动态 SQL（SET @col_exists + PREPARE + EXECUTE 模式，参考 v2_alter_schedule.sql 但不要用 DELIMITER）
-  · 在 application.yml 的 schema-locations 末尾追加该文件
-  · 给 Entity 补 private Long semesterId 字段
-  · UnscheduledTaskService.addUnscheduledTask 调用方也要传 semesterId
+A1. 修复 UnscheduledTaskService.clearAll 跨学期误删
+- backend/src/main/java/com/paike/scheduler/service/UnscheduledTaskService.java
+  · 把 clearAll() 改名为 clearBySemester(Long semesterId)，方法上加 @Transactional(rollbackFor = Exception.class)
+  · semesterId 为 null 时抛 BusinessException("clearBySemester 必须传入 semesterId")
+  · 删除条件改为 LambdaQueryWrapper<UnscheduledTask>().eq(UnscheduledTask::getSemesterId, semesterId)
+  · addUnscheduledTask 方法签名加一个 Long semesterId 参数（放在 batchId 之后），把它 set 到 entity 上
+- backend/src/main/java/com/paike/scheduler/service/AutoScheduleService.java
+  · clearAllSchedule / clearOldAutoSchedule 两个分支里的 unscheduledTaskService.clearAll() 调用改成 clearBySemester(semesterId)
+  · 所有 addUnscheduledTask 调用点（共 4 处：course/class/room 不匹配 + 排课失败兜底）补传 semesterId
+- backend/src/main/java/com/paike/scheduler/entity/UnscheduledTask.java
+  · 加字段 private Long semesterId;（放在 batchId 之后）
+- backend/src/main/java/com/paike/scheduler/controller/UnscheduledTaskController.java
+  · DELETE 端点的 clear() 方法补一个 @RequestParam(required = false) Long semesterId 参数
+  · 原本 batchId == null 时调用 clearAll() 的分支改成调用 clearBySemester(semesterId)
+- 新建 backend/src/main/resources/db/v8_unscheduled_task_semester.sql：
+  · 用动态 SQL（SET @col_exists + PREPARE + EXECUTE 模式，参考 v2_alter_schedule.sql 但不要用 DELIMITER）幂等地：
+    1. 检查 information_schema.COLUMNS，若 unscheduled_task.semester_id 列不存在则 ALTER TABLE 添加为 BIGINT NULL，位置 AFTER batch_id
+    2. UPDATE unscheduled_task ut JOIN teaching_task tt ON tt.id = ut.task_id SET ut.semester_id = tt.semester_id WHERE ut.semester_id IS NULL AND tt.semester_id IS NOT NULL（回填历史数据）
+    3. DELETE FROM unscheduled_task WHERE semester_id IS NULL（清扫无主孤儿行——teaching_task 已不存在或其 semester_id 为 NULL 的记录，这些行无法被 clearBySemester 命中，留着会无限堆积）
+    4. 检查 information_schema.COLUMNS 的 IS_NULLABLE，若仍为 'YES' 则 ALTER TABLE MODIFY COLUMN semester_id BIGINT NOT NULL DEFAULT 0 COMMENT '所属学期ID'（强制后续插入必须显式带学期）
+    5. 检查 information_schema.STATISTICS，若 idx_unscheduled_task_semester 不存在则 CREATE INDEX
+  · 关键顺序：DELETE 必须在 ALTER MODIFY NOT NULL 之前，否则 NOT NULL 转换会失败
+- backend/src/main/resources/application.yml
+  · 在 spring.sql.init.schema-locations 末尾追加 ,classpath:db/v8_unscheduled_task_semester.sql
 
-A2. 12 个 Controller 补 @Valid
-- 在以下文件的指定行号给 @RequestBody 参数前补 @Valid 注解：
-  · AutoScheduleBatchController.java:44
-  · ScheduleAiAnalysisController.java:24
-  · ScheduleRuleWeightController.java:54（不要改 line 60，那个交给 A3）
-  · ScheduleRuleController.java:26（注意 List 内泛型也要 @Valid，并给 Controller 类加 @Validated）
-  · ScheduleLockController.java:19, 25
-  · ScheduleGenerateController.java:21, 26
-  · ScheduleReplanController.java:24
-  · ScheduleReportController.java:31
-  · V5CandidatePositionController.java:18
-  · V5RepairSuggestionController.java:25
-  · V5SimulationController.java:31
-- 顺便审计这些端点对应的 DTO（如 AutoScheduleRequest），如果关键字段缺 @NotNull / @NotBlank / @Size 等校验，补齐
+A2. 12 个 Controller 补 @Valid，并给 DTO 补校验
+- 给以下端点的 @RequestBody 参数前补 @Valid（import jakarta.validation.Valid）：
+  · AutoScheduleBatchController.java run 方法
+  · ScheduleAiAnalysisController.java generatePlanAiAnalysis 方法
+  · ScheduleRuleWeightController.java update(@PathVariable Long id, ...) 方法（line 60 那个 batchUpdate 由 A3 处理）
+  · ScheduleRuleController.java update 方法：除了 @Valid @RequestBody List<@Valid RuleUpdateForm>，还要给 Controller 类加 @Validated（org.springframework.validation.annotation.Validated）
+  · ScheduleLockController.java lock / unlock 两个方法
+  · ScheduleGenerateController.java generate / generateMultiple 两个方法
+  · ScheduleReplanController.java createLocalReplanPlan 方法
+  · ScheduleReportController.java generatePlanReport 方法
+  · V5CandidatePositionController.java generate 方法
+  · V5RepairSuggestionController.java generate 方法
+  · V5SimulationController.java localReplan 方法
+- DTO 校验补齐：
+  · AutoScheduleRequest.java：semesterId 字段必须同时有 @NotNull(message = "semesterId 不能为空") 和 @Positive(message = "semesterId 必须大于 0")，缺一不可（@Positive 对 null 是通过的，必须显式 @NotNull）；taskIds 加 @Size(max = 5000)
+  · ScheduleLockRequest.java：targetType 加 @NotBlank + @Size(max = 20)；planId/planItemId/scheduleId 各加 @Positive；lockReason 加 @Size(max = 255)
+  · ScheduleGenerateRequest.java：semesterId @Positive；strategyType @Size(max = 50)；planName @Size(max = 100)
+  · MultipleScheduleGenerateRequest.java：semesterId @Positive；strategyTypes @Size(max = 8)
+  · V4ScheduleAiAnalysisRequest.java：analysisType @Size(max = 32)
+  · V4ScheduleReplanRequest.java：newPlanName @Size(max = 100)；strategyCode @Size(max = 50)
+  · V4ScheduleReportGenerateRequest.java：reportType @Size(max = 50)；format @Size(max = 20)
+  · V5CandidatePositionGenerateRequest.java：scheduleId/planItemId 各 @Positive；limit @Min(1) @Max(1000)
+  · V5LocalReplanRequest.java：newPlanName @Size(max = 100)；candidateLimit @Min(1) @Max(2000)
+  · V5RepairSuggestionGenerateRequest.java：candidateLimit @Min(1) @Max(1000)
 
 A3. 裸实体 @RequestBody 换 Form DTO
-- 新建 backend/.../service/dto/TeacherUnavailableTimeForm.java，只暴露 teacherId / timeSlotId / reason / status / remark（不含 id / deleted / createTime）
-- 新建 backend/.../service/dto/ScheduleRuleWeightBatchForm.java，内部用 List<Item> 结构，Item 只含 id / weight / enabled / description
-- 修改 TeacherUnavailableTimeController.java:34, 40, 52 的 @RequestBody 类型
-- 修改 ScheduleRuleWeightController.java:60 改用新 DTO
-- 修改 TeacherUnavailableTimeService.create / update 接收 Form，内部装配 Entity
-- V5RepairTaskController.java:51 的 Map<String, Object> 入参也建议新建 V5RepairTaskCancelRequest DTO 替代（保留 required=false 语义）
+- 新建 backend/src/main/java/com/paike/scheduler/service/dto/TeacherUnavailableTimeForm.java：
+  · 字段：Long teacherId（@NotNull + @Positive）、Long timeSlotId（@NotNull + @Positive）、String reason（@Size(max = 255)）、Integer status（@Min(0) @Max(1)）、String remark（@Size(max = 255)）
+  · 不能含 id / deleted / createTime
+- 新建 backend/src/main/java/com/paike/scheduler/service/dto/ScheduleRuleWeightBatchForm.java：
+  · 顶层字段：List<Item> rules（@NotEmpty + @Valid）
+  · 内部 static class Item：Long id（@NotNull + @Positive）、BigDecimal weight（@NotNull + @DecimalMin("0.0")）、Integer enabled（@NotNull + @Min(0) + @Max(1)）、String description（@Size(max = 255)）
+- 新建 backend/src/main/java/com/paike/scheduler/service/dto/V5RepairTaskCancelRequest.java：
+  · 字段：String reason（@Size(max = 255)）
+- 切换 Controller：
+  · TeacherUnavailableTimeController.java create / update 两个端点的 @RequestBody 类型从 TeacherUnavailableTime 换成 TeacherUnavailableTimeForm
+  · ScheduleRuleWeightController.java batchUpdate 端点从 @RequestBody List<ScheduleRuleWeight> 换成 @Valid @RequestBody ScheduleRuleWeightBatchForm，调用时传 form.getRules()
+  · V5RepairTaskController.java cancel 端点从 @RequestBody(required = false) Map<String, Object> body 换成 @Valid @RequestBody(required = false) V5RepairTaskCancelRequest request，保留 required=false 语义
+- 切换 Service：
+  · TeacherUnavailableTimeService.java create / update 方法签名形参类型换成 TeacherUnavailableTimeForm，内部装配 TeacherUnavailableTime 实体（手动 set 各字段，不能用 BeanUtils.copyProperties 全量拷贝）
+  · ScheduleRuleWeightService.java batchUpdate 方法签名换成 List<ScheduleRuleWeightBatchForm.Item>，循环里只 set existing 的 weight / enabled / description / updatedAt，禁止把 form 里的字段直接 setDeleted / setCreateTime
 
 A4. 关键 Service 加 @Transactional
-- TeacherUnavailableTimeService.java：给 create / update / updateStatus 三个方法加 @Transactional(rollbackFor = Exception.class)
-  · create 内的 insert 要套 try/catch DuplicateKeyException，并发兜底转 409 业务异常
-- ScheduleRuleService.java:29 updateRules 方法加 @Transactional(rollbackFor = Exception.class)
-- AutoScheduleBatchService.java:54 updateBatchResult 方法加 @Transactional(rollbackFor = Exception.class)
+- TeacherUnavailableTimeService.java：create / update / updateStatus 三个方法各加 @Transactional(rollbackFor = Exception.class)
+  · create 内 unavailableTimeMapper.insert(entity) 要套 try/catch DuplicateKeyException(org.springframework.dao.DuplicateKeyException)，catch 内抛 new BusinessException(409, teacher.getName() + "老师在" + timeSlot.getTimeLabel() + "已存在禁排时间")
+- ScheduleRuleService.java：
+  · updateRules 方法加 @Transactional(rollbackFor = Exception.class)
+  · resetToDefault 方法也加 @Transactional(rollbackFor = Exception.class)（同样是循环 select/update/insert，性质完全一样，不能漏）
+- AutoScheduleBatchService.java：updateBatchResult 方法加 @Transactional(rollbackFor = Exception.class)
+- ScheduleRuleWeightService.java：batchUpdate 方法加 @Transactional(rollbackFor = Exception.class)（循环 update，半路抛异常会留下脏数据）
 
 A5. JwtService 显式校验密钥长度
-- 文件：backend/src/main/java/com/paike/scheduler/auth/JwtService.java:25
-- 在现有 isBlank / DEFAULT_SECRET 校验之后，追加密钥长度 >= 32 字节的检查
-- 不满足时抛 IllegalStateException 含具体长度提示，让运维一眼看懂
+- backend/src/main/java/com/paike/scheduler/auth/JwtService.java
+- 在构造器现有的 isBlank / DEFAULT_SECRET 校验之后、Keys.hmacShaKeyFor 调用之前，追加：
+  · 取 secret.getBytes(StandardCharsets.UTF_8).length，记为 secretLength
+  · 若 secretLength < 32，抛 IllegalStateException("JWT_SECRET 长度不足：当前仅 " + secretLength + " 字节，要求至少 32 字节。请配置新的强密钥后重启服务。")
 
-【验收标准】
-1. mvn -pl backend compile 通过（不要尝试运行 spring-boot:run）
-2. 没有引入新的编译警告
-3. 所有改动文件都在 git status 里能看到
-4. 不要修改本任务清单以外的文件
-5. 不要碰这些已被验证为误报的位置（哪怕你觉得它们有问题）：
-   · WebMvcConfig.java（误报：所有 v3 接口实际是 /api/v3/）
-   · LoginResponse.java 的 @JsonIgnore（误报：HttpOnly Cookie 是 by design）
-   · AutoScheduleService 的事务隔离逻辑（误报：MySQL 支持 read-own-writes）
-   · SchedulePlanService.adjustPlanItem 的 adjustReason null 检查（已被 @Valid 挡住）
+【验证】
+1. 在 D:\paike\backend 执行 mvn compile，编译必须通过；日志输出到 D:\paike\backend-compile.log，并贴出最后 50 行给操作者看
+2. 跑 git status --short，确认改动文件集合大致是：
+   - M 约 22 个 java 文件（13 个 controller + 6 个 service + 1 个 entity + 10 个 DTO，具体看你实际触碰的数量）
+   - M backend/src/main/resources/application.yml
+   - ?? backend/src/main/resources/db/v8_unscheduled_task_semester.sql
+   - ?? 三个新 DTO 文件（TeacherUnavailableTimeForm / ScheduleRuleWeightBatchForm / V5RepairTaskCancelRequest）
+   多动的文件需要解释清楚，不要 restore
+3. 跑 git diff --stat 给操作者看
+4. 不要 commit，等操作者 review
 
-【输出要求】
-1. 按顺序执行 A1 → A5，每完成一项简述改了哪些文件
-2. 全部完成后给出 git diff --stat 摘要
-3. 若发现 A1 中需要补迁移脚本，明确告诉操作者新增了哪个 .sql 文件，要让他在测试库手动跑一次确认
-4. 完成后不要自动 commit，等操作者 review
+【输出格式】
+按 A1 → A5 顺序，每完成一节简述触碰了哪些文件（只说文件名即可，不要贴 diff）。
+全部完成后给一份汇总：
+- mvn compile 是否通过
+- git diff --stat 完整内容
+- 新增的 v8_unscheduled_task_semester.sql 需要操作者在测试库手动跑一次确认，重点核查：
+  · unscheduled_task.semester_id 列是否 NOT NULL DEFAULT 0
+  · idx_unscheduled_task_semester 索引是否存在
+  · 原 NULL 行是否已被回填或清除
 
-参考文档：D:\paike\代码修改建议.md（详细 diff 在批次 A 章节）
+参考文档：D:\paike\代码修改建议.md（详细 diff 在批次 A 章节，本提示词中的"4 项 review 补丁"已对里面的部分内容做了升级，以本提示词为准——具体差异是：v8 SQL 增加了清扫孤儿行 + ALTER MODIFY NOT NULL 两步、AutoScheduleRequest.semesterId 必须同时有 @NotNull 和 @Positive、ScheduleRuleService.resetToDefault 也要加 @Transactional、ScheduleRuleWeightService.batchUpdate 也要加 @Transactional）
 ```
 
 ---
@@ -419,6 +473,7 @@ SchedulePlanService.java:267-356 (applyPlan) 与 :373-446 (applyPlanInternal) �
 - 改动文件后不要立即查询 codegraph，watcher 有约 500ms 延迟
 
 【git 约束】
+- 严禁执行任何破坏性 git 命令（restore / reset / checkout -- / stash drop / clean -f / rm）；想 revert 之前必须先报告操作者
 - 不要 git push 或 git commit，最终由操作者审核
 - 不要 git add -A，明确指定文件
 - 改动较大时建议保留 git diff 摘要
