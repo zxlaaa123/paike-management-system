@@ -16,16 +16,24 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Map<Integer, HttpStatus> BIZ_CODE_HTTP = Map.of(
+            401, HttpStatus.UNAUTHORIZED,
+            403, HttpStatus.FORBIDDEN,
+            404, HttpStatus.NOT_FOUND,
+            409, HttpStatus.CONFLICT,
+            429, HttpStatus.TOO_MANY_REQUESTS
+    );
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Result<Void>> handleBusinessException(BusinessException ex) {
-        HttpStatus status = HttpStatus.resolve(ex.getCode());
-        if (status == null) status = HttpStatus.BAD_REQUEST;
+        HttpStatus status = BIZ_CODE_HTTP.getOrDefault(ex.getCode(), HttpStatus.BAD_REQUEST);
         return ResponseEntity.status(status).body(Result.fail(ex.getCode(), ex.getMessage()));
     }
 
