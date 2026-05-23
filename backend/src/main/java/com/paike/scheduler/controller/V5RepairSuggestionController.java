@@ -7,7 +7,9 @@ import com.paike.scheduler.service.dto.V5RepairSuggestionGenerateRequest;
 import com.paike.scheduler.service.vo.V5RepairSuggestionVo;
 import com.paike.scheduler.service.vo.V5SimulationPlanDetailVo;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,6 +17,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v5/repair-tasks/{taskId}/suggestions")
 @RequiredArgsConstructor
+@Validated
 public class V5RepairSuggestionController {
 
     private final V5RepairSuggestionService repairSuggestionService;
@@ -22,24 +25,24 @@ public class V5RepairSuggestionController {
 
     @PostMapping("/generate")
     public Result<List<V5RepairSuggestionVo>> generate(
-            @PathVariable Long taskId,
+            @PathVariable @Positive Long taskId,
             @Valid @RequestBody(required = false) V5RepairSuggestionGenerateRequest request
     ) {
         return Result.success("修复建议已生成", repairSuggestionService.generate(taskId, request));
     }
 
     @GetMapping
-    public Result<List<V5RepairSuggestionVo>> list(@PathVariable Long taskId) {
+    public Result<List<V5RepairSuggestionVo>> list(@PathVariable @Positive Long taskId) {
         return Result.success(repairSuggestionService.listByTask(taskId));
     }
 
     @GetMapping("/{suggestionId}")
-    public Result<V5RepairSuggestionVo> detail(@PathVariable Long taskId, @PathVariable Long suggestionId) {
+    public Result<V5RepairSuggestionVo> detail(@PathVariable @Positive Long taskId, @PathVariable @Positive Long suggestionId) {
         return Result.success(repairSuggestionService.detail(taskId, suggestionId));
     }
 
     @PostMapping("/{suggestionId}/simulate")
-    public Result<V5SimulationPlanDetailVo> simulate(@PathVariable Long taskId, @PathVariable Long suggestionId) {
+    public Result<V5SimulationPlanDetailVo> simulate(@PathVariable @Positive Long taskId, @PathVariable @Positive Long suggestionId) {
         return Result.success("试算方案已生成", simulationService.generate(taskId, suggestionId));
     }
 }
