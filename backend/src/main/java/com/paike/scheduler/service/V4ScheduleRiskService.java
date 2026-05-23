@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.paike.scheduler.common.enums.CourseType;
 import com.paike.scheduler.common.enums.RoomType;
 import com.paike.scheduler.common.exception.BusinessException;
+import com.paike.scheduler.config.ScheduleThresholdProperties;
 import com.paike.scheduler.entity.ClassInfo;
 import com.paike.scheduler.entity.Classroom;
 import com.paike.scheduler.entity.Course;
@@ -46,13 +47,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class V4ScheduleRiskService {
 
-    private static final int TEACHER_OVERLOAD_MEDIUM = 18;
-    private static final int TEACHER_OVERLOAD_HIGH = 22;
-    private static final int CLASS_DAILY_OVERLOAD_MEDIUM = 8;
-    private static final int CLASS_DAILY_OVERLOAD_HIGH = 10;
-    private static final BigDecimal ROOM_LOW_UTILIZATION_THRESHOLD = BigDecimal.valueOf(30);
-    private static final BigDecimal ROOM_HIGH_UTILIZATION_THRESHOLD = BigDecimal.valueOf(85);
-
     private final SchedulePlanMapper schedulePlanMapper;
     private final SchedulePlanItemMapper schedulePlanItemMapper;
     private final TeacherMapper teacherMapper;
@@ -63,6 +57,7 @@ public class V4ScheduleRiskService {
     private final TimeSlotMapper timeSlotMapper;
     private final TeacherUnavailableTimeService teacherUnavailableTimeService;
     private final SchedulePlanExplainService schedulePlanExplainService;
+    private final ScheduleThresholdProperties thresholds;
 
     public ScheduleRiskListVo getPlanRisks(Long planId, String riskType, String level, Boolean onlyUnresolved) {
         SchedulePlan plan = schedulePlanMapper.selectById(planId);
@@ -323,11 +318,11 @@ public class V4ScheduleRiskService {
             teacherLoads.merge(item.getTeacherId(), lessonPeriods(item), Integer::sum);
         }
         for (Map.Entry<Long, Integer> entry : teacherLoads.entrySet()) {
-            if (entry.getKey() == null || entry.getValue() < TEACHER_OVERLOAD_MEDIUM) {
+            if (entry.getKey() == null || entry.getValue() < thresholds.getTeacherOverloadMedium()) {
                 continue;
             }
             Teacher teacher = context.teacherMap.get(entry.getKey());
-            String level = entry.getValue() >= TEACHER_OVERLOAD_HIGH ? "HIGH" : "MEDIUM";
+            String level = entry.getValue() >= thresholds.getTeacherOverloadHigh() ? "HIGH" : "MEDIUM";
             ScheduleRiskIssueVo risk = baseRisk(idGenerator, "TEACHER_OVERLOAD", "教师课时过高", level);
             risk.setTitle(safeName(teacher == null ? null : teacher.getName()) + " 当前总课时偏高");
             risk.setDescription("当前方案中，该教师累计课时为 " + entry.getValue() + " 节。");
@@ -349,12 +344,12 @@ public class V4ScheduleRiskService {
             firstItemMap.putIfAbsent(key, item);
         }
         for (Map.Entry<String, Integer> entry : classDailyLoads.entrySet()) {
-            if (entry.getValue() < CLASS_DAILY_OVERLOAD_MEDIUM) {
+            if (entry.getValue() < thresholds.getClassDailyOverloadMedium()) {
                 continue;
             }
             SchedulePlanItem first = firstItemMap.get(entry.getKey());
             ClassInfo classInfo = first == null ? null : context.classMap.get(first.getClassId());
-            String level = entry.getValue() >= CLASS_DAILY_OVERLOAD_HIGH ? "HIGH" : "MEDIUM";
+            String level = entry.getValue() >= thresholds.getClassDailyOverloadHigh() ? "HIGH" : "MEDIUM";
             ScheduleRiskIssueVo risk = baseRisk(idGenerator, "CLASS_DAILY_OVERLOAD", "班级单日课程过多", level);
             risk.setTitle(safeName(classInfo == null ? null : classInfo.getClassName()) + " 在 " + formatWeekDay(first == null ? null : first.getWeekday()) + " 课时偏高");
             risk.setDescription("该班级当天累计安排 " + entry.getValue() + " 节课程。");
@@ -382,7 +377,7 @@ public class V4ScheduleRiskService {
             BigDecimal rate = BigDecimal.valueOf(entry.getValue())
                     .multiply(BigDecimal.valueOf(100))
                     .divide(denominator, 1, RoundingMode.HALF_UP);
-            if (rate.compareTo(ROOM_LOW_UTILIZATION_THRESHOLD) < 0) {
+            if (rate.compareTo(thresholds.getRoomLowUtilization()) < 0) {
                 ScheduleRiskIssueVo risk = baseRisk(idGenerator, "ROOM_LOW_UTILIZATION", "教室利用率偏低", "LOW");
                 risk.setTitle(safeName(room == null ? null : room.getRoomName()) + " 利用率偏低");
                 risk.setDescription("当前方案中，该教室利用率为 " + rate.stripTrailingZeros().toPlainString() + "%。");
@@ -396,7 +391,7 @@ public class V4ScheduleRiskService {
                         "利用率：" + rate.stripTrailingZeros().toPlainString() + "%"
                 ));
                 risks.add(risk);
-            } else if (rate.compareTo(ROOM_HIGH_UTILIZATION_THRESHOLD) >= 0) {
+            } else if (rate.compareTo(thresholds.getRoomHighUtilization()) >= 0) {
                 ScheduleRiskIssueVo risk = baseRisk(idGenerator, "ROOM_HIGH_UTILIZATION", "教室利用率偏高", "MEDIUM");
                 risk.setTitle(safeName(room == null ? null : room.getRoomName()) + " 利用率偏高");
                 risk.setDescription("当前方案中，该教室利用率为 " + rate.stripTrailingZeros().toPlainString() + "%。");

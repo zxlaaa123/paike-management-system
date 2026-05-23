@@ -2,6 +2,7 @@ package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.paike.scheduler.common.exception.BusinessException;
+import com.paike.scheduler.config.ScheduleThresholdProperties;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
 import com.paike.scheduler.entity.ScheduleRuleWeight;
@@ -38,6 +39,7 @@ public class V4ScheduleAnalysisService {
     private final TimeSlotMapper timeSlotMapper;
     private final ScheduleScoreService scheduleScoreService;
     private final ScheduleRuleWeightService scheduleRuleWeightService;
+    private final ScheduleThresholdProperties thresholds;
 
     public ScheduleAnalysisSummaryVo getPlanSummary(Long planId) {
         SchedulePlan plan = schedulePlanMapper.selectById(planId);
@@ -87,13 +89,13 @@ public class V4ScheduleAnalysisService {
         }
 
         for (Integer load : teacherLoads.values()) {
-            if (load >= 18) {
+            if (load >= thresholds.getTeacherOverloadMedium()) {
                 overloadedTeacherCount++;
             }
         }
 
         for (Integer load : classDailyLoads.values()) {
-            if (load >= 8) {
+            if (load >= thresholds.getClassDailyOverloadMedium()) {
                 overloadedClassDayCount++;
             }
         }
@@ -103,9 +105,9 @@ public class V4ScheduleAnalysisService {
 
         for (Integer load : roomLoads.values()) {
             BigDecimal roomRate = percent(load, totalTimeSlots * 2);
-            if (roomRate.compareTo(BigDecimal.valueOf(85)) >= 0) {
+            if (roomRate.compareTo(thresholds.getRoomHighUtilization()) >= 0) {
                 overloadedRoomCount++;
-            } else if (roomRate.compareTo(BigDecimal.valueOf(30)) < 0) {
+            } else if (roomRate.compareTo(thresholds.getRoomLowUtilization()) < 0) {
                 underutilizedRoomCount++;
             }
         }

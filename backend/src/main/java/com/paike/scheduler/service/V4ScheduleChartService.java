@@ -3,6 +3,7 @@ package com.paike.scheduler.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.paike.scheduler.common.enums.RoomType;
 import com.paike.scheduler.common.exception.BusinessException;
+import com.paike.scheduler.config.ScheduleThresholdProperties;
 import com.paike.scheduler.entity.ClassInfo;
 import com.paike.scheduler.entity.Classroom;
 import com.paike.scheduler.entity.SchedulePlan;
@@ -39,14 +40,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class V4ScheduleChartService {
 
-    private static final int TOTAL_AVAILABLE_PERIODS = 20;
-
     private final SchedulePlanMapper schedulePlanMapper;
     private final SchedulePlanItemMapper schedulePlanItemMapper;
     private final TeacherMapper teacherMapper;
     private final ClassroomMapper classroomMapper;
     private final ClassInfoMapper classInfoMapper;
     private final ScheduleScoreService scheduleScoreService;
+    private final ScheduleThresholdProperties thresholds;
 
     public ScheduleTeacherHoursChartVo getTeacherHours(Long planId) {
         List<SchedulePlanItem> items = loadPlanItems(planId);
@@ -101,8 +101,8 @@ public class V4ScheduleChartService {
                     row.setRoomType(roomTypeText(room == null ? null : room.getRoomType()));
                     row.setCapacity(room == null ? null : room.getCapacity());
                     row.setUsedPeriods(entry.getValue());
-                    row.setTotalPeriods(TOTAL_AVAILABLE_PERIODS);
-                    row.setUtilizationRate(percent(entry.getValue(), TOTAL_AVAILABLE_PERIODS));
+                    row.setTotalPeriods(thresholds.getTotalAvailablePeriods());
+                    row.setUtilizationRate(percent(entry.getValue(), thresholds.getTotalAvailablePeriods()));
                     return row;
                 })
                 .sorted(Comparator.comparing(ScheduleRoomUtilizationChartVo.Item::getUtilizationRate).reversed())
