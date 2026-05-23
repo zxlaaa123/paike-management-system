@@ -2,6 +2,7 @@ package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.paike.scheduler.common.exception.BusinessException;
+import com.paike.scheduler.config.ScheduleThresholdProperties;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class ScheduleStatisticsService {
     private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
     private final TimeSlotMapper timeSlotMapper;
+    private final ScheduleThresholdProperties thresholds;
 
     // ==================== 教师工作量统计 ====================
 
@@ -108,9 +110,6 @@ public class ScheduleStatisticsService {
             roomUsage.merge(roomId, (long) periods, Long::sum);
         }
 
-        // 总可用节次 = 5天 × 4大节 = 20节/周
-        final int TOTAL_AVAILABLE_PERIODS = 20;
-
         List<Classroom> allRooms = classroomMapper.selectList(
                 new LambdaQueryWrapper<Classroom>()
                         .eq(Classroom::getStatus, 1)
@@ -127,11 +126,11 @@ public class ScheduleStatisticsService {
 
             long usedPeriods = roomUsage.getOrDefault(room.getId(), 0L);
             row.put("usedPeriods", usedPeriods);
-            row.put("totalPeriods", TOTAL_AVAILABLE_PERIODS);
+            row.put("totalPeriods", thresholds.getTotalAvailablePeriods());
 
-            BigDecimal rate = TOTAL_AVAILABLE_PERIODS > 0
+            BigDecimal rate = thresholds.getTotalAvailablePeriods() > 0
                     ? BigDecimal.valueOf(usedPeriods).multiply(BigDecimal.valueOf(100))
-                            .divide(BigDecimal.valueOf(TOTAL_AVAILABLE_PERIODS), 1, RoundingMode.HALF_UP)
+                            .divide(BigDecimal.valueOf(thresholds.getTotalAvailablePeriods()), 1, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
             row.put("utilizationRate", rate);
             row.put("evaluation", evaluateUtilization(rate.doubleValue()));

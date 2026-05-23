@@ -1,6 +1,7 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.paike.scheduler.config.ScheduleThresholdProperties;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
 import com.paike.scheduler.entity.ScheduleRuleWeight;
@@ -29,6 +30,7 @@ public class ScheduleScoreService {
     private final SchedulePlanMapper planMapper;
     private final SchedulePlanItemMapper planItemMapper;
     private final ScheduleRuleWeightService ruleWeightService;
+    private final ScheduleThresholdProperties thresholds;
 
     public List<ScheduleScoreDetail> getScoreDetails(Long planId) {
         return scoreDetailMapper.selectList(
@@ -312,7 +314,7 @@ public class ScheduleScoreService {
         if (items.isEmpty()) {
             return BigDecimal.ZERO;
         }
-        long afternoonCount = items.stream().filter(item -> item.getStartPeriod() >= 5).count();
+        long afternoonCount = items.stream().filter(item -> item.getStartPeriod() >= thresholds.getAfternoonStartPeriod()).count();
         return BigDecimal.valueOf((double) afternoonCount / items.size()).setScale(4, RoundingMode.HALF_UP);
     }
 

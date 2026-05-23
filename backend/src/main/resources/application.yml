@@ -55,3 +55,13 @@ app:
     base-url: ${AI_BASE_URL:https://api.openai.com/v1/chat/completions}
     model: ${AI_MODEL:gpt-4o-mini}
     timeout-ms: ${AI_TIMEOUT_MS:20000}
+  schedule:
+    thresholds:
+      teacher-overload-medium: 18
+      teacher-overload-high: 22
+      class-daily-overload-medium: 8
+      class-daily-overload-high: 10
+      room-low-utilization: 30
+      room-high-utilization: 85
+      total-available-periods: 20
+      afternoon-start-period: 5
