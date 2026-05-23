@@ -1,12 +1,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import type { ApiResponse } from '../api/types'
 import router from '../router'
-
-interface ApiResponse<T = unknown> {
-  code: number
-  message: string
-  data: T
-}
 
 /** 从浏览器 Cookie 中读取指定名称的值 */
 function getCookie(name: string): string | null {

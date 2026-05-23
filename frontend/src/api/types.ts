@@ -5,7 +5,7 @@ export interface PageResult<T> {
   size: number
 }
 
-export interface ApiResponse<T> {
+export interface ApiResponse<T = unknown> {
   code: number
   message: string
   data: T
