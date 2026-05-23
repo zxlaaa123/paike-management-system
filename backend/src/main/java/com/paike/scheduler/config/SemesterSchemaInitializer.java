@@ -6,6 +6,20 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+/**
+ * 三套 schema 初始化入口的第三套：运行时兜底。
+ *
+ * 执行时机：CommandLineRunner，在 spring.sql.init 跑完 schema.sql + v2~v7 之后。
+ * 职责：兼容旧库（早于某些 v*.sql 就跑过、缺列缺索引的库），不做新数据库初始化。
+ *
+ * 每个 ensure* 方法与 v*.sql 文件的重叠关系详见 backend/src/main/resources/db/README.md 第 3 节。
+ *
+ * 维护约定：
+ *  - 新表/新列优先写在 v8_*.sql 文件里，不要扩本类
+ *  - ensureStage7Tables / ensureStage9Tables 是历史遗留（4 张表无对应 SQL 文件），保留不动
+ *  - schedule_locked_item.active_key 在三处定义（本类 CREATE TABLE / 本类 ALTER / v6_bugfix_constraints.sql），
+ *    全部幂等结果一致，接受冗余不收敛
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
