@@ -1,6 +1,7 @@
 package com.paike.scheduler.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Getter;
@@ -36,5 +37,9 @@ public class AutoScheduleBatch {
 
     private LocalDateTime endTime;
 
+    @TableField("create_time")
     private LocalDateTime createTime;
+
+    @TableField("update_time")
+    private LocalDateTime updateTime;
 }
