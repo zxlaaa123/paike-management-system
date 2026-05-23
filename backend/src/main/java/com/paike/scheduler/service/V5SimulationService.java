@@ -1,6 +1,7 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paike.scheduler.common.enums.V5RepairTaskStatus;
@@ -365,13 +366,29 @@ public class V5SimulationService {
         plan.setStatus("DISCARDED");
         plan.setUpdatedAt(LocalDateTime.now());
         planMapper.updateById(plan);
+
         if (Objects.equals(task.getResultPlanId(), planId)) {
             task.setStatus(V5RepairTaskStatus.SUGGESTED.getCode());
             task.setResultPlanId(null);
             task.setUpdatedAt(LocalDateTime.now());
             repairTaskMapper.updateById(task);
         }
-        return detail(taskId, planId);
+
+        // P2-15: 先生成详情快照，再清理孤儿数据；避免 V4ScheduleRiskService 对空 items 的空 IN 报错
+        V5SimulationPlanDetailVo result = detail(taskId, planId);
+
+        // 清理试算副本的孤儿数据；保留 optimization_compare 与 adjust_log 作为审计快照
+        planItemMapper.delete(new LambdaQueryWrapper<SchedulePlanItem>()
+                .eq(SchedulePlanItem::getPlanId, planId));
+        lockedItemMapper.update(null, new LambdaUpdateWrapper<ScheduleLockedItem>()
+                .eq(ScheduleLockedItem::getPlanId, planId)
+                .eq(ScheduleLockedItem::getActiveFlag, 1)
+                .set(ScheduleLockedItem::getActiveFlag, 0)
+                .set(ScheduleLockedItem::getUpdatedAt, LocalDateTime.now()));
+        scoreDetailMapper.delete(new LambdaQueryWrapper<ScheduleScoreDetail>()
+                .eq(ScheduleScoreDetail::getPlanId, planId));
+
+        return result;
     }
 
     private SchedulePlan createSimulationPlan(

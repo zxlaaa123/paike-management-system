@@ -115,20 +115,21 @@ public class V4ScheduleRiskService {
     private RiskContext buildContext(List<SchedulePlanItem> items) {
         RiskContext context = new RiskContext();
         context.items = items;
-        context.teacherMap = teacherMapper.selectBatchIds(collectIds(items, SchedulePlanItem::getTeacherId)).stream()
-                .collect(Collectors.toMap(Teacher::getId, Function.identity(), (a, b) -> a));
-        context.classMap = classInfoMapper.selectBatchIds(collectIds(items, SchedulePlanItem::getClassId)).stream()
-                .collect(Collectors.toMap(ClassInfo::getId, Function.identity(), (a, b) -> a));
-        context.roomMap = classroomMapper.selectBatchIds(collectIds(items, SchedulePlanItem::getClassroomId)).stream()
-                .collect(Collectors.toMap(Classroom::getId, Function.identity(), (a, b) -> a));
-        context.courseMap = courseMapper.selectBatchIds(collectIds(items, SchedulePlanItem::getCourseId)).stream()
-                .collect(Collectors.toMap(Course::getId, Function.identity(), (a, b) -> a));
-        context.taskMap = teachingTaskMapper.selectBatchIds(collectIds(items, SchedulePlanItem::getTeachingTaskId)).stream()
-                .collect(Collectors.toMap(TeachingTask::getId, Function.identity(), (a, b) -> a));
+        context.teacherMap = loadByIds(teacherMapper, collectIds(items, SchedulePlanItem::getTeacherId), Teacher::getId);
+        context.classMap = loadByIds(classInfoMapper, collectIds(items, SchedulePlanItem::getClassId), ClassInfo::getId);
+        context.roomMap = loadByIds(classroomMapper, collectIds(items, SchedulePlanItem::getClassroomId), Classroom::getId);
+        context.courseMap = loadByIds(courseMapper, collectIds(items, SchedulePlanItem::getCourseId), Course::getId);
+        context.taskMap = loadByIds(teachingTaskMapper, collectIds(items, SchedulePlanItem::getTeachingTaskId), TeachingTask::getId);
         context.slotMap = timeSlotMapper.selectList(new LambdaQueryWrapper<>()).stream()
                 .collect(Collectors.toMap(slot -> slot.getDayOfWeek() + "_" + slot.getPeriodNo(), Function.identity(), (a, b) -> a));
         context.totalTimeSlots = Math.max(timeSlotMapper.selectCount(new LambdaQueryWrapper<TimeSlot>()), 1L);
         return context;
+    }
+
+    private <T> Map<Long, T> loadByIds(com.baomidou.mybatisplus.core.mapper.BaseMapper<T> mapper, List<Long> ids, Function<T, Long> keyExtractor) {
+        if (ids.isEmpty()) return Map.of();
+        return mapper.selectBatchIds(ids).stream()
+                .collect(Collectors.toMap(keyExtractor, Function.identity(), (a, b) -> a));
     }
 
     private <T> List<Long> collectIds(List<SchedulePlanItem> items, Function<SchedulePlanItem, Long> idFunc) {

@@ -1,5 +1,6 @@
 package com.paike.scheduler.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -33,6 +34,7 @@ public class ScheduleRepairTask {
     private Integer processedItemCount;
     private Integer successItemCount;
     private Integer failureItemCount;
+    @TableField(updateStrategy = FieldStrategy.IGNORED)
     private Long resultPlanId;
     private LocalDateTime startedAt;
     private LocalDateTime finishedAt;
