@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { House, DataLine, Calendar, Reading, PieChart, School, ArrowDown, Warning, Loading, Collection } from '@element-plus/icons-vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
 import { getCurrentSemester, setCurrentSemester, getAllSemesters, type Semester } from '../api/semester'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 const currentSemester = ref<Semester | null>(null)
@@ -59,7 +60,7 @@ onMounted(() => {
   <el-container class="app-layout">
     <el-aside width="220px" class="app-aside">
       <div class="logo">高校排课管理系统</div>
-      <el-menu router :default-active="router.currentRoute.value.path">
+      <el-menu router :default-active="route.path">
         <el-menu-item index="/dashboard">
           <el-icon><House /></el-icon>
           <span>首页</span>
