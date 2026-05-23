@@ -6,6 +6,7 @@ import com.paike.scheduler.entity.ScheduleRuleConfig;
 import com.paike.scheduler.mapper.ScheduleRuleConfigMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,6 +27,7 @@ public class ScheduleRuleService {
                 .orderByAsc(ScheduleRuleConfig::getId));
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void updateRules(List<ScheduleRuleConfig> rules) {
         for (ScheduleRuleConfig rule : rules) {
             // 校验每日最大课程数必须大于 0
@@ -51,6 +53,7 @@ public class ScheduleRuleService {
         ruleCache.clear();
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void resetToDefault() {
         List<ScheduleRuleConfig> defaults = List.of(
                 createRule("TEACHER_MAX_DAILY_SLOTS", "3", "教师每天最多课程大节数", "每位教师每天最多安排的大节数量", 1),

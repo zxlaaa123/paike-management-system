@@ -4,9 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.ScheduleRuleWeight;
 import com.paike.scheduler.mapper.ScheduleRuleWeightMapper;
+import com.paike.scheduler.service.dto.ScheduleRuleWeightBatchForm;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -44,8 +47,9 @@ public class ScheduleRuleWeightService {
         ruleWeightMapper.updateById(rule);
     }
 
-    public void batchUpdate(List<ScheduleRuleWeight> rules) {
-        for (ScheduleRuleWeight rule : rules) {
+    @Transactional(rollbackFor = Exception.class)
+    public void batchUpdate(List<ScheduleRuleWeightBatchForm.Item> rules) {
+        for (ScheduleRuleWeightBatchForm.Item rule : rules) {
             ScheduleRuleWeight existing = ruleWeightMapper.selectById(rule.getId());
             if (existing != null) {
                 if (rule.getEnabled() != null && rule.getEnabled() == 0 && isHardRule(existing)) {
@@ -53,6 +57,8 @@ public class ScheduleRuleWeightService {
                 }
                 existing.setWeight(rule.getWeight());
                 existing.setEnabled(rule.getEnabled());
+                existing.setDescription(rule.getDescription());
+                existing.setUpdatedAt(LocalDateTime.now());
                 ruleWeightMapper.updateById(existing);
             }
         }

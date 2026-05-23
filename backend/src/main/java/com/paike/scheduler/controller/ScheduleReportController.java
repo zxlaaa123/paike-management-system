@@ -6,6 +6,7 @@ import com.paike.scheduler.service.V4ScheduleReportService;
 import com.paike.scheduler.service.dto.V4ScheduleReportGenerateRequest;
 import com.paike.scheduler.service.vo.ScheduleReportItemVo;
 import com.paike.scheduler.service.vo.ScheduleReportListVo;
+import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.util.StreamUtils;
@@ -28,7 +29,7 @@ public class ScheduleReportController {
     @PostMapping("/plans/{planId}/generate")
     public Result<ScheduleReportItemVo> generatePlanReport(
             @PathVariable Long planId,
-            @RequestBody(required = false) V4ScheduleReportGenerateRequest request
+            @Valid @RequestBody(required = false) V4ScheduleReportGenerateRequest request
     ) {
         ScheduleReportItemVo result = scheduleReportService.generateReport(planId, request);
         return Result.success("报告生成成功", result);
@@ -53,4 +54,3 @@ public class ScheduleReportController {
         }
     }
 }
-

@@ -2,6 +2,7 @@ package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import lombok.RequiredArgsConstructor;
@@ -81,7 +82,7 @@ public class UnscheduledTaskService {
         return pageResult;
     }
 
-    public void addUnscheduledTask(Long batchId, Long taskId, int requiredSlots,
+    public void addUnscheduledTask(Long batchId, Long semesterId, Long taskId, int requiredSlots,
                                     int scheduledSlots, int remainingSlots,
                                     String reasonType, String reasonMessage) {
         TeachingTask task = teachingTaskMapper.selectById(taskId);
@@ -89,6 +90,7 @@ public class UnscheduledTaskService {
 
         UnscheduledTask ut = new UnscheduledTask();
         ut.setBatchId(batchId);
+        ut.setSemesterId(semesterId);
         ut.setTaskId(taskId);
         ut.setCourseId(task.getCourseId());
         ut.setTeacherId(task.getTeacherId());
@@ -109,8 +111,12 @@ public class UnscheduledTaskService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void clearAll() {
-        unscheduledTaskMapper.delete(new LambdaQueryWrapper<>());
+    public void clearBySemester(Long semesterId) {
+        if (semesterId == null) {
+            throw new BusinessException("clearBySemester 必须传入 semesterId");
+        }
+        unscheduledTaskMapper.delete(new LambdaQueryWrapper<UnscheduledTask>()
+                .eq(UnscheduledTask::getSemesterId, semesterId));
     }
 
     private void fillRelationFields(List<UnscheduledTask> records) {

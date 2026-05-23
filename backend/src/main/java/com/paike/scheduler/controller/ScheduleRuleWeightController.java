@@ -5,6 +5,8 @@ import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.ScheduleRuleWeight;
 import com.paike.scheduler.service.ScheduleRuleWeightService;
 import com.paike.scheduler.service.SemesterService;
+import com.paike.scheduler.service.dto.ScheduleRuleWeightBatchForm;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -51,14 +53,14 @@ public class ScheduleRuleWeightController {
     }
 
     @PutMapping("/{id}")
-    public Result<Void> update(@PathVariable Long id, @RequestBody WeightUpdateRequest request) {
+    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody WeightUpdateRequest request) {
         ruleWeightService.updateWeight(id, request.getWeight(), request.getEnabled(), request.getDescription());
         return Result.success("修改成功", null);
     }
 
     @PutMapping("/batch")
-    public Result<Void> batchUpdate(@RequestBody List<ScheduleRuleWeight> rules) {
-        ruleWeightService.batchUpdate(rules);
+    public Result<Void> batchUpdate(@Valid @RequestBody ScheduleRuleWeightBatchForm form) {
+        ruleWeightService.batchUpdate(form.getRules());
         return Result.success("批量保存成功", null);
     }
 

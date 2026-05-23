@@ -6,6 +6,7 @@ import com.paike.scheduler.service.V5SimulationService;
 import com.paike.scheduler.service.dto.V5RepairSuggestionGenerateRequest;
 import com.paike.scheduler.service.vo.V5RepairSuggestionVo;
 import com.paike.scheduler.service.vo.V5SimulationPlanDetailVo;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,7 +23,7 @@ public class V5RepairSuggestionController {
     @PostMapping("/generate")
     public Result<List<V5RepairSuggestionVo>> generate(
             @PathVariable Long taskId,
-            @RequestBody(required = false) V5RepairSuggestionGenerateRequest request
+            @Valid @RequestBody(required = false) V5RepairSuggestionGenerateRequest request
     ) {
         return Result.success("修复建议已生成", repairSuggestionService.generate(taskId, request));
     }

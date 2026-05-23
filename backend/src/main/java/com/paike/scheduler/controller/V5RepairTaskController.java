@@ -2,6 +2,7 @@ package com.paike.scheduler.controller;
 
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.service.V5RepairTaskFlowService;
+import com.paike.scheduler.service.dto.V5RepairTaskCancelRequest;
 import com.paike.scheduler.service.dto.V5RepairTaskFlowCreateRequest;
 import com.paike.scheduler.service.dto.V5RepairTaskStatusUpdateRequest;
 import com.paike.scheduler.service.vo.V5RepairTaskDetailVo;
@@ -11,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v5/repair-tasks")
@@ -48,9 +48,8 @@ public class V5RepairTaskController {
     }
 
     @PostMapping("/{taskId}/cancel")
-    public Result<V5RepairTaskDetailVo> cancel(@PathVariable Long taskId, @RequestBody(required = false) Map<String, Object> body) {
-        String reason = body == null || body.get("reason") == null ? null : String.valueOf(body.get("reason"));
+    public Result<V5RepairTaskDetailVo> cancel(@PathVariable Long taskId, @Valid @RequestBody(required = false) V5RepairTaskCancelRequest request) {
+        String reason = request == null ? null : request.getReason();
         return Result.success("任务已取消", repairTaskFlowService.cancelTask(taskId, reason));
     }
 }
-

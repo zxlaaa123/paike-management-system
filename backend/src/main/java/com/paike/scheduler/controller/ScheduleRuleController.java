@@ -3,9 +3,11 @@ package com.paike.scheduler.controller;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.ScheduleRuleConfig;
 import com.paike.scheduler.service.ScheduleRuleService;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -13,6 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/schedule-rules")
 @RequiredArgsConstructor
+@Validated
 public class ScheduleRuleController {
 
     private final ScheduleRuleService scheduleRuleService;
@@ -23,7 +26,7 @@ public class ScheduleRuleController {
     }
 
     @PutMapping
-    public Result<Void> update(@RequestBody List<RuleUpdateForm> rules) {
+    public Result<Void> update(@Valid @RequestBody List<@Valid RuleUpdateForm> rules) {
         List<ScheduleRuleConfig> entities = rules.stream().map(form -> {
             ScheduleRuleConfig entity = new ScheduleRuleConfig();
             entity.setRuleKey(form.getRuleKey());

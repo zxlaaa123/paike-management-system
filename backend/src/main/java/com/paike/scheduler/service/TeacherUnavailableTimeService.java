@@ -9,8 +9,11 @@ import com.paike.scheduler.entity.TimeSlot;
 import com.paike.scheduler.mapper.TeacherMapper;
 import com.paike.scheduler.mapper.TeacherUnavailableTimeMapper;
 import com.paike.scheduler.mapper.TimeSlotMapper;
+import com.paike.scheduler.service.dto.TeacherUnavailableTimeForm;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -100,7 +103,8 @@ public class TeacherUnavailableTimeService {
      * 禁排时间只允许配置到有效教师和有效时间段上。
      * 同一教师同一时间段只能有一条有效记录，避免冲突检测口径出现歧义。
      */
-    public TeacherUnavailableTime create(TeacherUnavailableTime form) {
+    @Transactional(rollbackFor = Exception.class)
+    public TeacherUnavailableTime create(TeacherUnavailableTimeForm form) {
         // 校验教师是否存在且启用
         Teacher teacher = teacherMapper.selectById(form.getTeacherId());
         if (teacher == null || teacher.getDeleted() == 1) {
@@ -134,7 +138,11 @@ public class TeacherUnavailableTimeService {
         entity.setDeleted(0);
         entity.setCreateTime(LocalDateTime.now());
         entity.setUpdateTime(LocalDateTime.now());
-        unavailableTimeMapper.insert(entity);
+        try {
+            unavailableTimeMapper.insert(entity);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException(409, teacher.getName() + "老师在" + timeSlot.getTimeLabel() + "已存在禁排时间");
+        }
         fillRelationFields(java.util.Collections.singletonList(entity));
         return entity;
     }
@@ -142,7 +150,8 @@ public class TeacherUnavailableTimeService {
     /**
      * 更新时沿用创建时的业务约束，但重复校验需要排除当前记录自身。
      */
-    public TeacherUnavailableTime update(Long id, TeacherUnavailableTime form) {
+    @Transactional(rollbackFor = Exception.class)
+    public TeacherUnavailableTime update(Long id, TeacherUnavailableTimeForm form) {
         TeacherUnavailableTime existing = unavailableTimeMapper.selectById(id);
         if (existing == null || existing.getDeleted() == 1) {
             throw new BusinessException("禁排时间记录不存在");
@@ -198,6 +207,7 @@ public class TeacherUnavailableTimeService {
     /**
      * 状态切换用于临时启停一条禁排规则，不影响记录本身的其他信息。
      */
+    @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long id, Integer status) {
         TeacherUnavailableTime existing = unavailableTimeMapper.selectById(id);
         if (existing == null || existing.getDeleted() == 1) {
