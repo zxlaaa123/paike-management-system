@@ -510,6 +510,10 @@ public class V5SimulationService {
                 .eq(Classroom::getDeleted, 0)
                 .eq(Classroom::getStatus, 1)
                 .orderByAsc(Classroom::getRoomName));
+        // P1-13: 把 plan / item / teacher / classInfo / course / allItems / weights / isLocked / classrooms / timeSlots 提到循环外。
+        // 单次评估 SQL 从 ~11 降到 ~1（仅剩 isUnavailable）。
+        V5RuleEvaluationService.EvaluationContext evalContext =
+                ruleEvaluationService.buildEvaluationContext(planId, target.getId(), classrooms, timeSlots);
         CandidatePlacement best = null;
         int evaluated = 0;
         for (TimeSlot slot : timeSlots) {
@@ -527,7 +531,7 @@ public class V5SimulationService {
                 evalReq.setScopePlanItemIds(new ArrayList<>(simulationScopeIds));
                 evalReq.setSimulationOnly(true);
                 evalReq.setSourcePlanId(planId);
-                V5CandidateEvaluationVo eval = ruleEvaluationService.evaluateCandidate(evalReq);
+                V5CandidateEvaluationVo eval = ruleEvaluationService.evaluateCandidate(evalReq, evalContext);
                 evaluated++;
                 if (!Boolean.TRUE.equals(eval.getAvailable())) {
                     continue;
