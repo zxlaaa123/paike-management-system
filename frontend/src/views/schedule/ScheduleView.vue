@@ -18,7 +18,6 @@ import { getAllTeachingTasks, type TeachingTask } from '../../api/teachingTask'
 import { getAllTimeSlots, type TimeSlot } from '../../api/timeSlot'
 import { getAllClassrooms, type Classroom } from '../../api/classroom'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
-import { extractMessage } from '../../utils/errors'
 
 const router = useRouter()
 const loading = ref(false)
@@ -92,6 +91,9 @@ async function fetchData() {
     const res = await getScheduleList(params)
     tableData.value = res.records
     total.value = res.total
+  } catch {
+    tableData.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
@@ -161,7 +163,7 @@ async function handleSubmit() {
     await createSchedule(form)
     ElMessage.success('排课成功')
     dialogVisible.value = false
-    fetchData()
+    await fetchData()
   } catch (_e) {
     console.error(_e)
   } finally {
@@ -178,9 +180,9 @@ async function handleDelete(row: Schedule) {
   try {
     await deleteSchedule(row.id)
     ElMessage.success('删除成功')
-    fetchData()
-  } catch (e: unknown) {
-    ElMessage.error(extractMessage(e, '删除失败'))
+    await fetchData()
+  } catch {
+    // 拦截器已弹错误提示
   }
 }
 

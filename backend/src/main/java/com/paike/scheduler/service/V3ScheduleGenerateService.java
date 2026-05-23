@@ -53,6 +53,14 @@ public class V3ScheduleGenerateService {
         if (tasks.isEmpty()) {
             throw new BusinessException("当前学期没有可排课的教学任务");
         }
+        List<Long> courseIds = tasks.stream().map(TeachingTask::getCourseId).filter(Objects::nonNull).distinct().toList();
+        List<Long> classIds = tasks.stream().map(TeachingTask::getClassId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, Course> courseMap = courseIds.isEmpty() ? Map.of() :
+                courseMapper.selectBatchIds(courseIds).stream()
+                        .collect(Collectors.toMap(Course::getId, c -> c, (a, b) -> a));
+        Map<Long, ClassInfo> classMap = classIds.isEmpty() ? Map.of() :
+                classInfoMapper.selectBatchIds(classIds).stream()
+                        .collect(Collectors.toMap(ClassInfo::getId, c -> c, (a, b) -> a));
 
         List<TimeSlot> timeSlots = loadSortedTimeSlots();
         List<Classroom> classrooms = loadAvailableClassrooms();
@@ -82,7 +90,9 @@ public class V3ScheduleGenerateService {
                 toUnavailableKeySet(unavailableTimes),
                 toUnavailableCount(unavailableTimes),
                 timeSlots,
-                classrooms
+                classrooms,
+                courseMap,
+                classMap
         );
 
         StepCounter stepCounter = new StepCounter();
@@ -282,7 +292,7 @@ public class V3ScheduleGenerateService {
     }
 
     private List<SchedulePlanItem> generatePlanItems(SchedulePlan plan, List<TeachingTask> tasks, GenerationContext context) {
-        List<TeachingTask> sortedTasks = sortTasks(tasks, context.unavailableCount());
+        List<TeachingTask> sortedTasks = sortTasks(tasks, context.unavailableCount(), context.courseMap(), context.classMap());
         List<SchedulePlanItem> generatedItems = new ArrayList<>();
         int unscheduledCount = 0;
         StepCounter stepCounter = new StepCounter(2);
@@ -290,9 +300,9 @@ public class V3ScheduleGenerateService {
         for (TeachingTask task : sortedTasks) {
             int requiredSlots = Math.max(1, (int) Math.ceil((task.getWeeklyHours() == null ? 0 : task.getWeeklyHours()) / 2.0));
             Set<Integer> usedDays = new HashSet<>();
-            String courseType = getCourseType(task.getCourseId());
-            int studentCount = getClassStudentCount(task.getClassId());
-            String taskLabel = taskLabel(task);
+            String courseType = getCourseType(task.getCourseId(), context.courseMap());
+            int studentCount = getClassStudentCount(task.getClassId(), context.classMap());
+            String taskLabel = taskLabel(task, context.courseMap(), context.classMap());
             List<Classroom> matchedRooms = context.classrooms().stream()
                     .filter(room -> room.getCapacity() != null && room.getCapacity() >= studentCount)
                     .filter(room -> isRoomTypeMatched(courseType, room.getRoomType()))
@@ -379,7 +389,7 @@ public class V3ScheduleGenerateService {
         boolean allowSameCourseSameDay = ruleService.getBoolValue("ALLOW_SAME_COURSE_SAME_DAY");
 
         Candidate best = null;
-        String taskLabel = taskLabel(task);
+        String taskLabel = taskLabel(task, context.courseMap(), context.classMap());
         for (TimeSlot slot : context.timeSlots()) {
             if (context.unavailableKeySet().contains(task.getTeacherId() + "_" + slot.getId())) {
                 explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_TEACHER",
@@ -481,8 +491,8 @@ public class V3ScheduleGenerateService {
             GenerationContext context
     ) {
         double score = 0D;
-        String courseType = getCourseType(task.getCourseId());
-        int studentCount = getClassStudentCount(task.getClassId());
+        String courseType = getCourseType(task.getCourseId(), context.courseMap());
+        int studentCount = getClassStudentCount(task.getClassId(), context.classMap());
 
         score += weight(context, "CLASSROOM_UTILIZATION") * classroomUtilizationScore(room, studentCount);
         score += weight(context, "CLASS_DAILY_BALANCE") * balanceScore(generatedItems, item -> Objects.equals(item.getClassId(), task.getClassId()), slot.getDayOfWeek());
@@ -537,16 +547,21 @@ public class V3ScheduleGenerateService {
         return context.weightMap().getOrDefault(ruleCode, BigDecimal.ZERO).doubleValue();
     }
 
-    private List<TeachingTask> sortTasks(List<TeachingTask> tasks, Map<Long, Long> unavailableCount) {
+    private List<TeachingTask> sortTasks(
+            List<TeachingTask> tasks,
+            Map<Long, Long> unavailableCount,
+            Map<Long, Course> courseMap,
+            Map<Long, ClassInfo> classMap
+    ) {
         return tasks.stream().sorted((a, b) -> {
-            String typeA = getCourseType(a.getCourseId());
-            String typeB = getCourseType(b.getCourseId());
+            String typeA = getCourseType(a.getCourseId(), courseMap);
+            String typeB = getCourseType(b.getCourseId(), courseMap);
             int priorityA = (CourseType.EXPERIMENT.getCode().equals(typeA) || CourseType.COMPUTER.getCode().equals(typeA)) ? 0 : 1;
             int priorityB = (CourseType.EXPERIMENT.getCode().equals(typeB) || CourseType.COMPUTER.getCode().equals(typeB)) ? 0 : 1;
             if (priorityA != priorityB) return priorityA - priorityB;
 
-            int countA = getClassStudentCount(a.getClassId());
-            int countB = getClassStudentCount(b.getClassId());
+            int countA = getClassStudentCount(a.getClassId(), classMap);
+            int countB = getClassStudentCount(b.getClassId(), classMap);
             if (countB != countA) return countB - countA;
 
             int weeklyA = a.getWeeklyHours() == null ? 0 : a.getWeeklyHours();
@@ -565,13 +580,13 @@ public class V3ScheduleGenerateService {
         return true;
     }
 
-    private String getCourseType(Long courseId) {
-        Course course = courseMapper.selectById(courseId);
+    private String getCourseType(Long courseId, Map<Long, Course> courseMap) {
+        Course course = courseMap.get(courseId);
         return course != null ? course.getCourseType() : CourseType.NORMAL.getCode();
     }
 
-    private int getClassStudentCount(Long classId) {
-        ClassInfo classInfo = classInfoMapper.selectById(classId);
+    private int getClassStudentCount(Long classId, Map<Long, ClassInfo> classMap) {
+        ClassInfo classInfo = classMap.get(classId);
         return classInfo != null && classInfo.getStudentCount() != null ? classInfo.getStudentCount() : 0;
     }
 
@@ -630,7 +645,9 @@ public class V3ScheduleGenerateService {
             Set<String> unavailableKeySet,
             Map<Long, Long> unavailableCount,
             List<TimeSlot> timeSlots,
-            List<Classroom> classrooms
+            List<Classroom> classrooms,
+            Map<Long, Course> courseMap,
+            Map<Long, ClassInfo> classMap
     ) {
     }
 
@@ -764,9 +781,9 @@ public class V3ScheduleGenerateService {
                 "请新增时间段，或降低同课程同日/日排课限制");
     }
 
-    private String taskLabel(TeachingTask task) {
-        Course course = courseMapper.selectById(task.getCourseId());
-        ClassInfo classInfo = classInfoMapper.selectById(task.getClassId());
+    private String taskLabel(TeachingTask task, Map<Long, Course> courseMap, Map<Long, ClassInfo> classMap) {
+        Course course = courseMap.get(task.getCourseId());
+        ClassInfo classInfo = classMap.get(task.getClassId());
         String courseName = course != null ? course.getCourseName() : "未知课程";
         String className = classInfo != null ? classInfo.getClassName() : "未知班级";
         return courseName + "-" + className;

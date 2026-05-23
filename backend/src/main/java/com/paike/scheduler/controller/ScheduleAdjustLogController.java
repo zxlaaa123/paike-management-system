@@ -1,7 +1,6 @@
 package com.paike.scheduler.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.ScheduleAdjustLog;
 import com.paike.scheduler.service.SchedulePlanExplainService;
@@ -30,11 +29,7 @@ public class ScheduleAdjustLogController {
     ) {
         Long resolvedSemesterId = semesterId;
         if (resolvedSemesterId == null) {
-            try {
-                resolvedSemesterId = semesterService.getCurrentSemester().getId();
-            } catch (BusinessException e) {
-                return Result.success(new Page<>(pageNum, pageSize));
-            }
+            resolvedSemesterId = semesterService.getCurrentSemester().getId();
         }
         return Result.success(explainService.listAdjustLogs(resolvedSemesterId, planId, teachingTaskId, pageNum, pageSize));
     }

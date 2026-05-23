@@ -103,6 +103,9 @@ public class AutoScheduleService {
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TimeSlot>()
                         .orderByAsc(TimeSlot::getSortOrder));
         timeSlots = sortTimeSlots(timeSlots, prioritizeMorning, avoidFridayAfternoon);
+        Map<Integer, List<Long>> slotIdsByDay = timeSlots.stream()
+                .collect(Collectors.groupingBy(TimeSlot::getDayOfWeek,
+                        Collectors.mapping(TimeSlot::getId, Collectors.toList())));
 
         // 6. 读取可用教室
         List<Classroom> classrooms = classroomMapper.selectList(
@@ -195,14 +198,14 @@ public class AutoScheduleService {
                     }
 
                     // 检查教师每日最大课程数
-                    if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), teacherMaxDailySlots, semesterId)) {
+                    if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), teacherMaxDailySlots, semesterId, slotIdsByDay)) {
                         lastFailReason = "教师每天最多" + teacherMaxDailySlots + "个大节";
                         lastFailReasonType = "TEACHER_DAILY_LIMIT";
                         continue;
                     }
 
                     // 检查班级每日最大课程数
-                    if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), classMaxDailySlots, semesterId)) {
+                    if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), classMaxDailySlots, semesterId, slotIdsByDay)) {
                         lastFailReason = "班级每天最多" + classMaxDailySlots + "个大节";
                         lastFailReasonType = "CLASS_DAILY_LIMIT";
                         continue;
@@ -211,7 +214,7 @@ public class AutoScheduleService {
                     // 检查同一课程同一天重复
                     if (!allowSameCourseSameDay && usedDays.contains(slot.getDayOfWeek())) {
                         // 先判断本次 run 中是否已经给当前任务占过这一天，再回库里确认历史排课是否也已占用。
-                        if (hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), batch.getId(), semesterId)) {
+                        if (hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), batch.getId(), semesterId, slotIdsByDay)) {
                             lastFailReason = "同一课程同一天不允许重复";
                             lastFailReasonType = "SAME_COURSE_SAME_DAY";
                             continue;
@@ -367,8 +370,8 @@ public class AutoScheduleService {
      * 通过同一连接读得到（MySQL 的 read-own-writes），无需额外 batchId 过滤。
      * 之前残留的 currentBatchId 参数已删除，避免给调用方造成"还在生效"的错觉。
      */
-    private boolean checkTeacherDailyLimit(Long teacherId, int dayOfWeek, int maxSlots, Long semesterId) {
-        List<Long> slotIds = getTimeSlotIdsByDay(dayOfWeek);
+    private boolean checkTeacherDailyLimit(Long teacherId, int dayOfWeek, int maxSlots, Long semesterId, Map<Integer, List<Long>> slotIdsByDay) {
+        List<Long> slotIds = slotIdsByDay.getOrDefault(dayOfWeek, List.of());
         if (slotIds.isEmpty()) return true;
         LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getTeacherId, teacherId)
@@ -382,8 +385,8 @@ public class AutoScheduleService {
     /**
      * 班级每日上限和教师上限同口径处理，避免新增当前大节后越过规则阈值。
      */
-    private boolean checkClassDailyLimit(Long classId, int dayOfWeek, int maxSlots, Long semesterId) {
-        List<Long> slotIds = getTimeSlotIdsByDay(dayOfWeek);
+    private boolean checkClassDailyLimit(Long classId, int dayOfWeek, int maxSlots, Long semesterId, Map<Integer, List<Long>> slotIdsByDay) {
+        List<Long> slotIds = slotIdsByDay.getOrDefault(dayOfWeek, List.of());
         if (slotIds.isEmpty()) return true;
         LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getClassId, classId)
@@ -394,15 +397,8 @@ public class AutoScheduleService {
         return count < maxSlots;
     }
 
-    private List<Long> getTimeSlotIdsByDay(int dayOfWeek) {
-        return timeSlotMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TimeSlot>()
-                        .eq(TimeSlot::getDayOfWeek, dayOfWeek))
-                .stream().map(TimeSlot::getId).collect(Collectors.toList());
-    }
-
-    private boolean hasSameCourseSameDay(Long classId, Long courseId, int dayOfWeek, Long batchId, Long semesterId) {
-        List<Long> slotIds = getTimeSlotIdsByDay(dayOfWeek);
+    private boolean hasSameCourseSameDay(Long classId, Long courseId, int dayOfWeek, Long batchId, Long semesterId, Map<Integer, List<Long>> slotIdsByDay) {
+        List<Long> slotIds = slotIdsByDay.getOrDefault(dayOfWeek, List.of());
         if (slotIds.isEmpty()) return false;
         long count = scheduleMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Schedule>()

@@ -46,6 +46,8 @@ async function fetchData() {
       params.semesterId = currentSemester.value.id
     }
     tableData.value = await getRuleWeights(params)
+  } catch {
+    tableData.value = []
   } finally {
     loading.value = false
   }

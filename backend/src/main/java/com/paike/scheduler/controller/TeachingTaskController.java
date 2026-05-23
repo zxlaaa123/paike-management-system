@@ -13,6 +13,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/teaching-tasks")
 @RequiredArgsConstructor
+@Slf4j
 public class TeachingTaskController {
 
     private final TeachingTaskMapper teachingTaskMapper;
@@ -50,6 +52,7 @@ public class TeachingTaskController {
                 resolvedSemesterId = current.getId();
             } catch (BusinessException e) {
                 // 没有当前学期时返回空结果
+                log.warn("未找到当前学期，教学任务列表按业务约定返回空分页，前端显示空列表", e);
                 return Result.success(new Page<>(pageNum, pageSize));
             }
         }

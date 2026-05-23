@@ -229,7 +229,7 @@ export interface V5ConsistencyCheckReport {
 }
 
 export function generateLocalReplan(taskId: number, payload?: V5LocalReplanPayload) {
-  return request.post<ApiResponse<V5SimulationPlanDetail>>(`/v5/repair-tasks/${taskId}/simulations/local-replan`, payload ?? {}).then((r) => {
+  return request.post<ApiResponse<V5SimulationPlanDetail>>(`/v5/repair-tasks/${taskId}/simulations/local-replan`, payload ?? {}, { timeout: 120_000 }).then((r) => {
     if (!r.data) throw new Error('响应数据为空')
     return r.data.data
   })
@@ -295,7 +295,7 @@ export interface V5RepairExplanation {
 }
 
 export function generateRepairExplanation(taskId: number, planId: number) {
-  return request.post<ApiResponse<V5RepairExplanation>>(`/v5/repair-tasks/${taskId}/simulations/${planId}/ai-explanation`).then((r) => {
+  return request.post<ApiResponse<V5RepairExplanation>>(`/v5/repair-tasks/${taskId}/simulations/${planId}/ai-explanation`, undefined, { timeout: 120_000 }).then((r) => {
     if (!r.data) throw new Error('响应数据为空')
     return r.data.data
   })

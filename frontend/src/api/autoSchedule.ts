@@ -40,7 +40,7 @@ export function runAutoSchedule(data: {
   clearOldAutoSchedule?: boolean
   clearAllSchedule?: boolean
 }) {
-  return request.post<ApiResponse<AutoScheduleBatch>>('/auto-schedule/run', data).then((r) => {
+  return request.post<ApiResponse<AutoScheduleBatch>>('/auto-schedule/run', data, { timeout: 120_000 }).then((r) => {
     if (!r.data) {
       throw new Error('响应数据为空')
     }

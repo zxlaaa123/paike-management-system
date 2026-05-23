@@ -15,6 +15,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/schedules")
 @RequiredArgsConstructor
+@Slf4j
 public class ScheduleController {
 
     private final ScheduleMapper scheduleMapper;
@@ -60,6 +62,7 @@ public class ScheduleController {
                 Semester current = semesterService.getCurrentSemester();
                 resolvedSemesterId = current.getId();
             } catch (BusinessException e) {
+                log.warn("未找到当前学期，排课列表按业务约定返回空分页，前端显示空列表", e);
                 return Result.success(new Page<>(page, size));
             }
         }
@@ -97,6 +100,9 @@ public class ScheduleController {
         }
 
         TeachingTask task = teachingTaskMapper.selectById(form.getTeachingTaskId());
+        if (task == null || task.getDeleted() == 1) {
+            throw new BusinessException(400, "教学任务不存在或已删除");
+        }
 
         Schedule schedule = new Schedule();
         schedule.setSemesterId(task.getSemesterId());

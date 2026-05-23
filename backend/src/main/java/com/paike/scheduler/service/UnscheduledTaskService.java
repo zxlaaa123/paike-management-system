@@ -125,22 +125,36 @@ public class UnscheduledTaskService {
         List<Long> taskIds = records.stream().map(UnscheduledTask::getTaskId).distinct().collect(Collectors.toList());
         List<Long> batchIds = records.stream().map(UnscheduledTask::getBatchId).distinct().collect(Collectors.toList());
 
-        Map<Long, TeachingTask> taskMap = teachingTaskMapper.selectList(
-                        new LambdaQueryWrapper<TeachingTask>().in(TeachingTask::getId, taskIds)).stream()
+        Map<Long, TeachingTask> taskMap = taskIds.isEmpty() ? Map.of() :
+                teachingTaskMapper.selectBatchIds(taskIds).stream()
                 .collect(Collectors.toMap(TeachingTask::getId, t -> t, (a, b) -> a));
 
-        Map<Long, AutoScheduleBatch> batchMap = batchMapper.selectList(
-                        new LambdaQueryWrapper<AutoScheduleBatch>().in(AutoScheduleBatch::getId, batchIds)).stream()
+        List<Long> courseIds = taskMap.values().stream().map(TeachingTask::getCourseId).distinct().collect(Collectors.toList());
+        List<Long> teacherIds = taskMap.values().stream().map(TeachingTask::getTeacherId).distinct().collect(Collectors.toList());
+        List<Long> classIds = taskMap.values().stream().map(TeachingTask::getClassId).distinct().collect(Collectors.toList());
+
+        Map<Long, Course> courseMap = courseIds.isEmpty() ? Map.of() :
+                courseMapper.selectBatchIds(courseIds).stream()
+                        .collect(Collectors.toMap(Course::getId, c -> c, (a, b) -> a));
+        Map<Long, Teacher> teacherMap = teacherIds.isEmpty() ? Map.of() :
+                teacherMapper.selectBatchIds(teacherIds).stream()
+                        .collect(Collectors.toMap(Teacher::getId, t -> t, (a, b) -> a));
+        Map<Long, ClassInfo> classInfoMap = classIds.isEmpty() ? Map.of() :
+                classInfoMapper.selectBatchIds(classIds).stream()
+                        .collect(Collectors.toMap(ClassInfo::getId, c -> c, (a, b) -> a));
+
+        Map<Long, AutoScheduleBatch> batchMap = batchIds.isEmpty() ? Map.of() :
+                batchMapper.selectBatchIds(batchIds).stream()
                 .collect(Collectors.toMap(AutoScheduleBatch::getId, b -> b, (a, b) -> a));
 
         for (UnscheduledTask ut : records) {
             TeachingTask task = taskMap.get(ut.getTaskId());
             if (task != null) {
-                Course course = courseMapper.selectById(task.getCourseId());
+                Course course = courseMap.get(task.getCourseId());
                 if (course != null) ut.setCourseName(course.getCourseName());
-                Teacher teacher = teacherMapper.selectById(task.getTeacherId());
+                Teacher teacher = teacherMap.get(task.getTeacherId());
                 if (teacher != null) ut.setTeacherName(teacher.getName());
-                ClassInfo classInfo = classInfoMapper.selectById(task.getClassId());
+                ClassInfo classInfo = classInfoMap.get(task.getClassId());
                 if (classInfo != null) ut.setClassName(classInfo.getClassName());
             }
             AutoScheduleBatch batch = batchMap.get(ut.getBatchId());

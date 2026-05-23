@@ -1,6 +1,5 @@
 package com.paike.scheduler.controller;
 
-import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.ScheduleRuleWeight;
 import com.paike.scheduler.service.ScheduleRuleWeightService;
@@ -30,11 +29,7 @@ public class ScheduleRuleWeightController {
     ) {
         Long resolvedSemesterId = semesterId;
         if (resolvedSemesterId == null) {
-            try {
-                resolvedSemesterId = semesterService.getCurrentSemester().getId();
-            } catch (BusinessException e) {
-                return Result.success(List.of());
-            }
+            resolvedSemesterId = semesterService.getCurrentSemester().getId();
         }
         return Result.success(ruleWeightService.list(resolvedSemesterId, strategyType, ruleType));
     }
