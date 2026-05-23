@@ -281,78 +281,7 @@ public class SchedulePlanService {
         if ("APPLIED".equals(plan.getStatus())) {
             throw new BusinessException("该方案已应用，无需重复应用");
         }
-        if (plan.getScheduledCount() == null || plan.getScheduledCount() == 0) {
-            throw new BusinessException("该方案没有排课明细，无法应用");
-        }
-
-        assertNoConflictsBeforeApply(plan.getId());
-        Long semesterId = plan.getSemesterId();
-
-        List<SchedulePlan> oldAppliedPlans = planMapper.selectList(
-                new LambdaQueryWrapper<SchedulePlan>()
-                        .eq(SchedulePlan::getSemesterId, semesterId)
-                        .eq(SchedulePlan::getStatus, "APPLIED"));
-        ensurePlansUnlocked(oldAppliedPlans, "存在已锁定课程，不能被新方案覆盖，请先解锁");
-        for (SchedulePlan oldPlan : oldAppliedPlans) {
-            scheduleMapper.update(null,
-                    new LambdaUpdateWrapper<Schedule>()
-                            .eq(Schedule::getSemesterId, semesterId)
-                            .eq(Schedule::getPlanId, oldPlan.getId())
-                            .set(Schedule::getDeleted, 1)
-                            .set(Schedule::getUpdateTime, LocalDateTime.now()));
-            oldPlan.setStatus("DRAFT");
-            oldPlan.setUpdatedAt(LocalDateTime.now());
-            planMapper.updateById(oldPlan);
-        }
-
-        List<SchedulePlanItem> items = planItemMapper.selectList(
-                new LambdaQueryWrapper<SchedulePlanItem>()
-                        .eq(SchedulePlanItem::getPlanId, id));
-
-        Map<String, Long> timeSlotMap = timeSlotMapper.selectList(null).stream()
-                .collect(Collectors.toMap(
-                        ts -> ts.getDayOfWeek() + "_" + ts.getPeriodNo(),
-                        TimeSlot::getId,
-                        (a, b) -> a));
-
-        int insertedCount = 0;
-        for (SchedulePlanItem item : items) {
-            validatePeriodPair(item);
-            int periodNo = (item.getStartPeriod() + 1) / 2;
-            String key = item.getWeekday() + "_" + periodNo;
-            Long timeSlotId = timeSlotMap.get(key);
-            if (timeSlotId == null) {
-                throw new BusinessException("无法找到对应的时间段：周" + item.getWeekday() + " 第" + item.getStartPeriod() + "-" + item.getEndPeriod() + "节");
-            }
-
-            Schedule schedule = new Schedule();
-            schedule.setSemesterId(semesterId);
-            schedule.setPlanId(plan.getId());
-            schedule.setTeachingTaskId(item.getTeachingTaskId());
-            schedule.setCourseId(item.getCourseId());
-            schedule.setTeacherId(item.getTeacherId());
-            schedule.setClassId(item.getClassId());
-            schedule.setClassroomId(item.getClassroomId());
-            schedule.setTimeSlotId(timeSlotId);
-            schedule.setSourceType("PLAN");
-            schedule.setDeleted(0);
-            schedule.setCreateTime(LocalDateTime.now());
-            schedule.setUpdateTime(LocalDateTime.now());
-            scheduleMapper.insert(schedule);
-            insertedCount++;
-        }
-
-        plan.setStatus("APPLIED");
-        plan.setAppliedAt(LocalDateTime.now());
-        plan.setUpdatedAt(LocalDateTime.now());
-        planMapper.updateById(plan);
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("planId", plan.getId());
-        result.put("semesterId", semesterId);
-        result.put("appliedCount", insertedCount);
-        result.put("appliedAt", plan.getAppliedAt());
-        return result;
+        return applyPlanInternal(plan);
     }
 
     @Transactional(rollbackFor = Exception.class)
