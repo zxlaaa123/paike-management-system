@@ -3,6 +3,7 @@ package com.paike.scheduler.service;
 import com.paike.scheduler.common.enums.CourseType;
 import com.paike.scheduler.common.enums.RoomType;
 import com.paike.scheduler.common.enums.ScheduleSourceType;
+import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.service.dto.AutoScheduleRequest;
 import com.paike.scheduler.service.dto.AutoScheduleResult;
@@ -44,18 +45,30 @@ public class AutoScheduleService {
     private final TeacherUnavailableTimeMapper unavailableTimeMapper;
     private final CourseMapper courseMapper;
     private final ClassInfoMapper classInfoMapper;
+    private final SemesterService semesterService;
+    private final ScheduleLockGuardService lockGuardService;
 
     @Transactional(rollbackFor = Exception.class)
     public AutoScheduleResult run(AutoScheduleRequest request) {
+        Long semesterId = resolveSemesterId(request);
         // 1. 清空旧排课（如需要）
         if (request.isClearAllSchedule()) {
+            ensureSchedulesUnlocked(new LambdaQueryWrapper<Schedule>()
+                    .eq(Schedule::getDeleted, 0)
+                    .eq(Schedule::getSemesterId, semesterId));
             scheduleMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Schedule>()
-                    .eq(Schedule::getDeleted, 0));
+                    .eq(Schedule::getDeleted, 0)
+                    .eq(Schedule::getSemesterId, semesterId));
             unscheduledTaskService.clearAll();
         } else if (request.isClearOldAutoSchedule()) {
+            ensureSchedulesUnlocked(new LambdaQueryWrapper<Schedule>()
+                    .eq(Schedule::getSourceType, ScheduleSourceType.AUTO.getCode())
+                    .eq(Schedule::getDeleted, 0)
+                    .eq(Schedule::getSemesterId, semesterId));
             scheduleMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Schedule>()
                     .eq(Schedule::getSourceType, ScheduleSourceType.AUTO.getCode())
-                    .eq(Schedule::getDeleted, 0));
+                    .eq(Schedule::getDeleted, 0)
+                    .eq(Schedule::getSemesterId, semesterId));
             unscheduledTaskService.clearAll();
         }
 
@@ -63,7 +76,8 @@ public class AutoScheduleService {
         List<TeachingTask> allTasks = teachingTaskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TeachingTask>()
                         .eq(TeachingTask::getDeleted, 0)
-                        .eq(TeachingTask::getStatus, 1));
+                        .eq(TeachingTask::getStatus, 1)
+                        .eq(TeachingTask::getSemesterId, semesterId));
 
         List<TeachingTask> targetTasks;
         if (request.getTaskIds() != null && !request.getTaskIds().isEmpty()) {
@@ -181,14 +195,14 @@ public class AutoScheduleService {
                     }
 
                     // 检查教师每日最大课程数
-                    if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), teacherMaxDailySlots)) {
+                    if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), teacherMaxDailySlots, semesterId)) {
                         lastFailReason = "教师每天最多" + teacherMaxDailySlots + "个大节";
                         lastFailReasonType = "TEACHER_DAILY_LIMIT";
                         continue;
                     }
 
                     // 检查班级每日最大课程数
-                    if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), classMaxDailySlots)) {
+                    if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), classMaxDailySlots, semesterId)) {
                         lastFailReason = "班级每天最多" + classMaxDailySlots + "个大节";
                         lastFailReasonType = "CLASS_DAILY_LIMIT";
                         continue;
@@ -197,7 +211,7 @@ public class AutoScheduleService {
                     // 检查同一课程同一天重复
                     if (!allowSameCourseSameDay && usedDays.contains(slot.getDayOfWeek())) {
                         // 先判断本次 run 中是否已经给当前任务占过这一天，再回库里确认历史排课是否也已占用。
-                        if (hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), batch.getId())) {
+                        if (hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), batch.getId(), semesterId)) {
                             lastFailReason = "同一课程同一天不允许重复";
                             lastFailReasonType = "SAME_COURSE_SAME_DAY";
                             continue;
@@ -353,11 +367,12 @@ public class AutoScheduleService {
      * 通过同一连接读得到（MySQL 的 read-own-writes），无需额外 batchId 过滤。
      * 之前残留的 currentBatchId 参数已删除，避免给调用方造成"还在生效"的错觉。
      */
-    private boolean checkTeacherDailyLimit(Long teacherId, int dayOfWeek, int maxSlots) {
+    private boolean checkTeacherDailyLimit(Long teacherId, int dayOfWeek, int maxSlots, Long semesterId) {
         List<Long> slotIds = getTimeSlotIdsByDay(dayOfWeek);
         if (slotIds.isEmpty()) return true;
         LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getTeacherId, teacherId)
+                .eq(Schedule::getSemesterId, semesterId)
                 .eq(Schedule::getDeleted, 0)
                 .in(Schedule::getTimeSlotId, slotIds);
         long count = scheduleMapper.selectCount(wrapper);
@@ -367,11 +382,12 @@ public class AutoScheduleService {
     /**
      * 班级每日上限和教师上限同口径处理，避免新增当前大节后越过规则阈值。
      */
-    private boolean checkClassDailyLimit(Long classId, int dayOfWeek, int maxSlots) {
+    private boolean checkClassDailyLimit(Long classId, int dayOfWeek, int maxSlots, Long semesterId) {
         List<Long> slotIds = getTimeSlotIdsByDay(dayOfWeek);
         if (slotIds.isEmpty()) return true;
         LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getClassId, classId)
+                .eq(Schedule::getSemesterId, semesterId)
                 .eq(Schedule::getDeleted, 0)
                 .in(Schedule::getTimeSlotId, slotIds);
         long count = scheduleMapper.selectCount(wrapper);
@@ -385,20 +401,29 @@ public class AutoScheduleService {
                 .stream().map(TimeSlot::getId).collect(Collectors.toList());
     }
 
-    private boolean hasSameCourseSameDay(Long classId, Long courseId, int dayOfWeek, Long batchId) {
+    private boolean hasSameCourseSameDay(Long classId, Long courseId, int dayOfWeek, Long batchId, Long semesterId) {
         List<Long> slotIds = getTimeSlotIdsByDay(dayOfWeek);
         if (slotIds.isEmpty()) return false;
         long count = scheduleMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Schedule>()
                         .eq(Schedule::getClassId, classId)
                         .eq(Schedule::getCourseId, courseId)
+                        .eq(Schedule::getSemesterId, semesterId)
                         .eq(Schedule::getDeleted, 0)
                         .in(Schedule::getTimeSlotId, slotIds));
         return count > 0;
     }
 
+    private void ensureSchedulesUnlocked(LambdaQueryWrapper<Schedule> wrapper) {
+        List<Schedule> schedules = scheduleMapper.selectList(wrapper);
+        for (Schedule schedule : schedules) {
+            lockGuardService.ensureScheduleAndLinkedPlanUnlocked(schedule, "存在已锁定课程，不能清空当前排课结果");
+        }
+    }
+
     private void saveSchedule(TeachingTask task, TimeSlot slot, Classroom room, Long batchId) {
         Schedule schedule = new Schedule();
+        schedule.setSemesterId(task.getSemesterId());
         schedule.setTeachingTaskId(task.getId());
         schedule.setCourseId(task.getCourseId());
         schedule.setTeacherId(task.getTeacherId());
@@ -411,6 +436,17 @@ public class AutoScheduleService {
         schedule.setCreateTime(LocalDateTime.now());
         schedule.setUpdateTime(LocalDateTime.now());
         scheduleMapper.insert(schedule);
+    }
+
+    private Long resolveSemesterId(AutoScheduleRequest request) {
+        if (request.getSemesterId() != null) {
+            return request.getSemesterId();
+        }
+        try {
+            return semesterService.getCurrentSemester().getId();
+        } catch (BusinessException e) {
+            throw new BusinessException("未找到当前学期，无法执行自动排课");
+        }
     }
 
     private String getCourseType(Long courseId, Map<Long, Course> courseMap) {

@@ -108,8 +108,7 @@ public class ScheduleConflictService {
         LambdaQueryWrapper<Schedule> baseWrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getDeleted, 0)
                 .eq(Schedule::getTimeSlotId, timeSlotId)
-                .eq(task.getSemesterId() != null, Schedule::getSemesterId, task.getSemesterId())
-                .isNull(Schedule::getPlanId);
+                .eq(task.getSemesterId() != null, Schedule::getSemesterId, task.getSemesterId());
         if (excludeScheduleId != null) {
             baseWrapper.ne(Schedule::getId, excludeScheduleId);
         }
@@ -156,8 +155,7 @@ public class ScheduleConflictService {
         LambdaQueryWrapper<Schedule> taskWrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getTeachingTaskId, taskId)
                 .eq(Schedule::getDeleted, 0)
-                .eq(task.getSemesterId() != null, Schedule::getSemesterId, task.getSemesterId())
-                .isNull(Schedule::getPlanId);
+                .eq(task.getSemesterId() != null, Schedule::getSemesterId, task.getSemesterId());
         if (excludeScheduleId != null) {
             taskWrapper.ne(Schedule::getId, excludeScheduleId);
         }
@@ -182,7 +180,7 @@ public class ScheduleConflictService {
 
         // 批量统计每日冲突计数,一次查询替代之前的三次 selectCount
         Map<String, Long> dailyCounts = scheduleMapper.selectDailyConflictCounts(
-                teacherId, classId, task.getCourseId(), daySlotIds, task.getSemesterId(), null);
+                teacherId, classId, task.getCourseId(), daySlotIds, task.getSemesterId(), null, excludeScheduleId);
         long teacherDailyCount = dailyCounts.getOrDefault("teacherDaily", 0L);
         long classDailyCount = dailyCounts.getOrDefault("classDaily", 0L);
         long sameCourseCount = dailyCounts.getOrDefault("sameCourse", 0L);

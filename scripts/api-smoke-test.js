@@ -33,6 +33,29 @@ function parseArgs(argv) {
 function createRequester(baseUrl) {
   const base = new URL(baseUrl)
   const transport = base.protocol === 'https:' ? https : http
+  const cookieJar = new Map()
+
+  function storeCookies(setCookieHeaders) {
+    if (!setCookieHeaders) return
+    const values = Array.isArray(setCookieHeaders) ? setCookieHeaders : [setCookieHeaders]
+    for (const header of values) {
+      if (!header || typeof header !== 'string') continue
+      const firstPart = header.split(';', 1)[0]
+      const separatorIndex = firstPart.indexOf('=')
+      if (separatorIndex <= 0) continue
+      const name = firstPart.slice(0, separatorIndex).trim()
+      const value = firstPart.slice(separatorIndex + 1).trim()
+      if (!name) continue
+      cookieJar.set(name, value)
+    }
+  }
+
+  function buildCookieHeader() {
+    if (cookieJar.size === 0) return ''
+    return Array.from(cookieJar.entries())
+      .map(([name, value]) => `${name}=${value}`)
+      .join('; ')
+  }
 
   return function request(method, pathname, data, token) {
     return new Promise((resolve, reject) => {
@@ -43,6 +66,13 @@ function createRequester(baseUrl) {
         headers['Content-Length'] = Buffer.byteLength(body)
       }
       if (token) headers.Authorization = `Bearer ${token}`
+      const cookieHeader = buildCookieHeader()
+      if (cookieHeader) headers.Cookie = cookieHeader
+      const upperMethod = String(method || 'GET').toUpperCase()
+      if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(upperMethod)) {
+        const csrfToken = cookieJar.get('XSRF-TOKEN')
+        if (csrfToken) headers['X-CSRF-Token'] = csrfToken
+      }
 
       const req = transport.request(
         {
@@ -54,6 +84,7 @@ function createRequester(baseUrl) {
           headers,
         },
         (res) => {
+          storeCookies(res.headers['set-cookie'])
           let raw = ''
           res.on('data', (chunk) => {
             raw += chunk
@@ -68,6 +99,7 @@ function createRequester(baseUrl) {
             resolve({
               httpStatus: res.statusCode || 0,
               payload,
+              cookies: Object.fromEntries(cookieJar),
             })
           })
         },
@@ -162,8 +194,14 @@ async function run() {
       password: options.password,
     })
     token = login.payload?.data?.token || ''
-    record('login', login.payload?.code === 200 && Boolean(token), summarizePayload(login.payload))
-    if (!token) throw new Error('登录失败，无法继续执行冒烟测试')
+    const hasAuthCookie = Boolean(login.cookies?.paike_token)
+    record('login', login.payload?.code === 200 && hasAuthCookie, summarizePayload(login.payload))
+    if (!hasAuthCookie) throw new Error('登录失败，未收到鉴权 Cookie，无法继续执行冒烟测试')
+
+    const me = await request('GET', api('/auth/me'), null, token)
+    const meOk = me.payload?.code === 200 && Boolean(me.payload?.data?.id)
+    record('auth-me', meOk, summarizePayload(me.payload))
+    if (!meOk) throw new Error('登录态校验失败，无法继续执行冒烟测试')
 
     const timeSlots = await apiCall('time-slots', 'GET', '/time-slots', null, token, (res) => {
       return res.payload?.code === 200 && Array.isArray(res.payload?.data) && res.payload.data.length > 0

@@ -6,6 +6,20 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+/**
+ * 三套 schema 初始化入口的第三套：运行时兜底。
+ *
+ * 执行时机：CommandLineRunner，在 spring.sql.init 跑完 schema.sql + v2~v7 之后。
+ * 职责：兼容旧库（早于某些 v*.sql 就跑过、缺列缺索引的库），不做新数据库初始化。
+ *
+ * 每个 ensure* 方法与 v*.sql 文件的重叠关系详见 backend/src/main/resources/db/README.md 第 3 节。
+ *
+ * 维护约定：
+ *  - 新表/新列优先写在 v8_*.sql 文件里，不要扩本类
+ *  - ensureStage7Tables / ensureStage9Tables 是历史遗留（4 张表无对应 SQL 文件），保留不动
+ *  - schedule_locked_item.active_key 在三处定义（本类 CREATE TABLE / 本类 ALTER / v6_bugfix_constraints.sql），
+ *    全部幂等结果一致，接受冗余不收敛
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -261,11 +275,23 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
                     schedule_id BIGINT NULL COMMENT '正式课表ID',
                     lock_reason VARCHAR(500) NOT NULL COMMENT '锁定原因',
                     active_flag TINYINT NOT NULL DEFAULT 1 COMMENT '是否当前生效',
+                    active_key BIGINT GENERATED ALWAYS AS (CASE WHEN active_flag = 1 THEN 0 ELSE NULL END) STORED,
                     unlocked_at DATETIME NULL COMMENT '取消锁定时间',
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
                 ) COMMENT='课程锁定记录表'
                 """);
+            Integer activeKeyCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS " +
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_locked_item' AND COLUMN_NAME = 'active_key'",
+                Integer.class);
+            if (activeKeyCount != null && activeKeyCount == 0) {
+                jdbcTemplate.execute(
+                    "ALTER TABLE schedule_locked_item " +
+                        "ADD COLUMN active_key BIGINT GENERATED ALWAYS AS (CASE WHEN active_flag = 1 THEN 0 ELSE NULL END) STORED");
+            }
+            ensureIndex("schedule_locked_item", "uk_locked_plan_item", "CREATE UNIQUE INDEX uk_locked_plan_item ON schedule_locked_item(plan_item_id, active_key)");
+            ensureIndex("schedule_locked_item", "uk_locked_schedule", "CREATE UNIQUE INDEX uk_locked_schedule ON schedule_locked_item(schedule_id, active_key)");
             ensureIndex("schedule_locked_item", "idx_locked_plan", "CREATE INDEX idx_locked_plan ON schedule_locked_item(plan_id)");
             ensureIndex("schedule_locked_item", "idx_locked_plan_item", "CREATE INDEX idx_locked_plan_item ON schedule_locked_item(plan_item_id)");
             ensureIndex("schedule_locked_item", "idx_locked_schedule", "CREATE INDEX idx_locked_schedule ON schedule_locked_item(schedule_id)");

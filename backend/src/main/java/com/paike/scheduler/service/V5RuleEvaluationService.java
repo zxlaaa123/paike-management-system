@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -54,22 +55,58 @@ public class V5RuleEvaluationService {
     private final TimeSlotMapper timeSlotMapper;
 
     public V5CandidateEvaluationVo evaluateCandidate(V5CandidateEvaluateRequest request) {
-        SchedulePlan plan = requirePlan(request.getPlanId());
-        SchedulePlanItem item = requirePlanItem(plan.getId(), request.getPlanItemId());
-        Classroom room = requireRoom(request.getCandidateClassroomId());
+        EvaluationContext ctx = buildEvaluationContext(request.getPlanId(), request.getPlanItemId());
+        return evaluateCandidate(request, ctx);
+    }
+
+    /**
+     * 与候选位置无关的不变量（plan / item / teacher / classInfo / course / allItems / weights / isLocked）
+     * 一次性加载并缓存，供同一 planItem 的多次候选评估复用。
+     * 由 V5SimulationService.findBestLocalPlacement 这种内层循环调用方负责构造。
+     */
+    public EvaluationContext buildEvaluationContext(Long planId, Long planItemId) {
+        return buildEvaluationContext(planId, planItemId, null, null);
+    }
+
+    /**
+     * 重载：在 findBestLocalPlacement 这种内层循环里，调用方已经一次性查好了 classroomPool / timeSlotPool，
+     * 直接传进来用作 room / slotId 的内存缓存，单次评估再省 2 条 SQL（requireRoom + resolveSlotId）。
+     */
+    public EvaluationContext buildEvaluationContext(Long planId, Long planItemId,
+                                                    List<Classroom> classroomPool,
+                                                    List<TimeSlot> timeSlotPool) {
+        SchedulePlan plan = requirePlan(planId);
+        SchedulePlanItem item = requirePlanItem(plan.getId(), planItemId);
         Teacher teacher = teacherMapper.selectById(item.getTeacherId());
         ClassInfo classInfo = classInfoMapper.selectById(item.getClassId());
         Course course = courseMapper.selectById(item.getCourseId());
         List<SchedulePlanItem> allItems = schedulePlanItemMapper.selectList(new LambdaQueryWrapper<SchedulePlanItem>()
                 .eq(SchedulePlanItem::getPlanId, plan.getId()));
-
         Map<String, BigDecimal> weights = loadWeights(plan.getSemesterId(), plan.getStrategyType());
-        List<V5RuleCheckDetailVo> details = new ArrayList<>();
+        boolean targetLocked = isLocked(plan.getId(), item.getId());
+        Map<Long, Classroom> roomCache = classroomPool == null ? Map.of()
+                : classroomPool.stream().filter(r -> r != null && r.getId() != null)
+                        .collect(Collectors.toMap(Classroom::getId, Function.identity(), (a, b) -> a));
+        Map<String, Long> slotIdCache = timeSlotPool == null ? Map.of()
+                : timeSlotPool.stream().filter(s -> s != null && s.getId() != null && s.getDayOfWeek() != null && s.getPeriodNo() != null)
+                        .collect(Collectors.toMap(s -> s.getDayOfWeek() + "-" + s.getPeriodNo(), TimeSlot::getId, (a, b) -> a));
+        return new EvaluationContext(plan, item, teacher, classInfo, course, allItems, weights, targetLocked, roomCache, slotIdCache);
+    }
 
-        checkRepairRules(request, plan, item, details);
-        checkHardRules(request, item, room, teacher, classInfo, course, allItems, details);
-        checkSoftRules(request, item, room, allItems, weights, details);
-        checkPreferenceRules(request, item, room, course, allItems, weights, details);
+    public V5CandidateEvaluationVo evaluateCandidate(V5CandidateEvaluateRequest request, EvaluationContext ctx) {
+        if (!Objects.equals(ctx.plan.getId(), request.getPlanId())
+                || !Objects.equals(ctx.item.getId(), request.getPlanItemId())) {
+            throw new BusinessException("评估上下文与请求不匹配");
+        }
+        Classroom room = ctx.roomCache.get(request.getCandidateClassroomId());
+        if (room == null) room = requireRoom(request.getCandidateClassroomId());
+        Long slotId = resolveSlotIdCached(ctx, request.getCandidateWeekday(), request.getCandidateStartPeriod(), request.getCandidateEndPeriod());
+
+        List<V5RuleCheckDetailVo> details = new ArrayList<>();
+        checkRepairRules(request, ctx.item, ctx.targetLocked, details);
+        checkHardRules(request, ctx.item, room, slotId, ctx.teacher, ctx.classInfo, ctx.course, ctx.allItems, details);
+        checkSoftRules(request, ctx.item, room, ctx.allItems, ctx.weights, details);
+        checkPreferenceRules(request, ctx.item, room, ctx.course, ctx.allItems, ctx.weights, details);
 
         int hardViolationCount = (int) details.stream().filter(d -> "HARD".equals(d.getRuleType()) && Boolean.FALSE.equals(d.getPassed())).count();
         int repairViolationCount = (int) details.stream().filter(d -> "REPAIR".equals(d.getRuleType()) && Boolean.FALSE.equals(d.getPassed())).count();
@@ -80,8 +117,8 @@ public class V5RuleEvaluationService {
         BigDecimal total = softScore.add(prefScore).setScale(2, RoundingMode.HALF_UP);
 
         V5CandidateEvaluationVo vo = new V5CandidateEvaluationVo();
-        vo.setPlanId(plan.getId());
-        vo.setPlanItemId(item.getId());
+        vo.setPlanId(ctx.plan.getId());
+        vo.setPlanItemId(ctx.item.getId());
         vo.setCandidateWeekday(request.getCandidateWeekday());
         vo.setCandidateStartPeriod(request.getCandidateStartPeriod());
         vo.setCandidateEndPeriod(request.getCandidateEndPeriod());
@@ -96,8 +133,7 @@ public class V5RuleEvaluationService {
         return vo;
     }
 
-    private void checkRepairRules(V5CandidateEvaluateRequest request, SchedulePlan plan, SchedulePlanItem item, List<V5RuleCheckDetailVo> details) {
-        boolean locked = isLocked(plan.getId(), item.getId());
+    private void checkRepairRules(V5CandidateEvaluateRequest request, SchedulePlanItem item, boolean locked, List<V5RuleCheckDetailVo> details) {
         details.add(repair("LOCKED_ITEM_IMMUTABLE", "锁定课程不可移动", !locked, locked ? "当前课程已锁定，禁止移动" : "课程未锁定，可评估"));
 
         Set<Long> scopeSet = request.getScopePlanItemIds() == null ? Set.of() : request.getScopePlanItemIds().stream().filter(Objects::nonNull).collect(Collectors.toSet());
@@ -117,6 +153,7 @@ public class V5RuleEvaluationService {
             V5CandidateEvaluateRequest request,
             SchedulePlanItem item,
             Classroom room,
+            Long slotId,
             Teacher teacher,
             ClassInfo classInfo,
             Course course,
@@ -141,8 +178,8 @@ public class V5RuleEvaluationService {
         details.add(hard("CLASSROOM_TIME_CONFLICT", "教室时间冲突", !roomConflict,
                 roomConflict ? safeName(room.getRoomName()) + " 在该时段已被占用" : "教室时段可用"));
 
-        Long slotId = resolveSlotId(request.getCandidateWeekday(), request.getCandidateStartPeriod(), request.getCandidateEndPeriod());
-        boolean unavailable = slotId != null && unavailableTimeService.isUnavailable(item.getTeacherId(), slotId);
+        Long resolvedSlotId = slotId != null ? slotId : resolveSlotId(request.getCandidateWeekday(), request.getCandidateStartPeriod(), request.getCandidateEndPeriod());
+        boolean unavailable = resolvedSlotId != null && unavailableTimeService.isUnavailable(item.getTeacherId(), resolvedSlotId);
         details.add(hard("TEACHER_UNAVAILABLE", "教师禁排", !unavailable,
                 unavailable ? safeName(teacher == null ? null : teacher.getName()) + " 命中禁排时段" : "未命中禁排时段"));
 
@@ -403,8 +440,49 @@ public class V5RuleEvaluationService {
         return slot == null ? null : slot.getId();
     }
 
+    private Long resolveSlotIdCached(EvaluationContext ctx, Integer weekday, Integer startPeriod, Integer endPeriod) {
+        if (weekday == null || startPeriod == null || endPeriod == null || startPeriod % 2 == 0 || endPeriod - startPeriod != 1) return null;
+        int periodNo = (startPeriod + 1) / 2;
+        Long cached = ctx.slotIdCache.get(weekday + "-" + periodNo);
+        if (cached != null) return cached;
+        return resolveSlotId(weekday, startPeriod, endPeriod);
+    }
+
     private String safeName(String value) {
         if (value == null || value.isBlank()) return "未知";
         return value.trim();
+    }
+
+    /**
+     * 候选位置评估的共享上下文。同一 planItem 的不同候选 (timeSlot, classroom) 共用一份，
+     * 避免在 findBestLocalPlacement 这种 O(slots*rooms) 循环里反复查 plan / item / teacher /
+     * classInfo / course / allItems / weights / isLocked 共 8 条 SQL（其中 allItems 还会全表物化）。
+     */
+    public static final class EvaluationContext {
+        final SchedulePlan plan;
+        final SchedulePlanItem item;
+        final Teacher teacher;
+        final ClassInfo classInfo;
+        final Course course;
+        final List<SchedulePlanItem> allItems;
+        final Map<String, BigDecimal> weights;
+        final boolean targetLocked;
+        final Map<Long, Classroom> roomCache;
+        final Map<String, Long> slotIdCache;
+
+        EvaluationContext(SchedulePlan plan, SchedulePlanItem item, Teacher teacher, ClassInfo classInfo,
+                          Course course, List<SchedulePlanItem> allItems, Map<String, BigDecimal> weights,
+                          boolean targetLocked, Map<Long, Classroom> roomCache, Map<String, Long> slotIdCache) {
+            this.plan = plan;
+            this.item = item;
+            this.teacher = teacher;
+            this.classInfo = classInfo;
+            this.course = course;
+            this.allItems = allItems;
+            this.weights = weights;
+            this.targetLocked = targetLocked;
+            this.roomCache = roomCache;
+            this.slotIdCache = slotIdCache;
+        }
     }
 }

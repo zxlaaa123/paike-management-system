@@ -27,7 +27,9 @@ public class ScheduleAdjustmentController {
     @PostMapping("/apply")
     public Result<ScheduleAdjustmentApplyVo> apply(@Valid @RequestBody V4ScheduleAdjustmentRequest request) {
         ScheduleAdjustmentApplyVo result = adjustmentService.applyAdjustment(request);
-        String message = Boolean.TRUE.equals(result.getSaved()) ? "调整已保存" : "检测完成";
+        String message = (result.getMessage() == null || result.getMessage().isBlank())
+                ? (Boolean.TRUE.equals(result.getSaved()) ? "调整已保存" : "检测完成")
+                : result.getMessage();
         return Result.success(message, result);
     }
 }

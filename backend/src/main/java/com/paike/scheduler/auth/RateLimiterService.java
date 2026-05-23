@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import java.util.Deque;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 简单的内存限流器，用于登录接口防暴力破解。
@@ -14,6 +15,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 public class RateLimiterService {
 
     private final ConcurrentHashMap<String, Deque<Long>> attempts = new ConcurrentHashMap<>();
+    private final AtomicLong lastCleanupAt = new AtomicLong(0);
 
     /**
      * @param key 限流标识（如 "login:username" 或 "login:ip"）
@@ -23,7 +25,7 @@ public class RateLimiterService {
      */
     public boolean isRateLimited(String key, int maxAttempts, long windowMs) {
         long now = System.currentTimeMillis();
-        cleanupExpiredKeys(now, windowMs);
+        cleanupExpiredKeysIfDue(now, windowMs);
         Deque<Long> timestamps = attempts.computeIfAbsent(key, k -> new ConcurrentLinkedDeque<>());
         synchronized (timestamps) {
             while (!timestamps.isEmpty() && now - timestamps.peekFirst() > windowMs) {
@@ -34,6 +36,17 @@ public class RateLimiterService {
             }
             timestamps.offerLast(now);
             return false;
+        }
+    }
+
+    private void cleanupExpiredKeysIfDue(long now, long windowMs) {
+        long cleanupIntervalMs = Math.max(1_000, Math.min(windowMs, 60_000));
+        long previous = lastCleanupAt.get();
+        if (now - previous < cleanupIntervalMs) {
+            return;
+        }
+        if (lastCleanupAt.compareAndSet(previous, now)) {
+            cleanupExpiredKeys(now, windowMs);
         }
     }
 

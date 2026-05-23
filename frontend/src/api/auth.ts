@@ -13,7 +13,7 @@ export interface UserInfo {
 }
 
 export interface LoginResponse {
-  token: string
+  token?: string
   userInfo: UserInfo
 }
 

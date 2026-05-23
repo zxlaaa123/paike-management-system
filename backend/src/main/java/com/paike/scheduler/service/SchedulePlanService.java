@@ -31,6 +31,8 @@ public class SchedulePlanService {
     private final SchedulePlanMapper planMapper;
     private final SchedulePlanItemMapper planItemMapper;
     private final ScheduleMapper scheduleMapper;
+    private final ScheduleLockedItemMapper scheduleLockedItemMapper;
+    private final ScheduleLockGuardService lockGuardService;
     private final CourseMapper courseMapper;
     private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
@@ -115,6 +117,7 @@ public class SchedulePlanService {
         if ("ABANDONED".equals(plan.getStatus())) {
             throw new BusinessException("已废弃方案不能调整");
         }
+        ensurePlanItemUnlocked(item.getId(), "该课程已锁定，不能调整");
         BigDecimal beforeScore = normalizeScore(plan.getTotalScore());
 
         Classroom classroom = classroomMapper.selectById(request.getClassroomId());
@@ -275,16 +278,21 @@ public class SchedulePlanService {
         if ("DISCARDED".equals(plan.getStatus())) {
             throw new BusinessException("已放弃试算方案不能应用");
         }
+        if ("APPLIED".equals(plan.getStatus())) {
+            throw new BusinessException("该方案已应用，无需重复应用");
+        }
         if (plan.getScheduledCount() == null || plan.getScheduledCount() == 0) {
             throw new BusinessException("该方案没有排课明细，无法应用");
         }
 
+        assertNoConflictsBeforeApply(plan.getId());
         Long semesterId = plan.getSemesterId();
 
         List<SchedulePlan> oldAppliedPlans = planMapper.selectList(
                 new LambdaQueryWrapper<SchedulePlan>()
                         .eq(SchedulePlan::getSemesterId, semesterId)
                         .eq(SchedulePlan::getStatus, "APPLIED"));
+        ensurePlansUnlocked(oldAppliedPlans, "存在已锁定课程，不能被新方案覆盖，请先解锁");
         for (SchedulePlan oldPlan : oldAppliedPlans) {
             scheduleMapper.update(null,
                     new LambdaUpdateWrapper<Schedule>()
@@ -367,12 +375,14 @@ public class SchedulePlanService {
             throw new BusinessException("该方案没有排课明细，无法应用");
         }
 
+        assertNoConflictsBeforeApply(plan.getId());
         Long semesterId = plan.getSemesterId();
 
         List<SchedulePlan> oldAppliedPlans = planMapper.selectList(
                 new LambdaQueryWrapper<SchedulePlan>()
                         .eq(SchedulePlan::getSemesterId, semesterId)
                         .eq(SchedulePlan::getStatus, "APPLIED"));
+        ensurePlansUnlocked(oldAppliedPlans, "存在已锁定课程，不能被新方案覆盖，请先解锁");
         for (SchedulePlan oldPlan : oldAppliedPlans) {
             scheduleMapper.update(null,
                     new LambdaUpdateWrapper<Schedule>()
@@ -448,8 +458,50 @@ public class SchedulePlanService {
             throw new BusinessException("该方案没有排课明细，无法回滚应用");
         }
 
+        if ("APPLIED".equals(plan.getStatus())) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("planId", plan.getId());
+            result.put("semesterId", plan.getSemesterId());
+            result.put("appliedCount", 0);
+            result.put("appliedAt", plan.getAppliedAt());
+            result.put("message", "目标方案已是当前应用方案");
+            return result;
+        }
+
         // 回滚语义：将目标方案重新应用为正式课表（而不是只删除当前正式课表）。
         return applyPlan(id);
+    }
+
+    private void assertNoConflictsBeforeApply(Long planId) {
+        int conflictCount = refreshPlanConflictState(planId);
+        if (conflictCount > 0) {
+            throw new BusinessException("方案存在冲突，请先处理后再应用");
+        }
+    }
+
+    private void ensurePlanItemUnlocked(Long planItemId, String message) {
+        lockGuardService.ensurePlanItemUnlocked(planItemId, message);
+    }
+
+    private void ensureScheduleUnlocked(Long scheduleId, String message) {
+        lockGuardService.ensureScheduleUnlocked(scheduleId, message);
+    }
+
+    private void ensurePlansUnlocked(List<SchedulePlan> plans, String message) {
+        List<Long> planIds = plans.stream()
+                .map(SchedulePlan::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (planIds.isEmpty()) {
+            return;
+        }
+        Long count = scheduleLockedItemMapper.selectCount(new LambdaQueryWrapper<ScheduleLockedItem>()
+                .in(ScheduleLockedItem::getPlanId, planIds)
+                .eq(ScheduleLockedItem::getActiveFlag, 1));
+        if (count != null && count > 0) {
+            throw new BusinessException(message);
+        }
     }
 
     private void fillItemRelations(List<SchedulePlanItem> items) {
@@ -604,6 +656,7 @@ public class SchedulePlanService {
             throw new BusinessException("已应用方案缺少对应正式课表记录，无法同步");
         }
         Schedule schedule = schedules.get(0);
+        ensureScheduleUnlocked(schedule.getId(), "该课程已锁定，不能同步正式课表");
         schedule.setClassroomId(after.getClassroomId());
         schedule.setTimeSlotId(newTimeSlotId);
         schedule.setUpdateTime(LocalDateTime.now());

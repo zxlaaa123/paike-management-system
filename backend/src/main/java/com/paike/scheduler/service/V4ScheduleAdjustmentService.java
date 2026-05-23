@@ -13,18 +13,18 @@ import com.paike.scheduler.service.vo.ScheduleAdjustmentCheckVo;
 import com.paike.scheduler.service.vo.ScheduleAdjustmentIssueVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,10 +45,14 @@ public class V4ScheduleAdjustmentService {
     private final CourseMapper courseMapper;
     private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
+    private final ScheduleLockGuardService lockGuardService;
     private final TeacherUnavailableTimeService unavailableTimeService;
+    private final TransactionTemplate transactionTemplate;
+    private final Object adjustmentMutationMutex = new Object();
 
     public ScheduleAdjustmentCheckVo checkAdjustment(V4ScheduleAdjustmentRequest request) {
         AdjustmentContext context = resolveContext(request);
+        ensureTargetUnlocked(context);
         Classroom newRoom = loadAvailableRoom(request.getNewRoomId());
         TimeSlot newSlot = resolveTimeSlot(request.getNewWeekDay(), request.getNewPeriodStart(), request.getNewPeriodEnd());
         if (newSlot == null) {
@@ -90,8 +94,11 @@ public class V4ScheduleAdjustmentService {
         return result;
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public ScheduleAdjustmentApplyVo applyAdjustment(V4ScheduleAdjustmentRequest request) {
+        return runAdjustmentMutation(() -> applyAdjustmentInternal(request));
+    }
+
+    private ScheduleAdjustmentApplyVo applyAdjustmentInternal(V4ScheduleAdjustmentRequest request) {
         if (request.getAdjustReason() == null || request.getAdjustReason().trim().isEmpty()) {
             throw new BusinessException("调整原因不能为空");
         }
@@ -135,6 +142,12 @@ public class V4ScheduleAdjustmentService {
                 ? "已强制保存正式课表调整，并记录调整日志"
                 : "正式课表调整成功");
         return result;
+    }
+
+    private <T> T runAdjustmentMutation(Supplier<T> action) {
+        synchronized (adjustmentMutationMutex) {
+            return Objects.requireNonNull(transactionTemplate.execute(status -> action.get()));
+        }
     }
 
     private void applyToSchedule(AdjustmentContext context, V4ScheduleAdjustmentRequest request, ScheduleAdjustmentCheckVo checkResult) {
@@ -451,13 +464,23 @@ public class V4ScheduleAdjustmentService {
                     .filter(item -> Objects.equals(item.getWeekday(), context.currentWeekDay)
                             && Objects.equals(item.getStartPeriod(), context.currentStartPeriod)
                             && Objects.equals(item.getEndPeriod(), context.currentPeriodEnd))
-                    .sorted(Comparator.comparing(item -> Objects.equals(item.getClassroomId(), context.schedule.getClassroomId()) ? 0 : 1))
                     .toList();
             if (!exactMatches.isEmpty()) {
-                return exactMatches.get(0);
+                return exactMatches.stream()
+                        .filter(item -> Objects.equals(item.getClassroomId(), context.schedule.getClassroomId()))
+                        .findFirst()
+                        .orElse(exactMatches.get(0));
             }
         }
         return items.size() == 1 ? items.get(0) : null;
+    }
+
+    private void ensureTargetUnlocked(AdjustmentContext context) {
+        if (TARGET_PLAN_ITEM.equals(context.targetType) && context.planItem != null) {
+            lockGuardService.ensurePlanItemUnlocked(context.planItem.getId(), "该课程已锁定，不能调整");
+        } else if (TARGET_SCHEDULE.equals(context.targetType) && context.schedule != null) {
+            lockGuardService.ensureScheduleAndLinkedPlanUnlocked(context.schedule, "该课程已锁定，不能调整");
+        }
     }
 
     private static class AdjustmentContext {

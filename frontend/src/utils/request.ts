@@ -1,7 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '../router'
-import { TOKEN_KEY } from './constants'
 
 interface ApiResponse<T = unknown> {
   code: number
@@ -23,6 +22,7 @@ function getCookie(name: string): string | null {
 const request = axios.create({
   baseURL: '/api',
   timeout: 10000,
+  withCredentials: true,
 })
 
 function isJsonBlob(data: unknown): data is Blob {
@@ -30,7 +30,6 @@ function isJsonBlob(data: unknown): data is Blob {
 }
 
 function redirectToLogin() {
-  localStorage.removeItem(TOKEN_KEY)
   if (router.currentRoute.value.path !== '/login') {
     router.push({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
   }
@@ -61,11 +60,6 @@ request.interceptors.request.use(
       if (csrfToken) {
         config.headers['X-CSRF-Token'] = csrfToken
       }
-    }
-    // 兼容旧版：如果 localStorage 中有 token，仍作为 Bearer 头发送（向后兼容未迁移的服务）
-    const token = localStorage.getItem(TOKEN_KEY)
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
     }
     return config
   },

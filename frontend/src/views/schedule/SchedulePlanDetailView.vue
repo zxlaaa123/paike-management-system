@@ -166,24 +166,32 @@ async function handleApply() {
     return
   }
 
-  const warnings: string[] = []
-  if (plan.value.unscheduledCount > 0) {
-    warnings.push(`存在 ${plan.value.unscheduledCount} 个未排任务`)
-  }
   if (plan.value.conflictCount > 0) {
-    warnings.push(`存在 ${plan.value.conflictCount} 个冲突`)
+    await ElMessageBox.alert(
+      `方案存在 ${plan.value.conflictCount} 项冲突，请先调整或重排冲突项后再应用`,
+      '应用被阻止',
+      { type: 'error', confirmButtonText: '我知道了' }
+    )
+    return
   }
 
-  let confirmMsg = `确定将「${plan.value.name}」应用为当前学期正式课表吗？`
-  if (warnings.length > 0) {
-    confirmMsg = `该方案${warnings.join('，')}，确定要继续应用吗？`
+  if (plan.value.unscheduledCount > 0) {
+    await ElMessageBox.confirm(
+      `该方案存在 ${plan.value.unscheduledCount} 个未排任务，确定要继续应用吗？`,
+      '应用方案',
+      {
+        type: 'warning',
+        confirmButtonText: '仍要应用',
+        cancelButtonText: '取消',
+      }
+    )
+  } else {
+    await ElMessageBox.confirm(`确定将「${plan.value.name}」应用为当前学期正式课表吗？`, '应用方案', {
+      type: 'info',
+      confirmButtonText: '确定应用',
+      cancelButtonText: '取消',
+    })
   }
-
-  await ElMessageBox.confirm(confirmMsg, '应用方案', {
-    type: warnings.length > 0 ? 'warning' : 'info',
-    confirmButtonText: '确定应用',
-    cancelButtonText: '取消',
-  })
 
   applying.value = true
   try {

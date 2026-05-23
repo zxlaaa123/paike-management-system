@@ -1,6 +1,7 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
@@ -9,8 +10,9 @@ import com.paike.scheduler.service.vo.ScheduleLockActionVo;
 import com.paike.scheduler.service.vo.ScheduleLockItemVo;
 import com.paike.scheduler.service.vo.ScheduleLockListVo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -34,9 +36,13 @@ public class V4ScheduleLockService {
     private final ClassInfoMapper classInfoMapper;
     private final ClassroomMapper classroomMapper;
     private final TimeSlotMapper timeSlotMapper;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional(rollbackFor = Exception.class)
     public ScheduleLockActionVo lock(ScheduleLockRequest request) {
+        return Objects.requireNonNull(transactionTemplate.execute(status -> lockInternal(request)));
+    }
+
+    private ScheduleLockActionVo lockInternal(ScheduleLockRequest request) {
         String targetType = normalizeTargetType(request.getTargetType());
         ResolvedTarget target = resolveTarget(request, targetType);
         String lockReason = trimToNull(request.getLockReason());
@@ -56,7 +62,11 @@ public class V4ScheduleLockService {
         record.setScheduleId(target.scheduleId);
         record.setLockReason(lockReason);
         record.setActiveFlag(1);
-        scheduleLockedItemMapper.insert(record);
+        try {
+            scheduleLockedItemMapper.insert(record);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException("该课程已处于锁定状态");
+        }
 
         ScheduleLockActionVo result = new ScheduleLockActionVo();
         result.setLocked(true);
@@ -69,8 +79,11 @@ public class V4ScheduleLockService {
         return result;
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public ScheduleLockActionVo unlock(ScheduleLockRequest request) {
+        return Objects.requireNonNull(transactionTemplate.execute(status -> unlockInternal(request)));
+    }
+
+    private ScheduleLockActionVo unlockInternal(ScheduleLockRequest request) {
         String targetType = normalizeTargetType(request.getTargetType());
         ResolvedTarget target = resolveTarget(request, targetType);
         ScheduleLockedItem existing = findActiveLock(targetType, target.planItemId, target.scheduleId);
@@ -78,9 +91,15 @@ public class V4ScheduleLockService {
             throw new BusinessException("该课程当前未锁定");
         }
 
-        existing.setActiveFlag(0);
-        existing.setUnlockedAt(LocalDateTime.now());
-        scheduleLockedItemMapper.updateById(existing);
+        LambdaUpdateWrapper<ScheduleLockedItem> updateWrapper = new LambdaUpdateWrapper<ScheduleLockedItem>()
+                .eq(ScheduleLockedItem::getId, existing.getId())
+                .eq(ScheduleLockedItem::getActiveFlag, 1)
+                .set(ScheduleLockedItem::getActiveFlag, 0)
+                .set(ScheduleLockedItem::getUnlockedAt, LocalDateTime.now());
+        int rows = scheduleLockedItemMapper.update(null, updateWrapper);
+        if (rows == 0) {
+            throw new BusinessException("该课程当前未锁定");
+        }
 
         ScheduleLockActionVo result = new ScheduleLockActionVo();
         result.setLocked(false);

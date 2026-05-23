@@ -1,6 +1,7 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paike.scheduler.common.enums.V5RepairTaskStatus;
@@ -339,6 +340,12 @@ public class V5SimulationService {
             planMapper.updateById(plan);
         }
         Map<String, Object> result = schedulePlanService.applySimulationPlan(planId);
+        plan = planMapper.selectById(planId);
+        if (plan != null && !"APPLIED".equals(plan.getStatus())) {
+            plan.setStatus("APPLIED");
+            plan.setUpdatedAt(LocalDateTime.now());
+            planMapper.updateById(plan);
+        }
         task.setStatus(V5RepairTaskStatus.APPLIED.getCode());
         task.setResultPlanId(planId);
         task.setFinishedAt(LocalDateTime.now());
@@ -353,16 +360,35 @@ public class V5SimulationService {
         if ("APPLIED".equals(plan.getStatus())) {
             throw new BusinessException("已应用试算方案不能放弃");
         }
+        if ("DISCARDED".equals(plan.getStatus())) {
+            throw new BusinessException("试算方案已放弃，不能重复操作");
+        }
         plan.setStatus("DISCARDED");
         plan.setUpdatedAt(LocalDateTime.now());
         planMapper.updateById(plan);
+
         if (Objects.equals(task.getResultPlanId(), planId)) {
             task.setStatus(V5RepairTaskStatus.SUGGESTED.getCode());
             task.setResultPlanId(null);
             task.setUpdatedAt(LocalDateTime.now());
             repairTaskMapper.updateById(task);
         }
-        return detail(taskId, planId);
+
+        // P2-15: 先生成详情快照，再清理孤儿数据；避免 V4ScheduleRiskService 对空 items 的空 IN 报错
+        V5SimulationPlanDetailVo result = detail(taskId, planId);
+
+        // 清理试算副本的孤儿数据；保留 optimization_compare 与 adjust_log 作为审计快照
+        planItemMapper.delete(new LambdaQueryWrapper<SchedulePlanItem>()
+                .eq(SchedulePlanItem::getPlanId, planId));
+        lockedItemMapper.update(null, new LambdaUpdateWrapper<ScheduleLockedItem>()
+                .eq(ScheduleLockedItem::getPlanId, planId)
+                .eq(ScheduleLockedItem::getActiveFlag, 1)
+                .set(ScheduleLockedItem::getActiveFlag, 0)
+                .set(ScheduleLockedItem::getUpdatedAt, LocalDateTime.now()));
+        scoreDetailMapper.delete(new LambdaQueryWrapper<ScheduleScoreDetail>()
+                .eq(ScheduleScoreDetail::getPlanId, planId));
+
+        return result;
     }
 
     private SchedulePlan createSimulationPlan(
@@ -484,6 +510,10 @@ public class V5SimulationService {
                 .eq(Classroom::getDeleted, 0)
                 .eq(Classroom::getStatus, 1)
                 .orderByAsc(Classroom::getRoomName));
+        // P1-13: 把 plan / item / teacher / classInfo / course / allItems / weights / isLocked / classrooms / timeSlots 提到循环外。
+        // 单次评估 SQL 从 ~11 降到 ~1（仅剩 isUnavailable）。
+        V5RuleEvaluationService.EvaluationContext evalContext =
+                ruleEvaluationService.buildEvaluationContext(planId, target.getId(), classrooms, timeSlots);
         CandidatePlacement best = null;
         int evaluated = 0;
         for (TimeSlot slot : timeSlots) {
@@ -501,7 +531,7 @@ public class V5SimulationService {
                 evalReq.setScopePlanItemIds(new ArrayList<>(simulationScopeIds));
                 evalReq.setSimulationOnly(true);
                 evalReq.setSourcePlanId(planId);
-                V5CandidateEvaluationVo eval = ruleEvaluationService.evaluateCandidate(evalReq);
+                V5CandidateEvaluationVo eval = ruleEvaluationService.evaluateCandidate(evalReq, evalContext);
                 evaluated++;
                 if (!Boolean.TRUE.equals(eval.getAvailable())) {
                     continue;
@@ -530,9 +560,17 @@ public class V5SimulationService {
     }
 
     private void copyLocks(List<ScheduleLockedItem> locks, Map<Long, Long> copiedItemIds, Long newPlanId) {
+        Set<Long> copiedTargets = new LinkedHashSet<>();
         for (ScheduleLockedItem source : locks) {
             Long newItemId = copiedItemIds.get(source.getPlanItemId());
             if (newItemId == null) continue;
+            if (!copiedTargets.add(newItemId)) continue;
+            Long existing = lockedItemMapper.selectCount(new LambdaQueryWrapper<ScheduleLockedItem>()
+                    .eq(ScheduleLockedItem::getTargetType, "PLAN")
+                    .eq(ScheduleLockedItem::getPlanId, newPlanId)
+                    .eq(ScheduleLockedItem::getPlanItemId, newItemId)
+                    .eq(ScheduleLockedItem::getActiveFlag, 1));
+            if (existing != null && existing > 0) continue;
             ScheduleLockedItem target = new ScheduleLockedItem();
             target.setTargetType("PLAN");
             target.setPlanId(newPlanId);
