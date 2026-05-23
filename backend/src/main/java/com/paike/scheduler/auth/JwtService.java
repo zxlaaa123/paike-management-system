@@ -27,6 +27,10 @@ public class JwtService {
                 "JWT_SECRET 未配置或仍为默认占位值；拒绝启动。请通过环境变量 JWT_SECRET 注入一个长度 >= 32 字节的强密钥。"
             );
         }
+        int secretLength = secret.getBytes(StandardCharsets.UTF_8).length;
+        if (secretLength < 32) {
+            throw new IllegalStateException("JWT_SECRET 长度不足：当前仅 " + secretLength + " 字节，要求至少 32 字节。请配置新的强密钥后重启服务。");
+        }
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMs = expirationMs;
     }

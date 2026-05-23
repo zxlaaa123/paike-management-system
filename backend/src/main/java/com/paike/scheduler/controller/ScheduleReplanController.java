@@ -4,6 +4,7 @@ import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.service.V4ScheduleReplanService;
 import com.paike.scheduler.service.dto.V4ScheduleReplanRequest;
 import com.paike.scheduler.service.vo.ScheduleReplanResultVo;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,7 +22,7 @@ public class ScheduleReplanController {
     @PostMapping("/plans/{planId}")
     public Result<ScheduleReplanResultVo> createLocalReplanPlan(
             @PathVariable Long planId,
-            @RequestBody(required = false) V4ScheduleReplanRequest request
+            @Valid @RequestBody(required = false) V4ScheduleReplanRequest request
     ) {
         ScheduleReplanResultVo result = scheduleReplanService.createLocalReplanPlan(planId, request);
         return Result.success(result);

@@ -4,6 +4,7 @@ import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.service.V4ScheduleAiAnalysisService;
 import com.paike.scheduler.service.dto.V4ScheduleAiAnalysisRequest;
 import com.paike.scheduler.service.vo.ScheduleAiAnalysisVo;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,9 +22,8 @@ public class ScheduleAiAnalysisController {
     @PostMapping("/plans/{planId}")
     public Result<ScheduleAiAnalysisVo> generatePlanAiAnalysis(
             @PathVariable Long planId,
-            @RequestBody(required = false) V4ScheduleAiAnalysisRequest request
+            @Valid @RequestBody(required = false) V4ScheduleAiAnalysisRequest request
     ) {
         return Result.success(scheduleAiAnalysisService.generateAnalysis(planId, request));
     }
 }
-

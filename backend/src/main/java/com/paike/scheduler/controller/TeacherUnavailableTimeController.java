@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.TeacherUnavailableTime;
 import com.paike.scheduler.service.TeacherUnavailableTimeService;
+import com.paike.scheduler.service.dto.TeacherUnavailableTimeForm;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -31,13 +32,13 @@ public class TeacherUnavailableTimeController {
     }
 
     @PostMapping
-    public Result<TeacherUnavailableTime> create(@Valid @RequestBody TeacherUnavailableTime form) {
+    public Result<TeacherUnavailableTime> create(@Valid @RequestBody TeacherUnavailableTimeForm form) {
         TeacherUnavailableTime result = unavailableTimeService.create(form);
         return Result.success(result);
     }
 
     @PutMapping("/{id}")
-    public Result<TeacherUnavailableTime> update(@PathVariable Long id, @Valid @RequestBody TeacherUnavailableTime form) {
+    public Result<TeacherUnavailableTime> update(@PathVariable Long id, @Valid @RequestBody TeacherUnavailableTimeForm form) {
         TeacherUnavailableTime result = unavailableTimeService.update(id, form);
         return Result.success(result);
     }

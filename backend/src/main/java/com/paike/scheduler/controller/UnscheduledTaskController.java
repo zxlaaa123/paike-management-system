@@ -40,11 +40,12 @@ public class UnscheduledTaskController {
 
     /** 清空未排任务记录 */
     @DeleteMapping
-    public Result<Void> clear(@RequestParam(required = false) Long batchId) {
+    public Result<Void> clear(@RequestParam(required = false) Long batchId,
+                              @RequestParam(required = false) Long semesterId) {
         if (batchId != null) {
             unscheduledTaskService.clearByBatchId(batchId);
         } else {
-            unscheduledTaskService.clearAll();
+            unscheduledTaskService.clearBySemester(semesterId);
         }
         return Result.success("清空成功", null);
     }

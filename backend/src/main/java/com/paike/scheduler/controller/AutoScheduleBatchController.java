@@ -7,6 +7,7 @@ import com.paike.scheduler.service.AutoScheduleBatchService;
 import com.paike.scheduler.service.AutoScheduleService;
 import com.paike.scheduler.service.dto.AutoScheduleRequest;
 import com.paike.scheduler.service.dto.AutoScheduleResult;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -41,7 +42,7 @@ public class AutoScheduleBatchController {
 
     /** 执行自动排课 */
     @PostMapping("/run")
-    public Result<AutoScheduleResult> run(@RequestBody AutoScheduleRequest request) {
+    public Result<AutoScheduleResult> run(@Valid @RequestBody AutoScheduleRequest request) {
         AutoScheduleResult result = autoScheduleService.run(request);
         return Result.success(result);
     }

@@ -59,7 +59,7 @@ public class AutoScheduleService {
             scheduleMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Schedule>()
                     .eq(Schedule::getDeleted, 0)
                     .eq(Schedule::getSemesterId, semesterId));
-            unscheduledTaskService.clearAll();
+            unscheduledTaskService.clearBySemester(semesterId);
         } else if (request.isClearOldAutoSchedule()) {
             ensureSchedulesUnlocked(new LambdaQueryWrapper<Schedule>()
                     .eq(Schedule::getSourceType, ScheduleSourceType.AUTO.getCode())
@@ -69,7 +69,7 @@ public class AutoScheduleService {
                     .eq(Schedule::getSourceType, ScheduleSourceType.AUTO.getCode())
                     .eq(Schedule::getDeleted, 0)
                     .eq(Schedule::getSemesterId, semesterId));
-            unscheduledTaskService.clearAll();
+            unscheduledTaskService.clearBySemester(semesterId);
         }
 
         // 2. 读取待排教学任务
@@ -151,14 +151,14 @@ public class AutoScheduleService {
             // 预过滤：符合课程类型+容量+停用的教室
             Course course = courseMap.get(task.getCourseId());
             if (course == null) {
-                unscheduledTaskService.addUnscheduledTask(batch.getId(), task.getId(), requiredSlots,
+                unscheduledTaskService.addUnscheduledTask(batch.getId(), semesterId, task.getId(), requiredSlots,
                         scheduledSlots, remainingSlots, "COURSE_NOT_FOUND", "关联课程不存在或已删除");
                 failedTaskCount++;
                 continue;
             }
             ClassInfo classInfo = classMap.get(task.getClassId());
             if (classInfo == null) {
-                unscheduledTaskService.addUnscheduledTask(batch.getId(), task.getId(), requiredSlots,
+                unscheduledTaskService.addUnscheduledTask(batch.getId(), semesterId, task.getId(), requiredSlots,
                         scheduledSlots, remainingSlots, "CLASS_NOT_FOUND", "关联班级不存在或已删除");
                 failedTaskCount++;
                 continue;
@@ -172,7 +172,7 @@ public class AutoScheduleService {
                     .collect(Collectors.toList());
 
             if (matchedRooms.isEmpty()) {
-                unscheduledTaskService.addUnscheduledTask(batch.getId(), task.getId(), requiredSlots,
+                unscheduledTaskService.addUnscheduledTask(batch.getId(), semesterId, task.getId(), requiredSlots,
                         scheduledSlots, remainingSlots, "NO_MATCHED_CLASSROOM", "没有符合课程类型和容量要求的教室");
                 failedTaskCount++;
                 continue;
@@ -247,7 +247,7 @@ public class AutoScheduleService {
                 successTaskCount++;
             } else {
                 failedTaskCount++;
-                unscheduledTaskService.addUnscheduledTask(batch.getId(), task.getId(), requiredSlots,
+                unscheduledTaskService.addUnscheduledTask(batch.getId(), semesterId, task.getId(), requiredSlots,
                         scheduledSlots + currentSuccess, remainingSlots - currentSuccess,
                         lastFailReasonType, lastFailReason);
             }

@@ -8,6 +8,7 @@ import com.paike.scheduler.mapper.AutoScheduleBatchMapper;
 import com.paike.scheduler.mapper.ScheduleMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -51,6 +52,7 @@ public class AutoScheduleBatchService {
         return batch;
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void updateBatchResult(Long batchId, int successTaskCount, int failedTaskCount,
                                    int generatedScheduleCount, String status, String message) {
         AutoScheduleBatch batch = batchMapper.selectById(batchId);

@@ -8,6 +8,7 @@ import com.paike.scheduler.service.dto.V5LocalReplanRequest;
 import com.paike.scheduler.service.vo.V5ConsistencyCheckReportVo;
 import com.paike.scheduler.service.vo.V5RepairExplanationVo;
 import com.paike.scheduler.service.vo.V5SimulationPlanDetailVo;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,7 +29,7 @@ public class V5SimulationController {
     private final V5RepairExplanationService repairExplanationService;
 
     @PostMapping("/local-replan")
-    public Result<V5SimulationPlanDetailVo> localReplan(@PathVariable Long taskId, @RequestBody(required = false) V5LocalReplanRequest request) {
+    public Result<V5SimulationPlanDetailVo> localReplan(@PathVariable Long taskId, @Valid @RequestBody(required = false) V5LocalReplanRequest request) {
         return Result.success("局部重排试算方案已生成", simulationService.localReplan(taskId, request));
     }
 

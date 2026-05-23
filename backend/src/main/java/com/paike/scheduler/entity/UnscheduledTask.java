@@ -19,6 +19,8 @@ public class UnscheduledTask {
 
     private Long batchId;
 
+    private Long semesterId;
+
     private Long taskId;
 
     private Long courseId;
