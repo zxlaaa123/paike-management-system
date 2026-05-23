@@ -55,6 +55,7 @@ declare module 'vue' {
     ElTag: typeof import('element-plus/es')['ElTag']
     ElTimeline: typeof import('element-plus/es')['ElTimeline']
     ElTimelineItem: typeof import('element-plus/es')['ElTimelineItem']
+    ErrorBoundary: typeof import('./src/components/ErrorBoundary.vue')['default']
     LocalReplanDialog: typeof import('./src/components/v4/LocalReplanDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
