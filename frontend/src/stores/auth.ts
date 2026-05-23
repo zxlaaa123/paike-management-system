@@ -2,6 +2,8 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getCurrentUserApi, loginApi, logoutApi, type UserInfo } from '../api/auth'
 
+let fetchCurrentUserInflight: Promise<UserInfo> | null = null
+
 /**
  * 认证 Store
  *
@@ -31,9 +33,17 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function fetchCurrentUser() {
-    const data = await getCurrentUserApi()
-    userInfo.value = data
-    return data
+    if (!fetchCurrentUserInflight) {
+      fetchCurrentUserInflight = getCurrentUserApi()
+        .then((data) => {
+          userInfo.value = data
+          return data
+        })
+        .finally(() => {
+          fetchCurrentUserInflight = null
+        })
+    }
+    return fetchCurrentUserInflight
   }
 
   async function logout() {

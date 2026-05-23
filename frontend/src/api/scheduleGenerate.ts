@@ -17,7 +17,7 @@ export function generateSchedulePlan(data: {
   planName?: string
   overwriteDraft?: boolean
 }) {
-  return request.post<ApiResponse<ScheduleGenerateResult>>('/v3/schedule-generate', data, { timeout: 60000 }).then((r) => {
+  return request.post<ApiResponse<ScheduleGenerateResult>>('/v3/schedule-generate', data, { timeout: 120_000 }).then((r) => {
     if (!r.data) {
       throw new Error('响应数据为空')
     }
@@ -30,7 +30,7 @@ export function generateMultipleSchedulePlans(data: {
   strategyTypes: string[]
   overwriteDraft?: boolean
 }) {
-  return request.post<ApiResponse<ScheduleGenerateResult[]>>('/v3/schedule-generate/multiple', data, { timeout: 60000 }).then((r) => {
+  return request.post<ApiResponse<ScheduleGenerateResult[]>>('/v3/schedule-generate/multiple', data, { timeout: 120_000 }).then((r) => {
     if (!r.data) {
       throw new Error('响应数据为空')
     }

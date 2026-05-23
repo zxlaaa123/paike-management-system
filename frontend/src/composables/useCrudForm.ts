@@ -118,7 +118,7 @@ export function useCrudForm<T extends { id: number }, F extends object>(options:
         ElMessage.success('新增成功')
       }
       dialogVisible.value = false
-      fetchData()
+      await fetchData()
     } catch (_e) {
       // 错误已由 request interceptor 处理
     }
@@ -134,9 +134,9 @@ export function useCrudForm<T extends { id: number }, F extends object>(options:
     try {
       await options.deleteItem(row.id)
       ElMessage.success('删除成功')
-      fetchData()
-    } catch (e: unknown) {
-      ElMessage.error(extractMessage(e, '删除失败'))
+      await fetchData()
+    } catch {
+      // 拦截器已弹错误提示
     }
   }
 

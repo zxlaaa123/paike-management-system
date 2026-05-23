@@ -49,6 +49,9 @@ async function fetchData() {
     const res = await getSchedulePlanList(params)
     tableData.value = res.records
     total.value = res.total
+  } catch {
+    tableData.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
@@ -96,11 +99,11 @@ async function handleDelete(row: SchedulePlan) {
     await ElMessageBox.confirm(`确定删除方案「${row.name}」吗？删除后不可恢复。`, '提示', { type: 'warning' })
     await deleteSchedulePlan(row.id)
     ElMessage.success('删除成功')
-    fetchData()
+    await fetchData()
   } catch (err: unknown) {
     if (isCancel(err)) return
     ElMessage.error(extractMessage(err, '删除失败'))
-    fetchData()
+    await fetchData()
   }
 }
 
@@ -109,11 +112,11 @@ async function handleAbandon(row: SchedulePlan) {
     await ElMessageBox.confirm(`确定废弃方案「${row.name}」吗？`, '提示', { type: 'warning' })
     await abandonSchedulePlan(row.id)
     ElMessage.success('已废弃')
-    fetchData()
+    await fetchData()
   } catch (err: unknown) {
     if (isCancel(err)) return
     ElMessage.error(extractMessage(err, '废弃失败'))
-    fetchData()
+    await fetchData()
   }
 }
 

@@ -14,6 +14,7 @@ import com.paike.scheduler.service.SemesterService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +23,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v3/schedule-plans")
 @RequiredArgsConstructor
+@Slf4j
 public class SchedulePlanController {
 
     private final SchedulePlanService planService;
@@ -43,6 +45,7 @@ public class SchedulePlanController {
             try {
                 resolvedSemesterId = semesterService.getCurrentSemester().getId();
             } catch (BusinessException e) {
+                log.warn("未找到当前学期，排课方案列表按业务约定返回空分页，前端显示空列表", e);
                 return Result.success(new Page<>(page, size));
             }
         }

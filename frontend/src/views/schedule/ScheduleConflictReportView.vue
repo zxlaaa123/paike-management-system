@@ -89,6 +89,9 @@ async function fetchReports() {
     const res = await getScheduleConflictReportList(params)
     reportList.value = res.records
     total.value = res.total
+  } catch {
+    reportList.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }

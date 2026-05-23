@@ -58,7 +58,7 @@ function triggerBrowserDownload(blob: Blob, fileName: string) {
 }
 
 export function generateScheduleReport(planId: number, payload: ScheduleReportGenerateRequest) {
-  return request.post<ApiResponse<ScheduleReportItem>>(`/v4/schedule-reports/plans/${planId}/generate`, payload).then((r) => {
+  return request.post<ApiResponse<ScheduleReportItem>>(`/v4/schedule-reports/plans/${planId}/generate`, payload, { timeout: 120_000 }).then((r) => {
     if (!r.data) throw new Error('响应数据为空')
     return r.data.data
   })
@@ -76,4 +76,3 @@ export async function downloadScheduleReport(item: ScheduleReportItem) {
   const fileName = resolveDownloadFileName(response.headers['content-disposition'], `schedule-report-${item.reportId}`)
   triggerBrowserDownload(response.data, fileName)
 }
-
