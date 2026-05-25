@@ -129,6 +129,14 @@ public class ScheduleScoreService {
         return detail;
     }
 
+    /**
+     * 事后<b>离线评分</b>：方案生成完调一次，给每条规则算扣分写库。
+     * 注意跟 V3ScheduleGenerateService.scoreCandidate（在线、贪心选候选）是<b>双轨</b>关系，
+     * 同名规则码（如 CLASSROOM_UTILIZATION）两边公式不同 —— 参见
+     * {@link com.paike.scheduler.service.scheduling.ScoringDimensions#SOFT}。
+     * 总分公式：clamp(100 + Σ rule.score, 0, 100)，软规则 score = -weight×min(1,penalty)，
+     * 硬规则 score = -weight×violationCount。
+     */
     private MetricResult calculateMetric(ScheduleRuleWeight rule, ScoreContext context) {
         BigDecimal weight = safeWeight(rule.getWeight());
         String ruleCode = rule.getRuleCode();

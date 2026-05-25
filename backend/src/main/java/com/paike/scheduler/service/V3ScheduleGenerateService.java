@@ -410,6 +410,12 @@ public class V3ScheduleGenerateService {
                                 && Objects.equals(item.getWeekday(), dayOfWeek));
     }
 
+    /**
+     * 贪心循环里的<b>在线评分</b>：给单个 (slot, room) 候选打"越大越好"的正向分。
+     * 跟 {@link ScheduleScoreService} 里的<b>离线 rescore</b> 用的是<b>不同公式</b>（双轨制），
+     * 每个维度的在线/离线公式差异参见 {@link com.paike.scheduler.service.scheduling.ScoringDimensions#SOFT}。
+     * 在线分仅用于贪心选谁，不持久化；用户看到的 totalScore（如 90.13）来自离线 rescore。
+     */
     private double scoreCandidate(
             TeachingTask task,
             TimeSlot slot,
