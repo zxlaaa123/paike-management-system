@@ -5,15 +5,12 @@ import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.service.dto.AutoScheduleRequest;
 import com.paike.scheduler.service.dto.AutoScheduleResult;
+import com.paike.scheduler.service.scheduling.SchedulingReferenceData;
+import com.paike.scheduler.service.scheduling.SchedulingReferenceLoader;
 import com.paike.scheduler.service.scheduling.SchedulingSupport;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.paike.scheduler.mapper.ClassInfoMapper;
-import com.paike.scheduler.mapper.ClassroomMapper;
-import com.paike.scheduler.mapper.CourseMapper;
 import com.paike.scheduler.mapper.ScheduleMapper;
-import com.paike.scheduler.mapper.TeacherUnavailableTimeMapper;
 import com.paike.scheduler.mapper.TeachingTaskMapper;
-import com.paike.scheduler.mapper.TimeSlotMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,11 +36,7 @@ public class AutoScheduleService {
     private final ScheduleRuleService ruleService;
     private final ScheduleMapper scheduleMapper;
     private final TeachingTaskMapper teachingTaskMapper;
-    private final TimeSlotMapper timeSlotMapper;
-    private final ClassroomMapper classroomMapper;
-    private final TeacherUnavailableTimeMapper unavailableTimeMapper;
-    private final CourseMapper courseMapper;
-    private final ClassInfoMapper classInfoMapper;
+    private final SchedulingReferenceLoader referenceLoader;
     private final SemesterService semesterService;
     private final ScheduleLockGuardService lockGuardService;
 
@@ -90,46 +83,24 @@ public class AutoScheduleService {
         // 3. 创建批次
         AutoScheduleBatch batch = batchService.createBatch(targetTasks.size(), request.isClearOldAutoSchedule());
 
-        // 4. 读取规则配置
+        // 4. 读取规则阈值（共享数据加载在第 5 步统一处理）
         int teacherMaxDailySlots = ruleService.getIntValue("TEACHER_MAX_DAILY_SLOTS");
         int classMaxDailySlots = ruleService.getIntValue("CLASS_MAX_DAILY_SLOTS");
-        boolean prioritizeMorning = ruleService.getBoolValue("PRIORITIZE_MORNING");
-        boolean avoidFridayAfternoon = ruleService.getBoolValue("AVOID_FRIDAY_AFTERNOON");
         boolean allowSameCourseSameDay = ruleService.getBoolValue("ALLOW_SAME_COURSE_SAME_DAY");
 
-        // 5. 读取时间段并排序
-        List<TimeSlot> timeSlots = timeSlotMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TimeSlot>()
-                        .orderByAsc(TimeSlot::getSortOrder));
-        timeSlots = SchedulingSupport.sortTimeSlots(timeSlots, prioritizeMorning, avoidFridayAfternoon);
-        Map<Integer, List<Long>> slotIdsByDay = SchedulingSupport.slotIdsByDay(timeSlots);
+        // 5. 一次性加载所有共享读型数据（时间段已按晨课/避周五偏好排序）
+        SchedulingReferenceData refData = referenceLoader.loadForAutoSchedule();
+        List<TimeSlot> timeSlots = refData.sortedTimeSlots();
+        Map<Integer, List<Long>> slotIdsByDay = refData.slotIdsByDay();
+        List<Classroom> classrooms = refData.classrooms();
+        Set<String> unavailableKeySet = refData.unavailableKeySet();
+        Map<Long, Course> courseMap = refData.courseMap();
+        Map<Long, ClassInfo> classMap = refData.classMap();
 
-        // 6. 读取可用教室
-        List<Classroom> classrooms = classroomMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Classroom>()
-                        .eq(Classroom::getStatus, 1)
-                        .eq(Classroom::getDeleted, 0));
-
-        // 7. 读取教师禁排时间
-        List<TeacherUnavailableTime> unavailableTimes = unavailableTimeMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TeacherUnavailableTime>()
-                        .eq(TeacherUnavailableTime::getStatus, 1)
-                        .eq(TeacherUnavailableTime::getDeleted, 0));
-        Set<String> unavailableKeySet = SchedulingSupport.toUnavailableKeySet(unavailableTimes);
-
-        Map<Long, Course> courseMap = courseMapper.selectList(new LambdaQueryWrapper<Course>()
-                        .eq(Course::getDeleted, 0))
-                .stream()
-                .collect(Collectors.toMap(Course::getId, c -> c, (a, b) -> a));
-        Map<Long, ClassInfo> classMap = classInfoMapper.selectList(new LambdaQueryWrapper<ClassInfo>()
-                        .eq(ClassInfo::getDeleted, 0))
-                .stream()
-                .collect(Collectors.toMap(ClassInfo::getId, c -> c, (a, b) -> a));
-
-        // 8. 对教学任务排序（难排优先）
+        // 6. 对教学任务排序（难排优先）
         targetTasks = SchedulingSupport.sortTasks(
                 targetTasks,
-                SchedulingSupport.toUnavailableCountByTeacher(unavailableTimes),
+                refData.unavailableCountByTeacher(),
                 courseMap,
                 classMap);
 

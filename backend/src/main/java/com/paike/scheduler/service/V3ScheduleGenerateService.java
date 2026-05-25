@@ -8,6 +8,8 @@ import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.dto.MultipleScheduleGenerateRequest;
 import com.paike.scheduler.service.dto.ScheduleGenerateRequest;
 import com.paike.scheduler.service.dto.ScheduleGenerateResult;
+import com.paike.scheduler.service.scheduling.SchedulingReferenceData;
+import com.paike.scheduler.service.scheduling.SchedulingReferenceLoader;
 import com.paike.scheduler.service.scheduling.SchedulingSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,7 +19,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,16 +29,11 @@ public class V3ScheduleGenerateService {
 
     private final SemesterService semesterService;
     private final ScheduleRuleService ruleService;
-    private final ScheduleRuleWeightService ruleWeightService;
     private final ScheduleScoreService scoreService;
     private final SchedulePlanMapper planMapper;
     private final SchedulePlanItemMapper planItemMapper;
     private final TeachingTaskMapper teachingTaskMapper;
-    private final TimeSlotMapper timeSlotMapper;
-    private final ClassroomMapper classroomMapper;
-    private final CourseMapper courseMapper;
-    private final ClassInfoMapper classInfoMapper;
-    private final TeacherUnavailableTimeMapper unavailableTimeMapper;
+    private final SchedulingReferenceLoader referenceLoader;
     private final SchedulePlanExplainService explainService;
 
     @Transactional(rollbackFor = Exception.class)
@@ -53,19 +49,8 @@ public class V3ScheduleGenerateService {
         if (tasks.isEmpty()) {
             throw new BusinessException("当前学期没有可排课的教学任务");
         }
-        List<Long> courseIds = tasks.stream().map(TeachingTask::getCourseId).filter(Objects::nonNull).distinct().toList();
-        List<Long> classIds = tasks.stream().map(TeachingTask::getClassId).filter(Objects::nonNull).distinct().toList();
-        Map<Long, Course> courseMap = courseIds.isEmpty() ? Map.of() :
-                courseMapper.selectBatchIds(courseIds).stream()
-                        .collect(Collectors.toMap(Course::getId, c -> c, (a, b) -> a));
-        Map<Long, ClassInfo> classMap = classIds.isEmpty() ? Map.of() :
-                classInfoMapper.selectBatchIds(classIds).stream()
-                        .collect(Collectors.toMap(ClassInfo::getId, c -> c, (a, b) -> a));
 
-        List<TimeSlot> timeSlots = loadSortedTimeSlots();
-        List<Classroom> classrooms = loadAvailableClassrooms();
-        List<TeacherUnavailableTime> unavailableTimes = loadUnavailableTimes();
-        Map<String, BigDecimal> weightMap = loadStrategyWeights(semesterId, strategyType);
+        SchedulingReferenceData refData = referenceLoader.loadForV3Generate(semesterId, strategyType);
 
         SchedulePlan plan = new SchedulePlan();
         plan.setSemesterId(semesterId);
@@ -82,18 +67,6 @@ public class V3ScheduleGenerateService {
         plan.setUpdatedAt(LocalDateTime.now());
         planMapper.insert(plan);
         explainService.clearPlanArtifacts(plan.getId());
-
-        GenerationContext context = new GenerationContext(
-                semesterId,
-                strategyType,
-                weightMap,
-                SchedulingSupport.toUnavailableKeySet(unavailableTimes),
-                SchedulingSupport.toUnavailableCountByTeacher(unavailableTimes),
-                timeSlots,
-                classrooms,
-                courseMap,
-                classMap
-        );
 
         StepCounter stepCounter = new StepCounter();
         explainService.appendGenerateLog(
@@ -113,7 +86,7 @@ public class V3ScheduleGenerateService {
                 "读取当前学期教学任务，共 " + tasks.size() + " 条",
                 stepCounter.next());
 
-        List<SchedulePlanItem> generatedItems = generatePlanItems(plan, tasks, context);
+        List<SchedulePlanItem> generatedItems = generatePlanItems(plan, tasks, refData);
         for (SchedulePlanItem item : generatedItems) {
             planItemMapper.insert(item);
         }
@@ -219,45 +192,8 @@ public class V3ScheduleGenerateService {
                         .eq(TeachingTask::getDeleted, 0));
     }
 
-    private List<TimeSlot> loadSortedTimeSlots() {
-        List<TimeSlot> timeSlots = timeSlotMapper.selectList(
-                new LambdaQueryWrapper<TimeSlot>().orderByAsc(TimeSlot::getSortOrder));
-        boolean prioritizeMorning = ruleService.getBoolValue("PRIORITIZE_MORNING");
-        boolean avoidFridayAfternoon = ruleService.getBoolValue("AVOID_FRIDAY_AFTERNOON");
-        return SchedulingSupport.sortTimeSlots(timeSlots, prioritizeMorning, avoidFridayAfternoon);
-    }
-
-    private List<Classroom> loadAvailableClassrooms() {
-        return classroomMapper.selectList(
-                new LambdaQueryWrapper<Classroom>()
-                        .eq(Classroom::getStatus, 1)
-                        .eq(Classroom::getDeleted, 0));
-    }
-
-    private List<TeacherUnavailableTime> loadUnavailableTimes() {
-        return unavailableTimeMapper.selectList(
-                new LambdaQueryWrapper<TeacherUnavailableTime>()
-                        .eq(TeacherUnavailableTime::getStatus, 1)
-                        .eq(TeacherUnavailableTime::getDeleted, 0));
-    }
-
-    private Map<String, BigDecimal> loadStrategyWeights(Long semesterId, String strategyType) {
-        List<ScheduleRuleWeight> rules = ruleWeightService.list(semesterId, strategyType, null);
-        if (rules.isEmpty()) {
-            ruleWeightService.initDefaultRules(semesterId, strategyType);
-            rules = ruleWeightService.list(semesterId, strategyType, null);
-        }
-        return rules.stream()
-                .filter(rule -> rule.getEnabled() != null && rule.getEnabled() == 1)
-                .collect(Collectors.toMap(
-                        ScheduleRuleWeight::getRuleCode,
-                        rule -> rule.getWeight() != null ? rule.getWeight() : BigDecimal.ZERO,
-                        (a, b) -> a
-                ));
-    }
-
-    private List<SchedulePlanItem> generatePlanItems(SchedulePlan plan, List<TeachingTask> tasks, GenerationContext context) {
-        List<TeachingTask> sortedTasks = SchedulingSupport.sortTasks(tasks, context.unavailableCount(), context.courseMap(), context.classMap());
+    private List<SchedulePlanItem> generatePlanItems(SchedulePlan plan, List<TeachingTask> tasks, SchedulingReferenceData refData) {
+        List<TeachingTask> sortedTasks = SchedulingSupport.sortTasks(tasks, refData.unavailableCountByTeacher(), refData.courseMap(), refData.classMap());
         List<SchedulePlanItem> generatedItems = new ArrayList<>();
         int unscheduledCount = 0;
         StepCounter stepCounter = new StepCounter(2);
@@ -265,10 +201,10 @@ public class V3ScheduleGenerateService {
         for (TeachingTask task : sortedTasks) {
             int requiredSlots = Math.max(1, (int) Math.ceil((task.getWeeklyHours() == null ? 0 : task.getWeeklyHours()) / 2.0));
             Set<Integer> usedDays = new HashSet<>();
-            String courseType = SchedulingSupport.getCourseType(task.getCourseId(), context.courseMap());
-            int studentCount = SchedulingSupport.getClassStudentCount(task.getClassId(), context.classMap());
-            String taskLabel = taskLabel(task, context.courseMap(), context.classMap());
-            List<Classroom> matchedRooms = context.classrooms().stream()
+            String courseType = SchedulingSupport.getCourseType(task.getCourseId(), refData.courseMap());
+            int studentCount = SchedulingSupport.getClassStudentCount(task.getClassId(), refData.classMap());
+            String taskLabel = taskLabel(task, refData.courseMap(), refData.classMap());
+            List<Classroom> matchedRooms = refData.classrooms().stream()
                     .filter(room -> room.getCapacity() != null && room.getCapacity() >= studentCount)
                     .filter(room -> SchedulingSupport.isRoomTypeMatched(courseType, room.getRoomType()))
                     .sorted(Comparator.comparingInt(Classroom::getCapacity))
@@ -285,7 +221,7 @@ public class V3ScheduleGenerateService {
 
             if (matchedRooms.isEmpty()) {
                 unscheduledCount += requiredSlots;
-                UnassignedReason reason = buildNoMatchedRoomReason(task, studentCount, courseType, context.classrooms());
+                UnassignedReason reason = buildNoMatchedRoomReason(task, studentCount, courseType, refData.classrooms());
                 explainService.saveUnassignedTask(plan.getId(), plan.getSemesterId(), task.getId(),
                         reason.reasonCode(), reason.reasonMessage(), reason.suggestion());
                 explainService.appendGenerateLog(
@@ -300,10 +236,10 @@ public class V3ScheduleGenerateService {
             }
 
             for (int occurrence = 0; occurrence < requiredSlots; occurrence++) {
-                Candidate candidate = findBestCandidate(plan, task, usedDays, matchedRooms, generatedItems, context, stepCounter);
+                Candidate candidate = findBestCandidate(plan, task, usedDays, matchedRooms, generatedItems, refData, stepCounter);
                 if (candidate == null) {
                     unscheduledCount++;
-                    UnassignedReason reason = analyzeUnassignedReason(task, usedDays, matchedRooms, generatedItems, context);
+                    UnassignedReason reason = analyzeUnassignedReason(task, usedDays, matchedRooms, generatedItems, refData);
                     explainService.saveUnassignedTask(plan.getId(), plan.getSemesterId(), task.getId(),
                             reason.reasonCode(), reason.reasonMessage(), reason.suggestion());
                     explainService.appendGenerateLog(
@@ -346,7 +282,7 @@ public class V3ScheduleGenerateService {
             Set<Integer> usedDays,
             List<Classroom> matchedRooms,
             List<SchedulePlanItem> generatedItems,
-            GenerationContext context,
+            SchedulingReferenceData refData,
             StepCounter stepCounter
     ) {
         int teacherMaxDailySlots = ruleService.getIntValue("TEACHER_MAX_DAILY_SLOTS");
@@ -354,9 +290,9 @@ public class V3ScheduleGenerateService {
         boolean allowSameCourseSameDay = ruleService.getBoolValue("ALLOW_SAME_COURSE_SAME_DAY");
 
         Candidate best = null;
-        String taskLabel = taskLabel(task, context.courseMap(), context.classMap());
-        for (TimeSlot slot : context.timeSlots()) {
-            if (context.unavailableKeySet().contains(task.getTeacherId() + "_" + slot.getId())) {
+        String taskLabel = taskLabel(task, refData.courseMap(), refData.classMap());
+        for (TimeSlot slot : refData.sortedTimeSlots()) {
+            if (refData.unavailableKeySet().contains(task.getTeacherId() + "_" + slot.getId())) {
                 explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_TEACHER",
                         "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，教师禁排", stepCounter.next());
                 continue;
@@ -388,7 +324,7 @@ public class V3ScheduleGenerateService {
                             "教学任务：" + taskLabel + " 跳过候选 " + slot.getTimeLabel() + " / " + room.getRoomName() + "，资源冲突", stepCounter.next());
                     continue;
                 }
-                double score = scoreCandidate(task, slot, room, generatedItems, context);
+                double score = scoreCandidate(task, slot, room, generatedItems, refData);
                 explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "INFO", "CALCULATE_SCORE",
                         "候选位置：" + slot.getTimeLabel() + "，教室 " + room.getRoomName() + "，得分 " + String.format(Locale.ROOT, "%.2f", score),
                         stepCounter.next());
@@ -453,18 +389,18 @@ public class V3ScheduleGenerateService {
             TimeSlot slot,
             Classroom room,
             List<SchedulePlanItem> generatedItems,
-            GenerationContext context
+            SchedulingReferenceData refData
     ) {
         double score = 0D;
-        String courseType = SchedulingSupport.getCourseType(task.getCourseId(), context.courseMap());
-        int studentCount = SchedulingSupport.getClassStudentCount(task.getClassId(), context.classMap());
+        String courseType = SchedulingSupport.getCourseType(task.getCourseId(), refData.courseMap());
+        int studentCount = SchedulingSupport.getClassStudentCount(task.getClassId(), refData.classMap());
 
-        score += weight(context, "CLASSROOM_UTILIZATION") * classroomUtilizationScore(room, studentCount);
-        score += weight(context, "CLASS_DAILY_BALANCE") * balanceScore(generatedItems, item -> Objects.equals(item.getClassId(), task.getClassId()), slot.getDayOfWeek());
-        score += weight(context, "TEACHER_DAILY_LOAD") * balanceScore(generatedItems, item -> Objects.equals(item.getTeacherId(), task.getTeacherId()), slot.getDayOfWeek());
-        score += weight(context, "COURSE_DISTRIBUTION") * courseDistributionScore(generatedItems, task, slot.getDayOfWeek());
-        score += weight(context, "CONTINUOUS_PERIOD_LIMIT") * continuousLimitScore(generatedItems, task, slot);
-        score += weight(context, "MORNING_THEORY_PRIORITY") * morningPriorityScore(courseType, slot);
+        score += weight(refData,"CLASSROOM_UTILIZATION") * classroomUtilizationScore(room, studentCount);
+        score += weight(refData,"CLASS_DAILY_BALANCE") * balanceScore(generatedItems, item -> Objects.equals(item.getClassId(), task.getClassId()), slot.getDayOfWeek());
+        score += weight(refData,"TEACHER_DAILY_LOAD") * balanceScore(generatedItems, item -> Objects.equals(item.getTeacherId(), task.getTeacherId()), slot.getDayOfWeek());
+        score += weight(refData,"COURSE_DISTRIBUTION") * courseDistributionScore(generatedItems, task, slot.getDayOfWeek());
+        score += weight(refData,"CONTINUOUS_PERIOD_LIMIT") * continuousLimitScore(generatedItems, task, slot);
+        score += weight(refData,"MORNING_THEORY_PRIORITY") * morningPriorityScore(courseType, slot);
 
         // 稳定偏好：更早的时间段略优，避免在候选分相同时结果抖动。
         score += Math.max(0, 100 - slot.getSortOrder()) * 0.0001D;
@@ -508,8 +444,8 @@ public class V3ScheduleGenerateService {
         return theory && slot.getPeriodNo() <= 2 ? 1D : 0D;
     }
 
-    private double weight(GenerationContext context, String ruleCode) {
-        return context.weightMap().getOrDefault(ruleCode, BigDecimal.ZERO).doubleValue();
+    private double weight(SchedulingReferenceData refData, String ruleCode) {
+        return refData.weightMap().getOrDefault(ruleCode, BigDecimal.ZERO).doubleValue();
     }
 
     private SchedulePlanItem toPlanItem(Long planId, TeachingTask task, TimeSlot slot, Classroom room) {
@@ -560,19 +496,6 @@ public class V3ScheduleGenerateService {
         return result;
     }
 
-    private record GenerationContext(
-            Long semesterId,
-            String strategyType,
-            Map<String, BigDecimal> weightMap,
-            Set<String> unavailableKeySet,
-            Map<Long, Long> unavailableCount,
-            List<TimeSlot> timeSlots,
-            List<Classroom> classrooms,
-            Map<Long, Course> courseMap,
-            Map<Long, ClassInfo> classMap
-    ) {
-    }
-
     private record Candidate(TimeSlot slot, Classroom room, double score) {
     }
 
@@ -615,7 +538,7 @@ public class V3ScheduleGenerateService {
             Set<Integer> usedDays,
             List<Classroom> matchedRooms,
             List<SchedulePlanItem> generatedItems,
-            GenerationContext context
+            SchedulingReferenceData refData
     ) {
         int teacherMaxDailySlots = ruleService.getIntValue("TEACHER_MAX_DAILY_SLOTS");
         int classMaxDailySlots = ruleService.getIntValue("CLASS_MAX_DAILY_SLOTS");
@@ -627,8 +550,8 @@ public class V3ScheduleGenerateService {
         boolean roomConflict = false;
         boolean classDayLimited = false;
 
-        for (TimeSlot slot : context.timeSlots()) {
-            if (context.unavailableKeySet().contains(task.getTeacherId() + "_" + slot.getId())) {
+        for (TimeSlot slot : refData.sortedTimeSlots()) {
+            if (refData.unavailableKeySet().contains(task.getTeacherId() + "_" + slot.getId())) {
                 teacherUnavailable = true;
                 continue;
             }
