@@ -186,6 +186,47 @@ class ScheduleScoreServiceTest {
         assertEquals(0, plan.getConflictCount());
     }
 
+    /**
+     * MORNING_THEORY_PRIORITY fixture：4 条 item（2 上午 startPeriod=1/3，2 下午 startPeriod=5/7），
+     * 跨不同 teacher/class/room/weekday 避免触发其他冲突维度。
+     *
+     * <pre>
+     * penaltyMorningPriority:
+     *   afternoonStartPeriod=5（@BeforeEach mock）
+     *   afternoonCount = 2 (items with sp=5,7)
+     *   total = 4
+     *   ratio = 2/4 = 0.5 → setScale(4)=0.5000
+     * soft: weight 20 × 0.5 = 10.0 → -10.00；level=50
+     * 总分 = 100 - 10 = 90.00
+     * </pre>
+     *
+     * 这条 fixture 专门 lock {@link com.paike.scheduler.service.scheduling.ScoringFunctions#penaltyMorningPriority}
+     * 的搬运等价性（D2 C2 集中后该路径在原 3 个 fixture 里没被覆盖到）。
+     */
+    @Test
+    void rescore_lockedBaseline_morningPriorityRule() {
+        SchedulePlan plan = newPlan(4L);
+
+        when(planItemMapper.selectList(any())).thenReturn(List.of(
+                item(1L, 1L, 1L, 1L, 1, 1),
+                item(2L, 2L, 2L, 2L, 2, 3),
+                item(3L, 3L, 3L, 3L, 3, 5),
+                item(4L, 4L, 4L, 4L, 4, 7)));
+
+        when(ruleWeightService.list(2L, "COMPREHENSIVE", null)).thenReturn(List.of(
+                rule("MORNING_THEORY_PRIORITY", "SOFT", "20")));
+
+        service.rescore(plan);
+
+        Map<String, ScheduleScoreDetail> byCode = captureDetailsByCode(1);
+
+        assertDetail(byCode, "MORNING_THEORY_PRIORITY", "-10.00",
+                "理论课优先上午偏差 50%，扣 10.00 分（满分 20）");
+
+        assertEquals(new BigDecimal("90.00"), plan.getTotalScore());
+        assertEquals(0, plan.getConflictCount());
+    }
+
     // ------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------
