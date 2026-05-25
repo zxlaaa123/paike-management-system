@@ -6,6 +6,7 @@ import com.paike.scheduler.service.ScheduleRuleWeightService;
 import com.paike.scheduler.service.SemesterService;
 import com.paike.scheduler.service.dto.ScheduleRuleWeightBatchForm;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -63,6 +64,8 @@ public class ScheduleRuleWeightController {
     public static class WeightUpdateRequest {
         private BigDecimal weight;
         private Integer enabled;
+
+        @Size(max = 500, message = "规则说明最长 500 字符")
         private String description;
     }
 }

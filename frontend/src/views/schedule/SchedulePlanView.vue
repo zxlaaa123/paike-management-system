@@ -10,7 +10,7 @@ import {
 } from '../../api/schedulePlan'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
 import { strategyText } from '../../utils/status'
-import { extractMessage, isCancel } from '../../utils/errors'
+import { isCancel } from '../../utils/errors'
 
 const router = useRouter()
 
@@ -102,7 +102,6 @@ async function handleDelete(row: SchedulePlan) {
     await fetchData()
   } catch (err: unknown) {
     if (isCancel(err)) return
-    ElMessage.error(extractMessage(err, '删除失败'))
     await fetchData()
   }
 }
@@ -115,7 +114,6 @@ async function handleAbandon(row: SchedulePlan) {
     await fetchData()
   } catch (err: unknown) {
     if (isCancel(err)) return
-    ElMessage.error(extractMessage(err, '废弃失败'))
     await fetchData()
   }
 }

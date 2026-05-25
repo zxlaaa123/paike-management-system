@@ -4,6 +4,8 @@ import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.ScheduleRuleConfig;
 import com.paike.scheduler.service.ScheduleRuleService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -46,8 +48,14 @@ public class ScheduleRuleController {
 
     @Getter
     public static class RuleUpdateForm {
+        @NotBlank(message = "规则键不能为空")
+        @Size(max = 100, message = "规则键最长 100 字符")
         private String ruleKey;
+
+        @NotBlank(message = "规则值不能为空")
+        @Size(max = 100, message = "规则值最长 100 字符")
         private String ruleValue;
+
         private Integer enabled;
     }
 }
