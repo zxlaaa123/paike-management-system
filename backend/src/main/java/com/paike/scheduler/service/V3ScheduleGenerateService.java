@@ -1,7 +1,6 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.paike.scheduler.common.enums.CourseType;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
@@ -12,6 +11,7 @@ import com.paike.scheduler.service.scheduling.RuleConfig;
 import com.paike.scheduler.service.scheduling.SchedulingReferenceData;
 import com.paike.scheduler.service.scheduling.SchedulingReferenceLoader;
 import com.paike.scheduler.service.scheduling.SchedulingSupport;
+import com.paike.scheduler.service.scheduling.ScoringFunctions;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -367,13 +367,13 @@ public class V3ScheduleGenerateService {
             if (!Objects.equals(item.getWeekday(), slot.getDayOfWeek())) {
                 continue;
             }
-            if (Objects.equals(item.getTeacherId(), task.getTeacherId()) && Objects.equals(item.getStartPeriod(), slotToStartPeriod(slot))) {
+            if (Objects.equals(item.getTeacherId(), task.getTeacherId()) && Objects.equals(item.getStartPeriod(), ScoringFunctions.slotToStartPeriod(slot))) {
                 return true;
             }
-            if (Objects.equals(item.getClassId(), task.getClassId()) && Objects.equals(item.getStartPeriod(), slotToStartPeriod(slot))) {
+            if (Objects.equals(item.getClassId(), task.getClassId()) && Objects.equals(item.getStartPeriod(), ScoringFunctions.slotToStartPeriod(slot))) {
                 return true;
             }
-            if (Objects.equals(item.getClassroomId(), room.getId()) && Objects.equals(item.getStartPeriod(), slotToStartPeriod(slot))) {
+            if (Objects.equals(item.getClassroomId(), room.getId()) && Objects.equals(item.getStartPeriod(), ScoringFunctions.slotToStartPeriod(slot))) {
                 return true;
             }
         }
@@ -427,53 +427,16 @@ public class V3ScheduleGenerateService {
         String courseType = SchedulingSupport.getCourseType(task.getCourseId(), refData.courseMap());
         int studentCount = SchedulingSupport.getClassStudentCount(task.getClassId(), refData.classMap());
 
-        score += weight(refData,"CLASSROOM_UTILIZATION") * classroomUtilizationScore(room, studentCount);
-        score += weight(refData,"CLASS_DAILY_BALANCE") * balanceScore(generatedItems, item -> Objects.equals(item.getClassId(), task.getClassId()), slot.getDayOfWeek());
-        score += weight(refData,"TEACHER_DAILY_LOAD") * balanceScore(generatedItems, item -> Objects.equals(item.getTeacherId(), task.getTeacherId()), slot.getDayOfWeek());
-        score += weight(refData,"COURSE_DISTRIBUTION") * courseDistributionScore(generatedItems, task, slot.getDayOfWeek());
-        score += weight(refData,"CONTINUOUS_PERIOD_LIMIT") * continuousLimitScore(generatedItems, task, slot);
-        score += weight(refData,"MORNING_THEORY_PRIORITY") * morningPriorityScore(courseType, slot);
+        score += weight(refData,"CLASSROOM_UTILIZATION") * ScoringFunctions.candidateClassroomUtilization(room, studentCount);
+        score += weight(refData,"CLASS_DAILY_BALANCE") * ScoringFunctions.candidateBalance(generatedItems, item -> Objects.equals(item.getClassId(), task.getClassId()), slot.getDayOfWeek());
+        score += weight(refData,"TEACHER_DAILY_LOAD") * ScoringFunctions.candidateBalance(generatedItems, item -> Objects.equals(item.getTeacherId(), task.getTeacherId()), slot.getDayOfWeek());
+        score += weight(refData,"COURSE_DISTRIBUTION") * ScoringFunctions.candidateCourseDistribution(generatedItems, task, slot.getDayOfWeek());
+        score += weight(refData,"CONTINUOUS_PERIOD_LIMIT") * ScoringFunctions.candidateContinuousLimit(generatedItems, task, slot);
+        score += weight(refData,"MORNING_THEORY_PRIORITY") * ScoringFunctions.candidateMorningPriority(courseType, slot);
 
         // 稳定偏好：更早的时间段略优，避免在候选分相同时结果抖动。
         score += Math.max(0, 100 - slot.getSortOrder()) * 0.0001D;
         return score;
-    }
-
-    private double classroomUtilizationScore(Classroom room, int studentCount) {
-        if (room.getCapacity() == null || room.getCapacity() <= 0) {
-            return 0D;
-        }
-        double ratio = (double) studentCount / room.getCapacity();
-        return Math.max(0D, ratio);
-    }
-
-    private double balanceScore(List<SchedulePlanItem> generatedItems, java.util.function.Predicate<SchedulePlanItem> predicate, int dayOfWeek) {
-        long count = generatedItems.stream()
-                .filter(predicate)
-                .filter(item -> Objects.equals(item.getWeekday(), dayOfWeek))
-                .count();
-        return 1D / (1D + count);
-    }
-
-    private double courseDistributionScore(List<SchedulePlanItem> generatedItems, TeachingTask task, int dayOfWeek) {
-        boolean existsSameDay = generatedItems.stream().anyMatch(item ->
-                Objects.equals(item.getClassId(), task.getClassId())
-                        && Objects.equals(item.getCourseId(), task.getCourseId())
-                        && Objects.equals(item.getWeekday(), dayOfWeek));
-        return existsSameDay ? 0D : 1D;
-    }
-
-    private double continuousLimitScore(List<SchedulePlanItem> generatedItems, TeachingTask task, TimeSlot slot) {
-        boolean adjacent = generatedItems.stream().anyMatch(item ->
-                Objects.equals(item.getWeekday(), slot.getDayOfWeek())
-                        && (Objects.equals(item.getTeacherId(), task.getTeacherId()) || Objects.equals(item.getClassId(), task.getClassId()))
-                        && Math.abs(item.getStartPeriod() - slotToStartPeriod(slot)) == 2);
-        return adjacent ? 0D : 1D;
-    }
-
-    private double morningPriorityScore(String courseType, TimeSlot slot) {
-        boolean theory = !CourseType.EXPERIMENT.getCode().equals(courseType) && !CourseType.COMPUTER.getCode().equals(courseType);
-        return theory && slot.getPeriodNo() <= 2 ? 1D : 0D;
     }
 
     private double weight(SchedulingReferenceData refData, String ruleCode) {
@@ -490,7 +453,7 @@ public class V3ScheduleGenerateService {
         item.setCourseId(task.getCourseId());
         item.setClassroomId(room.getId());
         item.setWeekday(slot.getDayOfWeek());
-        item.setStartPeriod(slotToStartPeriod(slot));
+        item.setStartPeriod(ScoringFunctions.slotToStartPeriod(slot));
         item.setEndPeriod(slotToEndPeriod(slot));
         item.setWeekType("ALL");
         item.setScore(null);
@@ -502,18 +465,8 @@ public class V3ScheduleGenerateService {
         return item;
     }
 
-    private int slotToStartPeriod(TimeSlot slot) {
-        return switch (slot.getPeriodNo()) {
-            case 1 -> 1;
-            case 2 -> 3;
-            case 3 -> 5;
-            case 4 -> 7;
-            default -> Math.max(1, slot.getPeriodNo() * 2 - 1);
-        };
-    }
-
     private int slotToEndPeriod(TimeSlot slot) {
-        return slotToStartPeriod(slot) + 1;
+        return ScoringFunctions.slotToStartPeriod(slot) + 1;
     }
 
     private ScheduleGenerateResult toResult(SchedulePlan plan) {
@@ -611,11 +564,11 @@ public class V3ScheduleGenerateService {
                 teacherConflict = teacherConflict || generatedItems.stream().anyMatch(item ->
                         Objects.equals(item.getTeacherId(), task.getTeacherId())
                                 && Objects.equals(item.getWeekday(), slot.getDayOfWeek())
-                                && Objects.equals(item.getStartPeriod(), slotToStartPeriod(slot)));
+                                && Objects.equals(item.getStartPeriod(), ScoringFunctions.slotToStartPeriod(slot)));
                 classConflict = classConflict || generatedItems.stream().anyMatch(item ->
                         Objects.equals(item.getClassId(), task.getClassId())
                                 && Objects.equals(item.getWeekday(), slot.getDayOfWeek())
-                                && Objects.equals(item.getStartPeriod(), slotToStartPeriod(slot)));
+                                && Objects.equals(item.getStartPeriod(), ScoringFunctions.slotToStartPeriod(slot)));
             }
             if (anyRoomAvailable) {
                 return new UnassignedReason(

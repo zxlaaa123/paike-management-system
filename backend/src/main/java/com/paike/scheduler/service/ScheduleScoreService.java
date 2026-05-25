@@ -9,6 +9,7 @@ import com.paike.scheduler.entity.ScheduleScoreDetail;
 import com.paike.scheduler.mapper.SchedulePlanItemMapper;
 import com.paike.scheduler.mapper.SchedulePlanMapper;
 import com.paike.scheduler.mapper.ScheduleScoreDetailMapper;
+import com.paike.scheduler.service.scheduling.ScoringFunctions;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -198,12 +199,12 @@ public class ScheduleScoreService {
         int capacityViolationCount = countConflictReason(items, PlanConflictType.CLASSROOM_CAPACITY);
         int roomTypeMismatchCount = countConflictReason(items, PlanConflictType.CLASSROOM_TYPE_MISMATCH);
 
-        BigDecimal classBalancePenalty = variancePenalty(classDayCounts);
-        BigDecimal teacherLoadPenalty = variancePenalty(teacherDayCounts);
-        BigDecimal courseDistributionPenalty = duplicateCoursePenalty(courseDayCounts);
-        BigDecimal continuousPenalty = continuousPenalty(teacherDayItems);
-        BigDecimal classroomUtilizationPenalty = classroomUtilizationPenalty(roomUseCounts, items.size());
-        BigDecimal morningPriorityPenalty = morningPriorityPenalty(items);
+        BigDecimal classBalancePenalty = ScoringFunctions.penaltyVariance(classDayCounts);
+        BigDecimal teacherLoadPenalty = ScoringFunctions.penaltyVariance(teacherDayCounts);
+        BigDecimal courseDistributionPenalty = ScoringFunctions.penaltyDuplicateCourse(courseDayCounts);
+        BigDecimal continuousPenalty = ScoringFunctions.penaltyContinuous(teacherDayItems);
+        BigDecimal classroomUtilizationPenalty = ScoringFunctions.penaltyClassroomUtilization(roomUseCounts, items.size());
+        BigDecimal morningPriorityPenalty = ScoringFunctions.penaltyMorningPriority(items, thresholds.getAfternoonStartPeriod());
 
         return new ScoreContext(
                 teacherConflictCount,
@@ -244,86 +245,6 @@ public class ScheduleScoreService {
         return grouped.values().stream()
                 .mapToInt(list -> Math.max(0, list.size() - 1))
                 .sum();
-    }
-
-    private BigDecimal variancePenalty(Map<Long, Map<Integer, Long>> countsByOwner) {
-        if (countsByOwner.isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-        double penalty = 0D;
-        for (Map<Integer, Long> dayCounts : countsByOwner.values()) {
-            if (dayCounts.size() <= 1) {
-                continue;
-            }
-            double avg = dayCounts.values().stream().mapToLong(Long::longValue).average().orElse(0D);
-            double variance = dayCounts.values().stream()
-                    .mapToDouble(count -> Math.pow(count - avg, 2))
-                    .average()
-                    .orElse(0D);
-            penalty += Math.min(1D, variance / 4D);
-        }
-        double normalized = penalty / countsByOwner.size();
-        return BigDecimal.valueOf(normalized).setScale(4, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal duplicateCoursePenalty(Map<String, Long> courseDayCounts) {
-        if (courseDayCounts.isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-        long duplicateDays = courseDayCounts.values().stream().filter(count -> count > 1).count();
-        long totalDays = courseDayCounts.size();
-        if (totalDays == 0) {
-            return BigDecimal.ZERO;
-        }
-        return BigDecimal.valueOf((double) duplicateDays / totalDays).setScale(4, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal continuousPenalty(Map<Long, Map<Integer, List<SchedulePlanItem>>> teacherDayItems) {
-        if (teacherDayItems.isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-        double penalty = 0D;
-        int sampleCount = 0;
-        for (Map<Integer, List<SchedulePlanItem>> dayItems : teacherDayItems.values()) {
-            for (List<SchedulePlanItem> items : dayItems.values()) {
-                sampleCount++;
-                List<Integer> starts = items.stream()
-                        .map(SchedulePlanItem::getStartPeriod)
-                        .sorted()
-                        .toList();
-                int consecutiveChains = 0;
-                for (int i = 1; i < starts.size(); i++) {
-                    if (starts.get(i) - starts.get(i - 1) == 2) {
-                        consecutiveChains++;
-                    }
-                }
-                penalty += Math.min(1D, consecutiveChains / 2D);
-            }
-        }
-        if (sampleCount == 0) {
-            return BigDecimal.ZERO;
-        }
-        return BigDecimal.valueOf(penalty / sampleCount).setScale(4, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal classroomUtilizationPenalty(Map<Long, Long> roomUseCounts, int totalItems) {
-        if (totalItems <= 0 || roomUseCounts.isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-        double avg = (double) totalItems / roomUseCounts.size();
-        double variance = roomUseCounts.values().stream()
-                .mapToDouble(count -> Math.pow(count - avg, 2))
-                .average()
-                .orElse(0D);
-        return BigDecimal.valueOf(Math.min(1D, variance / Math.max(1D, avg * avg))).setScale(4, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal morningPriorityPenalty(List<SchedulePlanItem> items) {
-        if (items.isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-        long afternoonCount = items.stream().filter(item -> item.getStartPeriod() >= thresholds.getAfternoonStartPeriod()).count();
-        return BigDecimal.valueOf((double) afternoonCount / items.size()).setScale(4, RoundingMode.HALF_UP);
     }
 
     private BigDecimal safeWeight(BigDecimal weight) {
