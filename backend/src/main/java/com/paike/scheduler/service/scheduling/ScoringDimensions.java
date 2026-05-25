@@ -15,8 +15,8 @@ import java.util.List;
  *       反向罚分，从 100 扣。</li>
  * </ul>
  *
- * 两套用途不同（贪心选下一步 vs 评估整体方案），故意保留双轨；本表是为了让这种差异<b>可见</b>，
- * 避免未来读者把"在线 CLASSROOM_UTILIZATION"误以为就是 schedule_score_detail 里那一行。
+ * 两套用途不同（贪心选下一步 vs 评估整体方案），故意保留双轨；本表从一条 Dimension record
+ * 升级为 sealed interface + 三种类型，编译期强制区分在线/离线/硬约束三轨道。
  *
  * <h2>已知现象（非 bug，留作 D3 议题）</h2>
  * MORNING_THEORY_PRIORITY 在 COMPREHENSIVE 默认权重表里没有，但在线 scoreCandidate 仍然会调
@@ -27,115 +27,150 @@ public final class ScoringDimensions {
 
     private ScoringDimensions() {}
 
-    public record Dimension(
+    public sealed interface Dimension permits OnlineSoft, OfflineSoft, OfflineHard {
+        String code();
+        String displayName();
+        String usage();
+    }
+
+    public record OnlineSoft(
             String code,
             String displayName,
-            String ruleType,
-            String onlineFormula,
-            String onlineRange,
-            String offlineFormula,
-            String offlineRange,
+            String formula,
+            String range,
             String usage
-    ) {}
+    ) implements Dimension {}
+
+    public record OfflineSoft(
+            String code,
+            String displayName,
+            String formula,
+            String range,
+            String usage
+    ) implements Dimension {}
+
+    public record OfflineHard(
+            String code,
+            String displayName,
+            String formula,
+            String range,
+            String usage
+    ) implements Dimension {}
 
     /**
-     * 6 个软维度 —— 两套公式都有。
-     * 硬维度（TEACHER_TIME_CONFLICT 等）只在离线 rescore 用，没有在线评分对应项，见 {@link #HARD}。
+     * 6 个在线软维度 —— 用于在线 scoreCandidate 的候选打分文档对照。
      */
-    public static final List<Dimension> SOFT = List.of(
-            new Dimension(
+    public static final List<OnlineSoft> ONLINE_SOFT = List.of(
+            new OnlineSoft(
                     "CLASSROOM_UTILIZATION",
                     "教室利用率",
-                    "SOFT",
                     "studentCount / capacity，超容也允许 >1（贪心更偏好『刚好坐满』）",
                     "[0, N)",
+                    "在线偏好高利用率单个房间；离线惩罚教室之间使用不均"),
+            new OnlineSoft(
+                    "CLASS_DAILY_BALANCE",
+                    "班级每日均衡",
+                    "1 / (1 + 同班当天已排数) —— 越后排越不愿意再加",
+                    "(0, 1]",
+                    "在线打压『同班同天扎堆』；离线惩罚『日数方差大』（跨周比较）"),
+            new OnlineSoft(
+                    "TEACHER_DAILY_LOAD",
+                    "教师每日负载",
+                    "1 / (1 + 同教师当天已排数)",
+                    "(0, 1]",
+                    "在线/离线公式都用 variancePenalty，但在线是『当天累计』，离线是『跨日方差』"),
+            new OnlineSoft(
+                    "COURSE_DISTRIBUTION",
+                    "课程分布均衡",
+                    "存在同班同课同日 ? 0 : 1 —— 二值",
+                    "{0, 1}",
+                    "在线是『同一天不再排』的硬偏好；离线是『全 plan 重复天数占比』"),
+            new OnlineSoft(
+                    "CONTINUOUS_PERIOD_LIMIT",
+                    "连续上课限制",
+                    "相邻节次 (|Δperiod|==2) 且同教师/同班 ? 0 : 1 —— 二值",
+                    "{0, 1}",
+                    "在线打压『紧挨着排』；离线衡量『连续链平均长度』"),
+            new OnlineSoft(
+                    "MORNING_THEORY_PRIORITY",
+                    "理论课优先上午",
+                    "理论课（非 EXPERIMENT/COMPUTER）&& periodNo<=2 ? 1 : 0",
+                    "{0, 1}",
+                    "COMPREHENSIVE 策略默认权重表无此项，相当于在线维度失效；BALANCED 等策略有"));
+
+    /**
+     * 6 个离线软维度 —— 用于离线 rescore 写库的罚分文档对照。
+     */
+    public static final List<OfflineSoft> OFFLINE_SOFT = List.of(
+            new OfflineSoft(
+                    "CLASSROOM_UTILIZATION",
+                    "教室利用率",
                     "教室使用次数方差，归一为 min(1, variance / avg²)",
                     "[0, 1]",
                     "在线偏好高利用率单个房间；离线惩罚教室之间使用不均"),
-            new Dimension(
+            new OfflineSoft(
                     "CLASS_DAILY_BALANCE",
                     "班级每日均衡",
-                    "SOFT",
-                    "1 / (1 + 同班当天已排数) —— 越后排越不愿意再加",
-                    "(0, 1]",
                     "班级每日数方差均值，归一 min(1, variance/4)",
                     "[0, 1]",
                     "在线打压『同班同天扎堆』；离线惩罚『日数方差大』（跨周比较）"),
-            new Dimension(
+            new OfflineSoft(
                     "TEACHER_DAILY_LOAD",
                     "教师每日负载",
-                    "SOFT",
-                    "1 / (1 + 同教师当天已排数)",
-                    "(0, 1]",
                     "同 CLASS_DAILY_BALANCE，按 teacherId 分组",
                     "[0, 1]",
                     "在线/离线公式都用 variancePenalty，但在线是『当天累计』，离线是『跨日方差』"),
-            new Dimension(
+            new OfflineSoft(
                     "COURSE_DISTRIBUTION",
                     "课程分布均衡",
-                    "SOFT",
-                    "存在同班同课同日 ? 0 : 1 —— 二值",
-                    "{0, 1}",
                     "(同班同课同日次数>1 的天数) / 总(班×课×天) 数",
                     "[0, 1]",
                     "在线是『同一天不再排』的硬偏好；离线是『全 plan 重复天数占比』"),
-            new Dimension(
+            new OfflineSoft(
                     "CONTINUOUS_PERIOD_LIMIT",
                     "连续上课限制",
-                    "SOFT",
-                    "相邻节次 (|Δperiod|==2) 且同教师/同班 ? 0 : 1 —— 二值",
-                    "{0, 1}",
                     "教师每日 startPeriod 排序后相邻差==2 的链数，min(1, chains/2) 求样本均值",
                     "[0, 1]",
                     "在线打压『紧挨着排』；离线衡量『连续链平均长度』"),
-            new Dimension(
+            new OfflineSoft(
                     "MORNING_THEORY_PRIORITY",
                     "理论课优先上午",
-                    "SOFT",
-                    "理论课（非 EXPERIMENT/COMPUTER）&& periodNo<=2 ? 1 : 0",
-                    "{0, 1}",
                     "全部下午课占比（不区分课程类型！）—— 离线公式更粗",
                     "[0, 1]",
                     "COMPREHENSIVE 策略默认权重表无此项，相当于在线维度失效；BALANCED 等策略有"));
 
     /**
-     * 6 个硬维度 —— 只在离线 rescore 出现，违规一次扣 weight × 1。
+     * 6 个离线硬维度 —— 只在离线 rescore 出现，违规一次扣 weight × 1。
      * 在线 scoreCandidate 不参与（硬约束由 conflictService 提前拦截，根本进不到打分这步）。
      */
-    public static final List<Dimension> HARD = List.of(
-            new Dimension(
-                    "TEACHER_TIME_CONFLICT", "教师时间冲突", "HARD",
-                    "N/A（在线由 ScheduleConflictService 拦截）", "—",
+    public static final List<OfflineHard> OFFLINE_HARD = List.of(
+            new OfflineHard(
+                    "TEACHER_TIME_CONFLICT", "教师时间冲突",
                     "同一 (teacherId, weekday, startPeriod) 出现 >1 条，每多 1 条算 1 次违规",
                     "[0, ∞)",
                     "硬约束，理论上 plan 内应为 0"),
-            new Dimension(
-                    "CLASS_TIME_CONFLICT", "班级时间冲突", "HARD",
-                    "N/A", "—",
+            new OfflineHard(
+                    "CLASS_TIME_CONFLICT", "班级时间冲突",
                     "同 (classId, weekday, startPeriod) >1 条",
                     "[0, ∞)",
                     "硬约束"),
-            new Dimension(
-                    "CLASSROOM_TIME_CONFLICT", "教室时间冲突", "HARD",
-                    "N/A", "—",
+            new OfflineHard(
+                    "CLASSROOM_TIME_CONFLICT", "教室时间冲突",
                     "同 (classroomId, weekday, startPeriod) >1 条",
                     "[0, ∞)",
                     "硬约束"),
-            new Dimension(
-                    "TEACHER_UNAVAILABLE", "教师禁排时间", "HARD",
-                    "N/A（在线 unavailableKeySet 直接 continue）", "—",
+            new OfflineHard(
+                    "TEACHER_UNAVAILABLE", "教师禁排时间",
                     "item.conflictReason 包含 TEACHER_UNAVAILABLE 标签的数量",
                     "[0, ∞)",
                     "靠 SchedulePlanItem.conflictReason 字符串解析，依赖前置标记"),
-            new Dimension(
-                    "CLASSROOM_CAPACITY", "教室容量不足", "HARD",
-                    "N/A（在线 matchedRooms 已按容量过滤）", "—",
+            new OfflineHard(
+                    "CLASSROOM_CAPACITY", "教室容量不足",
                     "item.conflictReason 包含 CLASSROOM_CAPACITY 标签的数量",
                     "[0, ∞)",
                     "靠 conflictReason 解析"),
-            new Dimension(
-                    "CLASSROOM_TYPE_MISMATCH", "教室类型不匹配", "HARD",
-                    "N/A（在线 matchedRooms 已按类型过滤）", "—",
+            new OfflineHard(
+                    "CLASSROOM_TYPE_MISMATCH", "教室类型不匹配",
                     "item.conflictReason 包含 CLASSROOM_TYPE_MISMATCH 标签的数量",
                     "[0, ∞)",
                     "靠 conflictReason 解析"));
