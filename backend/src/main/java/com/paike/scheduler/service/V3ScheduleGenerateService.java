@@ -2,13 +2,13 @@ package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.paike.scheduler.common.enums.CourseType;
-import com.paike.scheduler.common.enums.RoomType;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.dto.MultipleScheduleGenerateRequest;
 import com.paike.scheduler.service.dto.ScheduleGenerateRequest;
 import com.paike.scheduler.service.dto.ScheduleGenerateResult;
+import com.paike.scheduler.service.scheduling.SchedulingSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -87,8 +87,8 @@ public class V3ScheduleGenerateService {
                 semesterId,
                 strategyType,
                 weightMap,
-                toUnavailableKeySet(unavailableTimes),
-                toUnavailableCount(unavailableTimes),
+                SchedulingSupport.toUnavailableKeySet(unavailableTimes),
+                SchedulingSupport.toUnavailableCountByTeacher(unavailableTimes),
                 timeSlots,
                 classrooms,
                 courseMap,
@@ -224,31 +224,7 @@ public class V3ScheduleGenerateService {
                 new LambdaQueryWrapper<TimeSlot>().orderByAsc(TimeSlot::getSortOrder));
         boolean prioritizeMorning = ruleService.getBoolValue("PRIORITIZE_MORNING");
         boolean avoidFridayAfternoon = ruleService.getBoolValue("AVOID_FRIDAY_AFTERNOON");
-        return timeSlots.stream().sorted((a, b) -> {
-            int aPeriodNo = a.getPeriodNo() == null ? Integer.MAX_VALUE : a.getPeriodNo();
-            int bPeriodNo = b.getPeriodNo() == null ? Integer.MAX_VALUE : b.getPeriodNo();
-            int aDayOfWeek = a.getDayOfWeek() == null ? Integer.MAX_VALUE : a.getDayOfWeek();
-            int bDayOfWeek = b.getDayOfWeek() == null ? Integer.MAX_VALUE : b.getDayOfWeek();
-
-            if (prioritizeMorning) {
-                boolean aMorning = aPeriodNo <= 2;
-                boolean bMorning = bPeriodNo <= 2;
-                if (aMorning != bMorning) return aMorning ? -1 : 1;
-            }
-            if (avoidFridayAfternoon) {
-                boolean aFriPm = aDayOfWeek == 5 && aPeriodNo >= 3;
-                boolean bFriPm = bDayOfWeek == 5 && bPeriodNo >= 3;
-                if (aFriPm != bFriPm) return aFriPm ? 1 : -1;
-            }
-            return Integer.compare(safeSortOrder(a), safeSortOrder(b));
-        }).toList();
-    }
-
-    private int safeSortOrder(TimeSlot slot) {
-        if (slot == null) {
-            return Integer.MAX_VALUE;
-        }
-        return slot.getSortOrder() == null ? Integer.MAX_VALUE : slot.getSortOrder();
+        return SchedulingSupport.sortTimeSlots(timeSlots, prioritizeMorning, avoidFridayAfternoon);
     }
 
     private List<Classroom> loadAvailableClassrooms() {
@@ -263,17 +239,6 @@ public class V3ScheduleGenerateService {
                 new LambdaQueryWrapper<TeacherUnavailableTime>()
                         .eq(TeacherUnavailableTime::getStatus, 1)
                         .eq(TeacherUnavailableTime::getDeleted, 0));
-    }
-
-    private Set<String> toUnavailableKeySet(List<TeacherUnavailableTime> unavailableTimes) {
-        return unavailableTimes.stream()
-                .map(item -> item.getTeacherId() + "_" + item.getTimeSlotId())
-                .collect(Collectors.toSet());
-    }
-
-    private Map<Long, Long> toUnavailableCount(List<TeacherUnavailableTime> unavailableTimes) {
-        return unavailableTimes.stream()
-                .collect(Collectors.groupingBy(TeacherUnavailableTime::getTeacherId, Collectors.counting()));
     }
 
     private Map<String, BigDecimal> loadStrategyWeights(Long semesterId, String strategyType) {
@@ -292,7 +257,7 @@ public class V3ScheduleGenerateService {
     }
 
     private List<SchedulePlanItem> generatePlanItems(SchedulePlan plan, List<TeachingTask> tasks, GenerationContext context) {
-        List<TeachingTask> sortedTasks = sortTasks(tasks, context.unavailableCount(), context.courseMap(), context.classMap());
+        List<TeachingTask> sortedTasks = SchedulingSupport.sortTasks(tasks, context.unavailableCount(), context.courseMap(), context.classMap());
         List<SchedulePlanItem> generatedItems = new ArrayList<>();
         int unscheduledCount = 0;
         StepCounter stepCounter = new StepCounter(2);
@@ -300,12 +265,12 @@ public class V3ScheduleGenerateService {
         for (TeachingTask task : sortedTasks) {
             int requiredSlots = Math.max(1, (int) Math.ceil((task.getWeeklyHours() == null ? 0 : task.getWeeklyHours()) / 2.0));
             Set<Integer> usedDays = new HashSet<>();
-            String courseType = getCourseType(task.getCourseId(), context.courseMap());
-            int studentCount = getClassStudentCount(task.getClassId(), context.classMap());
+            String courseType = SchedulingSupport.getCourseType(task.getCourseId(), context.courseMap());
+            int studentCount = SchedulingSupport.getClassStudentCount(task.getClassId(), context.classMap());
             String taskLabel = taskLabel(task, context.courseMap(), context.classMap());
             List<Classroom> matchedRooms = context.classrooms().stream()
                     .filter(room -> room.getCapacity() != null && room.getCapacity() >= studentCount)
-                    .filter(room -> isRoomTypeMatched(courseType, room.getRoomType()))
+                    .filter(room -> SchedulingSupport.isRoomTypeMatched(courseType, room.getRoomType()))
                     .sorted(Comparator.comparingInt(Classroom::getCapacity))
                     .toList();
 
@@ -491,8 +456,8 @@ public class V3ScheduleGenerateService {
             GenerationContext context
     ) {
         double score = 0D;
-        String courseType = getCourseType(task.getCourseId(), context.courseMap());
-        int studentCount = getClassStudentCount(task.getClassId(), context.classMap());
+        String courseType = SchedulingSupport.getCourseType(task.getCourseId(), context.courseMap());
+        int studentCount = SchedulingSupport.getClassStudentCount(task.getClassId(), context.classMap());
 
         score += weight(context, "CLASSROOM_UTILIZATION") * classroomUtilizationScore(room, studentCount);
         score += weight(context, "CLASS_DAILY_BALANCE") * balanceScore(generatedItems, item -> Objects.equals(item.getClassId(), task.getClassId()), slot.getDayOfWeek());
@@ -545,49 +510,6 @@ public class V3ScheduleGenerateService {
 
     private double weight(GenerationContext context, String ruleCode) {
         return context.weightMap().getOrDefault(ruleCode, BigDecimal.ZERO).doubleValue();
-    }
-
-    private List<TeachingTask> sortTasks(
-            List<TeachingTask> tasks,
-            Map<Long, Long> unavailableCount,
-            Map<Long, Course> courseMap,
-            Map<Long, ClassInfo> classMap
-    ) {
-        return tasks.stream().sorted((a, b) -> {
-            String typeA = getCourseType(a.getCourseId(), courseMap);
-            String typeB = getCourseType(b.getCourseId(), courseMap);
-            int priorityA = (CourseType.EXPERIMENT.getCode().equals(typeA) || CourseType.COMPUTER.getCode().equals(typeA)) ? 0 : 1;
-            int priorityB = (CourseType.EXPERIMENT.getCode().equals(typeB) || CourseType.COMPUTER.getCode().equals(typeB)) ? 0 : 1;
-            if (priorityA != priorityB) return priorityA - priorityB;
-
-            int countA = getClassStudentCount(a.getClassId(), classMap);
-            int countB = getClassStudentCount(b.getClassId(), classMap);
-            if (countB != countA) return countB - countA;
-
-            int weeklyA = a.getWeeklyHours() == null ? 0 : a.getWeeklyHours();
-            int weeklyB = b.getWeeklyHours() == null ? 0 : b.getWeeklyHours();
-            if (weeklyB != weeklyA) return weeklyB - weeklyA;
-
-            long unavailA = unavailableCount.getOrDefault(a.getTeacherId(), 0L);
-            long unavailB = unavailableCount.getOrDefault(b.getTeacherId(), 0L);
-            return Long.compare(unavailB, unavailA);
-        }).toList();
-    }
-
-    private boolean isRoomTypeMatched(String courseType, String roomType) {
-        if (CourseType.EXPERIMENT.getCode().equals(courseType)) return RoomType.LAB.getCode().equals(roomType);
-        if (CourseType.COMPUTER.getCode().equals(courseType)) return RoomType.COMPUTER.getCode().equals(roomType);
-        return true;
-    }
-
-    private String getCourseType(Long courseId, Map<Long, Course> courseMap) {
-        Course course = courseMap.get(courseId);
-        return course != null ? course.getCourseType() : CourseType.NORMAL.getCode();
-    }
-
-    private int getClassStudentCount(Long classId, Map<Long, ClassInfo> classMap) {
-        ClassInfo classInfo = classMap.get(classId);
-        return classInfo != null && classInfo.getStudentCount() != null ? classInfo.getStudentCount() : 0;
     }
 
     private SchedulePlanItem toPlanItem(Long planId, TeachingTask task, TimeSlot slot, Classroom room) {
@@ -675,7 +597,7 @@ public class V3ScheduleGenerateService {
     }
 
     private UnassignedReason buildNoMatchedRoomReason(TeachingTask task, int studentCount, String courseType, List<Classroom> allRooms) {
-        boolean hasCourseTypeRoom = allRooms.stream().anyMatch(room -> isRoomTypeMatched(courseType, room.getRoomType()));
+        boolean hasCourseTypeRoom = allRooms.stream().anyMatch(room -> SchedulingSupport.isRoomTypeMatched(courseType, room.getRoomType()));
         if (!hasCourseTypeRoom) {
             return new UnassignedReason(
                     "CLASSROOM_TYPE_MISMATCH",

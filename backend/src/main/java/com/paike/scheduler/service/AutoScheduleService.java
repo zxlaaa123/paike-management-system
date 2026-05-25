@@ -1,12 +1,11 @@
 package com.paike.scheduler.service;
 
-import com.paike.scheduler.common.enums.CourseType;
-import com.paike.scheduler.common.enums.RoomType;
 import com.paike.scheduler.common.enums.ScheduleSourceType;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.service.dto.AutoScheduleRequest;
 import com.paike.scheduler.service.dto.AutoScheduleResult;
+import com.paike.scheduler.service.scheduling.SchedulingSupport;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.paike.scheduler.mapper.ClassInfoMapper;
 import com.paike.scheduler.mapper.ClassroomMapper;
@@ -102,10 +101,8 @@ public class AutoScheduleService {
         List<TimeSlot> timeSlots = timeSlotMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TimeSlot>()
                         .orderByAsc(TimeSlot::getSortOrder));
-        timeSlots = sortTimeSlots(timeSlots, prioritizeMorning, avoidFridayAfternoon);
-        Map<Integer, List<Long>> slotIdsByDay = timeSlots.stream()
-                .collect(Collectors.groupingBy(TimeSlot::getDayOfWeek,
-                        Collectors.mapping(TimeSlot::getId, Collectors.toList())));
+        timeSlots = SchedulingSupport.sortTimeSlots(timeSlots, prioritizeMorning, avoidFridayAfternoon);
+        Map<Integer, List<Long>> slotIdsByDay = SchedulingSupport.slotIdsByDay(timeSlots);
 
         // 6. 读取可用教室
         List<Classroom> classrooms = classroomMapper.selectList(
@@ -118,9 +115,7 @@ public class AutoScheduleService {
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TeacherUnavailableTime>()
                         .eq(TeacherUnavailableTime::getStatus, 1)
                         .eq(TeacherUnavailableTime::getDeleted, 0));
-        Set<String> unavailableKeySet = unavailableTimes.stream()
-                .map(ut -> ut.getTeacherId() + "_" + ut.getTimeSlotId())
-                .collect(Collectors.toSet());
+        Set<String> unavailableKeySet = SchedulingSupport.toUnavailableKeySet(unavailableTimes);
 
         Map<Long, Course> courseMap = courseMapper.selectList(new LambdaQueryWrapper<Course>()
                         .eq(Course::getDeleted, 0))
@@ -132,7 +127,11 @@ public class AutoScheduleService {
                 .collect(Collectors.toMap(ClassInfo::getId, c -> c, (a, b) -> a));
 
         // 8. 对教学任务排序（难排优先）
-        targetTasks = sortTasks(targetTasks, unavailableTimes, courseMap, classMap);
+        targetTasks = SchedulingSupport.sortTasks(
+                targetTasks,
+                SchedulingSupport.toUnavailableCountByTeacher(unavailableTimes),
+                courseMap,
+                classMap);
 
         // 9. 遍历排课
         int generatedCount = 0;
@@ -170,7 +169,7 @@ public class AutoScheduleService {
             int studentCount = classInfo.getStudentCount();
             List<Classroom> matchedRooms = classrooms.stream()
                     .filter(r -> r.getCapacity() >= studentCount)
-                    .filter(r -> isRoomTypeMatched(courseType, r.getRoomType()))
+                    .filter(r -> SchedulingSupport.isRoomTypeMatched(courseType, r.getRoomType()))
                     .sorted(Comparator.comparingInt(Classroom::getCapacity))
                     .collect(Collectors.toList());
 
@@ -285,75 +284,7 @@ public class AutoScheduleService {
         return result;
     }
 
-    // ========== 排序方法 ==========
-
-    /**
-     * 难排任务优先。
-     * 先排对资源要求高、班级人数多、周课时多、教师禁排更多的任务，能减少后续无解概率。
-     */
-    private List<TeachingTask> sortTasks(
-            List<TeachingTask> tasks,
-            List<TeacherUnavailableTime> unavailableTimes,
-            Map<Long, Course> courseMap,
-            Map<Long, ClassInfo> classMap
-    ) {
-        Map<Long, Long> unavailableCount = unavailableTimes.stream()
-                .collect(Collectors.groupingBy(TeacherUnavailableTime::getTeacherId, Collectors.counting()));
-
-        return tasks.stream().sorted((a, b) -> {
-            // 1. 实验课、机房课优先
-            String typeA = getCourseType(a.getCourseId(), courseMap);
-            String typeB = getCourseType(b.getCourseId(), courseMap);
-            int priorityA = (CourseType.EXPERIMENT.getCode().equals(typeA) || CourseType.COMPUTER.getCode().equals(typeA)) ? 0 : 1;
-            int priorityB = (CourseType.EXPERIMENT.getCode().equals(typeB) || CourseType.COMPUTER.getCode().equals(typeB)) ? 0 : 1;
-            if (priorityA != priorityB) return priorityA - priorityB;
-
-            // 2. 班级人数多的优先
-            int countA = getClassStudentCount(a.getClassId(), classMap);
-            int countB = getClassStudentCount(b.getClassId(), classMap);
-            if (countB != countA) return countB - countA;
-
-            // 3. 每周课时多的优先（Integer 比较走 intValue，避免对象引用比较 + null 拆箱）
-            int hoursA = a.getWeeklyHours() == null ? 0 : a.getWeeklyHours();
-            int hoursB = b.getWeeklyHours() == null ? 0 : b.getWeeklyHours();
-            if (hoursA != hoursB) return hoursB - hoursA;
-
-            // 4. 教师禁排时间多的优先
-            long unavailA = unavailableCount.getOrDefault(a.getTeacherId(), 0L);
-            long unavailB = unavailableCount.getOrDefault(b.getTeacherId(), 0L);
-            return Long.compare(unavailB, unavailA);
-        }).collect(Collectors.toList());
-    }
-
-    /**
-     * 时间段排序体现的是排课偏好，不是硬限制。
-     * 规则允许时优先上午、尽量避开周五下午，但仍保留这些时间段作为兜底候选。
-     */
-    private List<TimeSlot> sortTimeSlots(List<TimeSlot> slots, boolean prioritizeMorning, boolean avoidFridayAfternoon) {
-        return slots.stream().sorted((a, b) -> {
-            if (prioritizeMorning) {
-                boolean aMorning = a.getPeriodNo() <= 2;
-                boolean bMorning = b.getPeriodNo() <= 2;
-                if (aMorning != bMorning) return aMorning ? -1 : 1;
-            }
-            if (avoidFridayAfternoon) {
-                boolean aFriPm = a.getDayOfWeek() == 5 && a.getPeriodNo() >= 3;
-                boolean bFriPm = b.getDayOfWeek() == 5 && b.getPeriodNo() >= 3;
-                if (aFriPm != bFriPm) return aFriPm ? 1 : -1;
-            }
-            return a.getSortOrder() - b.getSortOrder();
-        }).collect(Collectors.toList());
-    }
-
-
     // ========== 辅助方法 ==========
-
-    private boolean isRoomTypeMatched(String courseType, String roomType) {
-        if (CourseType.EXPERIMENT.getCode().equals(courseType)) return RoomType.LAB.getCode().equals(roomType);
-        if (CourseType.COMPUTER.getCode().equals(courseType)) return RoomType.COMPUTER.getCode().equals(roomType);
-        // 普通课和体育课不限
-        return true;
-    }
 
     private int countScheduledSlots(Long taskId) {
         return scheduleMapper.selectCount(
@@ -443,16 +374,6 @@ public class AutoScheduleService {
         } catch (BusinessException e) {
             throw new BusinessException("未找到当前学期，无法执行自动排课");
         }
-    }
-
-    private String getCourseType(Long courseId, Map<Long, Course> courseMap) {
-        Course course = courseMap.get(courseId);
-        return course != null ? course.getCourseType() : CourseType.NORMAL.getCode();
-    }
-
-    private int getClassStudentCount(Long classId, Map<Long, ClassInfo> classMap) {
-        ClassInfo classInfo = classMap.get(classId);
-        return classInfo != null ? classInfo.getStudentCount() : 0;
     }
 
     /**
