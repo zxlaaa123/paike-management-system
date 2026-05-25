@@ -8,6 +8,7 @@ import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.dto.MultipleScheduleGenerateRequest;
 import com.paike.scheduler.service.dto.ScheduleGenerateRequest;
 import com.paike.scheduler.service.dto.ScheduleGenerateResult;
+import com.paike.scheduler.service.scheduling.RuleConfig;
 import com.paike.scheduler.service.scheduling.SchedulingReferenceData;
 import com.paike.scheduler.service.scheduling.SchedulingReferenceLoader;
 import com.paike.scheduler.service.scheduling.SchedulingSupport;
@@ -51,6 +52,7 @@ public class V3ScheduleGenerateService {
         }
 
         SchedulingReferenceData refData = referenceLoader.loadForV3Generate(semesterId, strategyType);
+        RuleConfig rules = loadRuleConfig();
 
         SchedulePlan plan = new SchedulePlan();
         plan.setSemesterId(semesterId);
@@ -86,7 +88,7 @@ public class V3ScheduleGenerateService {
                 "读取当前学期教学任务，共 " + tasks.size() + " 条",
                 stepCounter.next());
 
-        List<SchedulePlanItem> generatedItems = generatePlanItems(plan, tasks, refData);
+        List<SchedulePlanItem> generatedItems = generatePlanItems(plan, tasks, refData, rules);
         for (SchedulePlanItem item : generatedItems) {
             planItemMapper.insert(item);
         }
@@ -192,7 +194,14 @@ public class V3ScheduleGenerateService {
                         .eq(TeachingTask::getDeleted, 0));
     }
 
-    private List<SchedulePlanItem> generatePlanItems(SchedulePlan plan, List<TeachingTask> tasks, SchedulingReferenceData refData) {
+    private RuleConfig loadRuleConfig() {
+        return new RuleConfig(
+                ruleService.getIntValue("TEACHER_MAX_DAILY_SLOTS"),
+                ruleService.getIntValue("CLASS_MAX_DAILY_SLOTS"),
+                ruleService.getBoolValue("ALLOW_SAME_COURSE_SAME_DAY"));
+    }
+
+    private List<SchedulePlanItem> generatePlanItems(SchedulePlan plan, List<TeachingTask> tasks, SchedulingReferenceData refData, RuleConfig rules) {
         List<TeachingTask> sortedTasks = SchedulingSupport.sortTasks(tasks, refData.unavailableCountByTeacher(), refData.courseMap(), refData.classMap());
         List<SchedulePlanItem> generatedItems = new ArrayList<>();
         int unscheduledCount = 0;
@@ -236,10 +245,10 @@ public class V3ScheduleGenerateService {
             }
 
             for (int occurrence = 0; occurrence < requiredSlots; occurrence++) {
-                Candidate candidate = findBestCandidate(plan, task, usedDays, matchedRooms, generatedItems, refData, stepCounter);
+                Candidate candidate = findBestCandidate(plan, task, usedDays, matchedRooms, generatedItems, refData, rules, stepCounter);
                 if (candidate == null) {
                     unscheduledCount++;
-                    UnassignedReason reason = analyzeUnassignedReason(task, usedDays, matchedRooms, generatedItems, refData);
+                    UnassignedReason reason = analyzeUnassignedReason(task, usedDays, matchedRooms, generatedItems, refData, rules);
                     explainService.saveUnassignedTask(plan.getId(), plan.getSemesterId(), task.getId(),
                             reason.reasonCode(), reason.reasonMessage(), reason.suggestion());
                     explainService.appendGenerateLog(
@@ -283,12 +292,9 @@ public class V3ScheduleGenerateService {
             List<Classroom> matchedRooms,
             List<SchedulePlanItem> generatedItems,
             SchedulingReferenceData refData,
+            RuleConfig rules,
             StepCounter stepCounter
     ) {
-        int teacherMaxDailySlots = ruleService.getIntValue("TEACHER_MAX_DAILY_SLOTS");
-        int classMaxDailySlots = ruleService.getIntValue("CLASS_MAX_DAILY_SLOTS");
-        boolean allowSameCourseSameDay = ruleService.getBoolValue("ALLOW_SAME_COURSE_SAME_DAY");
-
         Candidate best = null;
         String taskLabel = taskLabel(task, refData.courseMap(), refData.classMap());
         for (TimeSlot slot : refData.sortedTimeSlots()) {
@@ -297,40 +303,60 @@ public class V3ScheduleGenerateService {
                         "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，教师禁排", stepCounter.next());
                 continue;
             }
-            if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), teacherMaxDailySlots, generatedItems)) {
+            if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), rules.teacherMaxDailySlots(), generatedItems)) {
                 explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_TEACHER",
                         "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，教师日排课上限", stepCounter.next());
                 continue;
             }
-            if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), classMaxDailySlots, generatedItems)) {
+            if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), rules.classMaxDailySlots(), generatedItems)) {
                 explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_CLASS",
                         "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，班级日排课上限", stepCounter.next());
                 continue;
             }
-            if (!allowSameCourseSameDay && usedDays.contains(slot.getDayOfWeek())) {
+            if (!rules.allowSameCourseSameDay() && usedDays.contains(slot.getDayOfWeek())) {
                 explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_CLASS",
                         "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，同任务已占用同一天", stepCounter.next());
                 continue;
             }
-            if (!allowSameCourseSameDay && hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), generatedItems)) {
+            if (!rules.allowSameCourseSameDay() && hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), generatedItems)) {
                 explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_CLASS",
                         "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，同班同课程同日限制", stepCounter.next());
                 continue;
             }
 
-            for (Classroom room : matchedRooms) {
-                if (hasConflict(task, slot, room, generatedItems)) {
-                    explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_CLASSROOM",
-                            "教学任务：" + taskLabel + " 跳过候选 " + slot.getTimeLabel() + " / " + room.getRoomName() + "，资源冲突", stepCounter.next());
-                    continue;
-                }
-                double score = scoreCandidate(task, slot, room, generatedItems, refData);
-                explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "INFO", "CALCULATE_SCORE",
-                        "候选位置：" + slot.getTimeLabel() + "，教室 " + room.getRoomName() + "，得分 " + String.format(Locale.ROOT, "%.2f", score),
-                        stepCounter.next());
-                if (best == null || score > best.score()) {
-                    best = new Candidate(slot, room, score);
-                }
+            best = evaluateRoomsForSlot(plan, task, slot, matchedRooms, generatedItems, refData, taskLabel, best, stepCounter);
+        }
+        return best;
+    }
+
+    /**
+     * 在给定 slot 下扫一遍候选教室，遇冲突跳过、否则评分并与 currentBest 比较取更高。
+     * 抽出此层是因为外层 slot loop 已经长，进一步把 room 评分提到独立方法降低嵌套。
+     */
+    private Candidate evaluateRoomsForSlot(
+            SchedulePlan plan,
+            TeachingTask task,
+            TimeSlot slot,
+            List<Classroom> matchedRooms,
+            List<SchedulePlanItem> generatedItems,
+            SchedulingReferenceData refData,
+            String taskLabel,
+            Candidate currentBest,
+            StepCounter stepCounter
+    ) {
+        Candidate best = currentBest;
+        for (Classroom room : matchedRooms) {
+            if (hasConflict(task, slot, room, generatedItems)) {
+                explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_CLASSROOM",
+                        "教学任务：" + taskLabel + " 跳过候选 " + slot.getTimeLabel() + " / " + room.getRoomName() + "，资源冲突", stepCounter.next());
+                continue;
+            }
+            double score = scoreCandidate(task, slot, room, generatedItems, refData);
+            explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "INFO", "CALCULATE_SCORE",
+                    "候选位置：" + slot.getTimeLabel() + "，教室 " + room.getRoomName() + "，得分 " + String.format(Locale.ROOT, "%.2f", score),
+                    stepCounter.next());
+            if (best == null || score > best.score()) {
+                best = new Candidate(slot, room, score);
             }
         }
         return best;
@@ -538,12 +564,9 @@ public class V3ScheduleGenerateService {
             Set<Integer> usedDays,
             List<Classroom> matchedRooms,
             List<SchedulePlanItem> generatedItems,
-            SchedulingReferenceData refData
+            SchedulingReferenceData refData,
+            RuleConfig rules
     ) {
-        int teacherMaxDailySlots = ruleService.getIntValue("TEACHER_MAX_DAILY_SLOTS");
-        int classMaxDailySlots = ruleService.getIntValue("CLASS_MAX_DAILY_SLOTS");
-        boolean allowSameCourseSameDay = ruleService.getBoolValue("ALLOW_SAME_COURSE_SAME_DAY");
-
         boolean teacherUnavailable = false;
         boolean teacherConflict = false;
         boolean classConflict = false;
@@ -555,19 +578,19 @@ public class V3ScheduleGenerateService {
                 teacherUnavailable = true;
                 continue;
             }
-            if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), teacherMaxDailySlots, generatedItems)) {
+            if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), rules.teacherMaxDailySlots(), generatedItems)) {
                 teacherConflict = true;
                 continue;
             }
-            if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), classMaxDailySlots, generatedItems)) {
+            if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), rules.classMaxDailySlots(), generatedItems)) {
                 classDayLimited = true;
                 continue;
             }
-            if (!allowSameCourseSameDay && usedDays.contains(slot.getDayOfWeek())) {
+            if (!rules.allowSameCourseSameDay() && usedDays.contains(slot.getDayOfWeek())) {
                 classConflict = true;
                 continue;
             }
-            if (!allowSameCourseSameDay && hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), generatedItems)) {
+            if (!rules.allowSameCourseSameDay() && hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), generatedItems)) {
                 classConflict = true;
                 continue;
             }
