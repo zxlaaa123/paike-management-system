@@ -160,22 +160,35 @@ public class ScheduleScoreService {
     }
 
     private MetricResult buildHardMetric(ScheduleRuleWeight rule, BigDecimal weight, int violationCount, String label) {
+        String maxScore = formatWeight(weight);
         if (violationCount <= 0) {
-            return new MetricResult(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), 0, "无违规");
+            return new MetricResult(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), 0,
+                    label + "无违规（满分 " + maxScore + "）");
         }
         BigDecimal score = weight.multiply(new BigDecimal(violationCount)).negate().setScale(2, RoundingMode.HALF_UP);
-        return new MetricResult(score, violationCount, label + "违规 " + violationCount + " 次，扣 " + score.abs() + " 分");
+        return new MetricResult(score, violationCount,
+                label + "违规 " + violationCount + " 次，扣 " + score.abs() + " 分（满分 " + maxScore + "）");
     }
 
     private MetricResult buildSoftMetric(BigDecimal weight, BigDecimal penaltyFactor, String label) {
+        String maxScore = formatWeight(weight);
         BigDecimal normalized = penaltyFactor == null ? BigDecimal.ZERO : penaltyFactor.max(BigDecimal.ZERO);
         if (normalized.compareTo(BigDecimal.ZERO) == 0) {
-            return new MetricResult(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), 0, "表现良好");
+            return new MetricResult(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), 0,
+                    label + "表现良好（满分 " + maxScore + "）");
         }
         BigDecimal clamped = normalized.min(BigDecimal.ONE);
         BigDecimal score = weight.multiply(clamped).negate().setScale(2, RoundingMode.HALF_UP);
         int level = clamped.multiply(new BigDecimal("100")).setScale(0, RoundingMode.HALF_UP).intValue();
-        return new MetricResult(score, level, label + "偏差 " + level + "%，扣 " + score.abs() + " 分");
+        return new MetricResult(score, level,
+                label + "偏差 " + level + "%，扣 " + score.abs() + " 分（满分 " + maxScore + "）");
+    }
+
+    private String formatWeight(BigDecimal weight) {
+        if (weight == null || weight.compareTo(BigDecimal.ZERO) == 0) {
+            return "0";
+        }
+        return weight.stripTrailingZeros().toPlainString();
     }
 
     private ScoreContext buildScoreContext(SchedulePlan plan, List<SchedulePlanItem> items) {
