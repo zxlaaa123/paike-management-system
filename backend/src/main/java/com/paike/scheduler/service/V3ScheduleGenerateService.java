@@ -301,6 +301,10 @@ public class V3ScheduleGenerateService {
     ) {
         Candidate best = null;
         String taskLabel = taskLabel(task, refData.courseMap(), refData.classMap());
+        DeltaPenaltyScorer.PenaltyContext penaltyContext = DeltaPenaltyScorer.context(
+                generatedItems,
+                thresholdProperties.getAfternoonStartPeriod()
+        );
         for (TimeSlot slot : refData.sortedTimeSlots()) {
             if (refData.unavailableKeySet().contains(task.getTeacherId() + "_" + slot.getId())) {
                 explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_TEACHER",
@@ -328,7 +332,7 @@ public class V3ScheduleGenerateService {
                 continue;
             }
 
-            best = evaluateRoomsForSlot(plan, task, slot, matchedRooms, generatedItems, refData, taskLabel, best, stepCounter);
+            best = evaluateRoomsForSlot(plan, task, slot, matchedRooms, generatedItems, refData, penaltyContext, taskLabel, best, stepCounter);
         }
         return best;
     }
@@ -344,6 +348,7 @@ public class V3ScheduleGenerateService {
             List<Classroom> matchedRooms,
             List<SchedulePlanItem> generatedItems,
             SchedulingReferenceData refData,
+            DeltaPenaltyScorer.PenaltyContext penaltyContext,
             String taskLabel,
             Candidate currentBest,
             StepCounter stepCounter
@@ -355,7 +360,7 @@ public class V3ScheduleGenerateService {
                         "教学任务：" + taskLabel + " 跳过候选 " + slot.getTimeLabel() + " / " + room.getRoomName() + "，资源冲突", stepCounter.next());
                 continue;
             }
-            double score = scoreCandidate(task, slot, room, generatedItems, refData);
+            double score = scoreCandidate(task, slot, room, generatedItems, refData, penaltyContext);
             explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "INFO", "CALCULATE_SCORE",
                     "候选位置：" + slot.getTimeLabel() + "，教室 " + room.getRoomName() + "，得分 " + String.format(Locale.ROOT, "%.2f", score),
                     stepCounter.next());
@@ -427,10 +432,11 @@ public class V3ScheduleGenerateService {
             TimeSlot slot,
             Classroom room,
             List<SchedulePlanItem> generatedItems,
-            SchedulingReferenceData refData
+            SchedulingReferenceData refData,
+            DeltaPenaltyScorer.PenaltyContext penaltyContext
     ) {
         if (USE_DELTA_PENALTY_SCORING) {
-            return scoreCandidateDeltaPenalty(task, slot, room, generatedItems, refData);
+            return scoreCandidateDeltaPenalty(task, slot, room, refData, penaltyContext);
         }
         return scoreCandidateLegacy(task, slot, room, generatedItems, refData);
     }
@@ -462,15 +468,14 @@ public class V3ScheduleGenerateService {
             TeachingTask task,
             TimeSlot slot,
             Classroom room,
-            List<SchedulePlanItem> generatedItems,
-            SchedulingReferenceData refData
+            SchedulingReferenceData refData,
+            DeltaPenaltyScorer.PenaltyContext penaltyContext
     ) {
         SchedulePlanItem candidate = toPlanItem(null, task, slot, room);
         BigDecimal weightedDeltaPenalty = DeltaPenaltyScorer.weightedSoftDeltaPenalty(
                 refData.weightMap(),
-                generatedItems,
-                candidate,
-                thresholdProperties.getAfternoonStartPeriod()
+                penaltyContext,
+                candidate
         );
         return weightedDeltaPenalty.negate().doubleValue() + stableTieBreaker(slot);
     }
