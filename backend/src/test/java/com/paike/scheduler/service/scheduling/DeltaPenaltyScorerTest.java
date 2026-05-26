@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class DeltaPenaltyScorerTest {
 
     private static final int AFTERNOON_START_PERIOD = 5;
+    private static final List<Long> ACTIVE_CLASSROOM_IDS = List.of(1L, 2L, 3L);
 
     @Test
     void deltaPenalty_matchesOfflinePenaltyDifferenceForEachSoftRule() {
@@ -27,7 +28,7 @@ class DeltaPenaltyScorerTest {
         assertDelta("0.0313", DeltaPenaltyScorer.TEACHER_DAILY_LOAD, current, candidate);
         assertDelta("-0.3333", DeltaPenaltyScorer.COURSE_DISTRIBUTION, current, candidate);
         assertDelta("-0.1667", DeltaPenaltyScorer.CONTINUOUS_PERIOD_LIMIT, current, candidate);
-        assertDelta("0.0400", DeltaPenaltyScorer.CLASSROOM_UTILIZATION, current, candidate);
+        assertDelta("0.0600", DeltaPenaltyScorer.CLASSROOM_UTILIZATION, current, candidate);
         assertDelta("-0.1000", DeltaPenaltyScorer.MORNING_THEORY_PRIORITY, current, candidate);
     }
 
@@ -53,9 +54,10 @@ class DeltaPenaltyScorerTest {
                 weights,
                 current,
                 candidate,
+                ACTIVE_CLASSROOM_IDS,
                 AFTERNOON_START_PERIOD);
 
-        assertEquals(new BigDecimal("-11.8220"), delta);
+        assertEquals(new BigDecimal("-11.4220"), delta);
     }
 
     @Test
@@ -77,7 +79,7 @@ class DeltaPenaltyScorerTest {
     ) {
         assertEquals(
                 new BigDecimal(expected),
-                DeltaPenaltyScorer.deltaPenalty(ruleCode, current, candidate, AFTERNOON_START_PERIOD),
+                DeltaPenaltyScorer.deltaPenalty(ruleCode, current, candidate, ACTIVE_CLASSROOM_IDS, AFTERNOON_START_PERIOD),
                 ruleCode);
     }
 
@@ -99,4 +101,3 @@ class DeltaPenaltyScorerTest {
         return item;
     }
 }
-

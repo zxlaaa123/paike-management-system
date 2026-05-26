@@ -5,6 +5,7 @@ import com.paike.scheduler.entity.SchedulePlanItem;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,14 @@ public final class DeltaPenaltyScorer {
     private DeltaPenaltyScorer() {}
 
     public static PenaltyContext context(List<SchedulePlanItem> currentItems, int afternoonStartPeriod) {
+        return context(currentItems, List.of(), afternoonStartPeriod);
+    }
+
+    public static PenaltyContext context(
+            List<SchedulePlanItem> currentItems,
+            Collection<Long> activeClassroomIds,
+            int afternoonStartPeriod
+    ) {
         List<SchedulePlanItem> items = currentItems == null ? List.of() : currentItems;
         int afternoonCount = (int) items.stream()
                 .filter(item -> isAfternoon(item, afternoonStartPeriod))
@@ -51,7 +60,7 @@ public final class DeltaPenaltyScorer {
                 nestedDayCounts(items, SchedulePlanItem::getTeacherId),
                 courseDayCounts(items),
                 nestedDayItems(items, SchedulePlanItem::getTeacherId),
-                roomUseCounts(items)
+                roomUseCounts(items, activeClassroomIds)
         );
     }
 
@@ -64,13 +73,23 @@ public final class DeltaPenaltyScorer {
             SchedulePlanItem candidate,
             int afternoonStartPeriod
     ) {
+        return deltaPenalty(ruleCode, currentItems, candidate, List.of(), afternoonStartPeriod);
+    }
+
+    public static BigDecimal deltaPenalty(
+            String ruleCode,
+            List<SchedulePlanItem> currentItems,
+            SchedulePlanItem candidate,
+            Collection<Long> activeClassroomIds,
+            int afternoonStartPeriod
+    ) {
         Objects.requireNonNull(ruleCode, "ruleCode must not be null");
         Objects.requireNonNull(candidate, "candidate must not be null");
 
         List<SchedulePlanItem> before = currentItems == null ? List.of() : currentItems;
         List<SchedulePlanItem> after = withCandidate(before, candidate);
-        return penalty(ruleCode, after, afternoonStartPeriod)
-                .subtract(penalty(ruleCode, before, afternoonStartPeriod));
+        return penalty(ruleCode, after, activeClassroomIds, afternoonStartPeriod)
+                .subtract(penalty(ruleCode, before, activeClassroomIds, afternoonStartPeriod));
     }
 
     /**
@@ -83,6 +102,19 @@ public final class DeltaPenaltyScorer {
             int afternoonStartPeriod
     ) {
         return weightedSoftDeltaPenalty(weightMap, context(currentItems, afternoonStartPeriod), candidate);
+    }
+
+    public static BigDecimal weightedSoftDeltaPenalty(
+            Map<String, BigDecimal> weightMap,
+            List<SchedulePlanItem> currentItems,
+            SchedulePlanItem candidate,
+            Collection<Long> activeClassroomIds,
+            int afternoonStartPeriod
+    ) {
+        return weightedSoftDeltaPenalty(
+                weightMap,
+                context(currentItems, activeClassroomIds, afternoonStartPeriod),
+                candidate);
     }
 
     public static BigDecimal weightedSoftDeltaPenalty(
@@ -230,13 +262,20 @@ public final class DeltaPenaltyScorer {
         }
     }
 
-    private static BigDecimal penalty(String ruleCode, List<SchedulePlanItem> items, int afternoonStartPeriod) {
+    private static BigDecimal penalty(
+            String ruleCode,
+            List<SchedulePlanItem> items,
+            Collection<Long> activeClassroomIds,
+            int afternoonStartPeriod
+    ) {
         return switch (ruleCode) {
             case CLASS_DAILY_BALANCE -> ScoringFunctions.penaltyVariance(nestedDayCounts(items, SchedulePlanItem::getClassId));
             case TEACHER_DAILY_LOAD -> ScoringFunctions.penaltyVariance(nestedDayCounts(items, SchedulePlanItem::getTeacherId));
             case COURSE_DISTRIBUTION -> ScoringFunctions.penaltyDuplicateCourse(courseDayCounts(items));
             case CONTINUOUS_PERIOD_LIMIT -> ScoringFunctions.penaltyContinuous(nestedDayItems(items, SchedulePlanItem::getTeacherId));
-            case CLASSROOM_UTILIZATION -> ScoringFunctions.penaltyClassroomUtilization(roomUseCounts(items), items.size());
+            case CLASSROOM_UTILIZATION -> ScoringFunctions.penaltyClassroomUtilization(
+                    roomUseCounts(items, activeClassroomIds),
+                    items.size());
             case MORNING_THEORY_PRIORITY -> ScoringFunctions.penaltyMorningPriority(items, afternoonStartPeriod);
             default -> BigDecimal.ZERO;
         };
@@ -276,8 +315,19 @@ public final class DeltaPenaltyScorer {
         ));
     }
 
-    private static Map<Long, Long> roomUseCounts(List<SchedulePlanItem> items) {
-        return items.stream().collect(Collectors.groupingBy(SchedulePlanItem::getClassroomId, Collectors.counting()));
+    private static Map<Long, Long> roomUseCounts(List<SchedulePlanItem> items, Collection<Long> activeClassroomIds) {
+        Map<Long, Long> counts = new HashMap<>();
+        if (activeClassroomIds != null) {
+            activeClassroomIds.stream()
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .forEach(roomId -> counts.put(roomId, 0L));
+        }
+        items.stream()
+                .map(SchedulePlanItem::getClassroomId)
+                .filter(Objects::nonNull)
+                .forEach(roomId -> counts.merge(roomId, 1L, Long::sum));
+        return counts;
     }
 
     private static double variancePenaltySum(Map<Long, Map<Integer, Long>> countsByOwner) {

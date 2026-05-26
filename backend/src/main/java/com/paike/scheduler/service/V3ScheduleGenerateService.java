@@ -303,6 +303,7 @@ public class V3ScheduleGenerateService {
         String taskLabel = taskLabel(task, refData.courseMap(), refData.classMap());
         DeltaPenaltyScorer.PenaltyContext penaltyContext = DeltaPenaltyScorer.context(
                 generatedItems,
+                refData.classrooms().stream().map(Classroom::getId).toList(),
                 thresholdProperties.getAfternoonStartPeriod()
         );
         for (TimeSlot slot : refData.sortedTimeSlots()) {
