@@ -19,7 +19,8 @@ import java.util.function.Predicate;
  * <h2>双轨说明</h2>
  * 同名规则码（如 CLASSROOM_UTILIZATION）在<b>在线 candidateXxx</b>（贪心选候选）和
  * <b>离线 penaltyXxx</b>（rescore 写库）里用了不同公式，原因和明细见
- * {@link ScoringDimensions#SOFT}。本类只把散在两个 service 私有作用域的实现搬过来
+ * {@link ScoringDimensions#ONLINE_SOFT} 与 {@link ScoringDimensions#OFFLINE_SOFT}。
+ * 本类只把散在两个 service 私有作用域的实现搬过来
  * 集中、便于阅读"同一规则码两套实现"的对比，<b>行为零变更</b>。
  *
  * <h2>签名约定</h2>
@@ -212,7 +213,7 @@ public final class ScoringFunctions {
 
     /**
      * 下午课占比惩罚（离线，理论课优先上午）：item.startPeriod >= afternoonStartPeriod 的占比。
-     * <b>不区分课程类型</b>（这是离线公式与在线公式的差异，见 ScoringDimensions.SOFT）。
+     * <b>不区分课程类型</b>（这是离线公式与在线公式的差异，见 ScoringDimensions.OFFLINE_SOFT）。
      * afternoonStartPeriod 由调用方从 ScheduleThresholdProperties 注入。
      */
     public static BigDecimal penaltyMorningPriority(List<SchedulePlanItem> items, int afternoonStartPeriod) {
