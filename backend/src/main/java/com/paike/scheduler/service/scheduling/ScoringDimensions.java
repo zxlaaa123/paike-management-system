@@ -18,10 +18,11 @@ import java.util.List;
  * 两套用途不同（贪心选下一步 vs 评估整体方案），故意保留双轨；本表从一条 Dimension record
  * 升级为 sealed interface + 三种类型，编译期强制区分在线/离线/硬约束三轨道。
  *
- * <h2>已知现象（非 bug，留作 D3 议题）</h2>
+ * <h2>已知现象（非 bug，D3 已决策）</h2>
  * MORNING_THEORY_PRIORITY 在 COMPREHENSIVE 默认权重表里没有，但在线 scoreCandidate 仍然会调
  * weight(refData, "MORNING_THEORY_PRIORITY") —— 从 weightMap 取不到走默认 0，相当于该维度在
- * COMPREHENSIVE 策略下"隐式失效"。要不要补默认权重，是产品决策，不在 D2 范围。
+ * COMPREHENSIVE 策略下"隐式失效"。产品决策为不补默认权重：COMPREHENSIVE 保持综合均衡，
+ * 早课偏好仅由 CLASS_BALANCE 等明确配置该规则的策略启用。
  */
 public final class ScoringDimensions {
 
@@ -96,7 +97,7 @@ public final class ScoringDimensions {
                     "理论课优先上午",
                     "理论课（非 EXPERIMENT/COMPUTER）&& periodNo<=2 ? 1 : 0",
                     "{0, 1}",
-                    "COMPREHENSIVE 策略默认权重表无此项，相当于在线维度失效；BALANCED 等策略有"));
+                    "COMPREHENSIVE 策略默认权重表无此项，相当于在线维度失效；CLASS_BALANCE 等策略有"));
 
     /**
      * 6 个离线软维度 —— 用于离线 rescore 写库的罚分文档对照。
@@ -137,7 +138,7 @@ public final class ScoringDimensions {
                     "理论课优先上午",
                     "全部下午课占比（不区分课程类型！）—— 离线公式更粗",
                     "[0, 1]",
-                    "COMPREHENSIVE 策略默认权重表无此项，相当于在线维度失效；BALANCED 等策略有"));
+                    "COMPREHENSIVE 策略默认权重表无此项，相当于在线维度失效；CLASS_BALANCE 等策略有"));
 
     /**
      * 6 个离线硬维度 —— 只在离线 rescore 出现，违规一次扣 weight × 1。
