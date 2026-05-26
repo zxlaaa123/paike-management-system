@@ -64,7 +64,7 @@
         <el-table-column prop="ruleName" label="规则" min-width="180" />
         <el-table-column prop="ruleType" label="类型" width="100" />
         <el-table-column prop="score" label="得分/扣分" width="120" />
-        <el-table-column prop="violationCount" label="违规数" width="100" />
+        <el-table-column prop="violationCount" label="违规/偏差值" width="110" />
         <el-table-column prop="detailMessage" label="说明" min-width="240" show-overflow-tooltip />
       </el-table>
       <el-table :data="props.detail.risks.risks" border stripe class="block">

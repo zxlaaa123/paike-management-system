@@ -538,7 +538,7 @@ onMounted(async () => {
                 </template>
               </el-table-column>
               <el-table-column prop="score" label="得分" width="80" />
-              <el-table-column prop="violationCount" label="违规次数" width="90" />
+              <el-table-column prop="violationCount" label="违规/偏差值" width="110" />
               <el-table-column prop="detailMessage" label="说明" min-width="200" />
             </el-table>
             <el-empty v-if="scoreDetails.length === 0" description="暂无评分数据，请点击「重新评分」" />
