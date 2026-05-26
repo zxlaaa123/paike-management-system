@@ -67,7 +67,7 @@ public final class ScoringDimensions {
                     "教室利用率",
                     "studentCount / capacity，超容也允许 >1（贪心更偏好『刚好坐满』）",
                     "[0, N)",
-                    "在线偏好高利用率单个房间；离线惩罚教室之间使用不均"),
+                    "在线偏好高利用率单个房间；离线惩罚启用教室全集使用不均"),
             new OnlineSoft(
                     "CLASS_DAILY_BALANCE",
                     "班级每日均衡",
@@ -106,9 +106,9 @@ public final class ScoringDimensions {
             new OfflineSoft(
                     "CLASSROOM_UTILIZATION",
                     "教室利用率",
-                    "教室使用次数方差，归一为 min(1, variance / avg²)",
+                    "启用教室使用次数方差（未使用按 0 计），归一为 min(1, variance / avg²)",
                     "[0, 1]",
-                    "在线偏好高利用率单个房间；离线惩罚教室之间使用不均"),
+                    "在线偏好高利用率单个房间；离线惩罚启用教室全集使用不均"),
             new OfflineSoft(
                     "CLASS_DAILY_BALANCE",
                     "班级每日均衡",

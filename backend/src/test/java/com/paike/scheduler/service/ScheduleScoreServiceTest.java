@@ -1,10 +1,12 @@
 package com.paike.scheduler.service;
 
 import com.paike.scheduler.config.ScheduleThresholdProperties;
+import com.paike.scheduler.entity.Classroom;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
 import com.paike.scheduler.entity.ScheduleRuleWeight;
 import com.paike.scheduler.entity.ScheduleScoreDetail;
+import com.paike.scheduler.mapper.ClassroomMapper;
 import com.paike.scheduler.mapper.SchedulePlanItemMapper;
 import com.paike.scheduler.mapper.SchedulePlanMapper;
 import com.paike.scheduler.mapper.ScheduleScoreDetailMapper;
@@ -36,6 +38,7 @@ class ScheduleScoreServiceTest {
     private ScheduleScoreDetailMapper scoreDetailMapper;
     private SchedulePlanMapper planMapper;
     private SchedulePlanItemMapper planItemMapper;
+    private ClassroomMapper classroomMapper;
     private ScheduleRuleWeightService ruleWeightService;
     private ScheduleThresholdProperties thresholds;
     private ScheduleScoreService service;
@@ -45,15 +48,18 @@ class ScheduleScoreServiceTest {
         scoreDetailMapper = mock(ScheduleScoreDetailMapper.class);
         planMapper = mock(SchedulePlanMapper.class);
         planItemMapper = mock(SchedulePlanItemMapper.class);
+        classroomMapper = mock(ClassroomMapper.class);
         ruleWeightService = mock(ScheduleRuleWeightService.class);
         thresholds = mock(ScheduleThresholdProperties.class);
         when(thresholds.getAfternoonStartPeriod()).thenReturn(5);
+        when(classroomMapper.selectList(any())).thenReturn(List.of());
         service = new ScheduleScoreService(
-                scoreDetailMapper, planMapper, planItemMapper, ruleWeightService, thresholds);
+                scoreDetailMapper, planMapper, planItemMapper, classroomMapper, ruleWeightService, thresholds);
     }
 
     /**
-     * 5 软规则 fixture：5 条 item 跨 2 班 2 教师 2 教室 2 天，触发软罚分但零硬冲突。
+     * 5 软规则 fixture：5 条 item 跨 2 班 2 教师 2 已用教室 2 天，另有 1 间启用教室未使用。
+     * 触发软罚分但零硬冲突。
      *
      * <pre>
      * items:
@@ -79,10 +85,10 @@ class ScheduleScoreServiceTest {
      *     t2_d2 starts=[5,7] → chains=1 → 0.5
      *     sum=1.0 / sample 3 = 0.3333 → -8.33；level=33
      *   classroomUtilizationPenalty:
-     *     roomUseCounts: r1=2, r2=3, avg=2.5, var=0.25
-     *     min(1, 0.25/6.25) = 0.04 → -0.80；level=4
+     *     active rooms: r1=2, r2=3, r3=0, avg=5/3, var=14/9
+     *     min(1, (14/9)/(25/9)) = 0.56 → -11.20；level=56
      *
-     * 总分 = 100 + (-0.94 -0.94 -16.67 -8.33 -0.80) = 72.32
+     * 总分 = 100 + (-0.94 -0.94 -16.67 -8.33 -11.20) = 61.92
      * </pre>
      */
     @Test
@@ -95,6 +101,10 @@ class ScheduleScoreServiceTest {
                 item(2L, 2L, 2L, 2L, 2, 5),
                 item(2L, 2L, 2L, 2L, 2, 7),
                 item(1L, 1L, 1L, 2L, 2, 1)));
+        when(classroomMapper.selectList(any())).thenReturn(List.of(
+                classroom(1L),
+                classroom(2L),
+                classroom(3L)));
 
         when(ruleWeightService.list(2L, "COMPREHENSIVE", null)).thenReturn(List.of(
                 rule("CLASS_DAILY_BALANCE", "SOFT", "30"),
@@ -115,10 +125,10 @@ class ScheduleScoreServiceTest {
                 "课程分布均衡偏差 67%，扣 16.67 分（满分 25）");
         assertDetail(byCode, "CONTINUOUS_PERIOD_LIMIT", "-8.33",
                 "连续上课限制偏差 33%，扣 8.33 分（满分 25）");
-        assertDetail(byCode, "CLASSROOM_UTILIZATION", "-0.80",
-                "教室利用率偏差 4%，扣 0.80 分（满分 20）");
+        assertDetail(byCode, "CLASSROOM_UTILIZATION", "-11.20",
+                "教室利用率偏差 56%，扣 11.20 分（满分 20）");
 
-        assertEquals(new BigDecimal("72.32"), plan.getTotalScore());
+        assertEquals(new BigDecimal("61.92"), plan.getTotalScore());
         assertEquals(0, plan.getConflictCount());
     }
 
@@ -250,6 +260,14 @@ class ScheduleScoreServiceTest {
         it.setWeekday(weekday);
         it.setStartPeriod(startPeriod);
         return it;
+    }
+
+    private Classroom classroom(long id) {
+        Classroom classroom = new Classroom();
+        classroom.setId(id);
+        classroom.setStatus(1);
+        classroom.setDeleted(0);
+        return classroom;
     }
 
     private ScheduleRuleWeight rule(String code, String type, String weight) {
