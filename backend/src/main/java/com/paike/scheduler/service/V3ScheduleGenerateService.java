@@ -2,11 +2,13 @@ package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.paike.scheduler.common.exception.BusinessException;
+import com.paike.scheduler.config.ScheduleThresholdProperties;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.dto.MultipleScheduleGenerateRequest;
 import com.paike.scheduler.service.dto.ScheduleGenerateRequest;
 import com.paike.scheduler.service.dto.ScheduleGenerateResult;
+import com.paike.scheduler.service.scheduling.DeltaPenaltyScorer;
 import com.paike.scheduler.service.scheduling.RuleConfig;
 import com.paike.scheduler.service.scheduling.SchedulingReferenceData;
 import com.paike.scheduler.service.scheduling.SchedulingReferenceLoader;
@@ -27,6 +29,7 @@ public class V3ScheduleGenerateService {
 
     private static final String DEFAULT_STRATEGY = "COMPREHENSIVE";
     private static final DateTimeFormatter PLAN_NAME_SUFFIX = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final boolean USE_DELTA_PENALTY_SCORING = false;
 
     private final SemesterService semesterService;
     private final ScheduleRuleService ruleService;
@@ -36,6 +39,7 @@ public class V3ScheduleGenerateService {
     private final TeachingTaskMapper teachingTaskMapper;
     private final SchedulingReferenceLoader referenceLoader;
     private final SchedulePlanExplainService explainService;
+    private final ScheduleThresholdProperties thresholdProperties;
 
     @Transactional(rollbackFor = Exception.class)
     public ScheduleGenerateResult generate(ScheduleGenerateRequest request) {
@@ -425,6 +429,19 @@ public class V3ScheduleGenerateService {
             List<SchedulePlanItem> generatedItems,
             SchedulingReferenceData refData
     ) {
+        if (USE_DELTA_PENALTY_SCORING) {
+            return scoreCandidateDeltaPenalty(task, slot, room, generatedItems, refData);
+        }
+        return scoreCandidateLegacy(task, slot, room, generatedItems, refData);
+    }
+
+    private double scoreCandidateLegacy(
+            TeachingTask task,
+            TimeSlot slot,
+            Classroom room,
+            List<SchedulePlanItem> generatedItems,
+            SchedulingReferenceData refData
+    ) {
         double score = 0D;
         String courseType = SchedulingSupport.getCourseType(task.getCourseId(), refData.courseMap());
         int studentCount = SchedulingSupport.getClassStudentCount(task.getClassId(), refData.classMap());
@@ -437,8 +454,29 @@ public class V3ScheduleGenerateService {
         score += weight(refData,"MORNING_THEORY_PRIORITY") * ScoringFunctions.candidateMorningPriority(courseType, slot);
 
         // 稳定偏好：更早的时间段略优，避免在候选分相同时结果抖动。
-        score += Math.max(0, 100 - slot.getSortOrder()) * 0.0001D;
+        score += stableTieBreaker(slot);
         return score;
+    }
+
+    private double scoreCandidateDeltaPenalty(
+            TeachingTask task,
+            TimeSlot slot,
+            Classroom room,
+            List<SchedulePlanItem> generatedItems,
+            SchedulingReferenceData refData
+    ) {
+        SchedulePlanItem candidate = toPlanItem(null, task, slot, room);
+        BigDecimal weightedDeltaPenalty = DeltaPenaltyScorer.weightedSoftDeltaPenalty(
+                refData.weightMap(),
+                generatedItems,
+                candidate,
+                thresholdProperties.getAfternoonStartPeriod()
+        );
+        return weightedDeltaPenalty.negate().doubleValue() + stableTieBreaker(slot);
+    }
+
+    private double stableTieBreaker(TimeSlot slot) {
+        return Math.max(0, 100 - slot.getSortOrder()) * 0.0001D;
     }
 
     private double weight(SchedulingReferenceData refData, String ruleCode) {
