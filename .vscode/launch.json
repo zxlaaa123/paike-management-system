@@ -1,0 +1,93 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "后端: 启动调试 (README env)",
+      "request": "launch",
+      "mainClass": "com.paike.scheduler.SchedulerBackendApplication",
+      "projectName": "scheduler-backend",
+      "cwd": "${workspaceFolder}/backend",
+      "env": {
+        "DB_URL": "jdbc:mysql://127.0.0.1:3306/paike?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai",
+        "DB_USERNAME": "${input:dbUsername}",
+        "DB_PASSWORD": "${input:dbPassword}",
+        "JWT_SECRET": "dev_local_secret_please_change_32_chars_minimum",
+        "JWT_EXPIRATION_MS": "86400000",
+        "COOKIE_SECURE": "false",
+        "CORS_ALLOWED_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173",
+        "CORS_ALLOW_CREDENTIALS": "false"
+      }
+    },
+    {
+      "type": "java",
+      "name": "后端: 附加调试 (5005)",
+      "request": "attach",
+      "hostName": "127.0.0.1",
+      "port": 5005
+    },
+    {
+      "type": "node",
+      "name": "前端: npm run dev",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "cwd": "${workspaceFolder}/frontend",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "pwa-chrome",
+      "name": "浏览器: 打开前端",
+      "request": "launch",
+      "url": "http://127.0.0.1:5173",
+      "webRoot": "${workspaceFolder}/frontend/src"
+    },
+    {
+      "type": "node",
+      "name": "前端: npm run build",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "build"
+      ],
+      "cwd": "${workspaceFolder}/frontend",
+      "console": "integratedTerminal"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "前后端: 启动后端和前端",
+      "configurations": [
+        "后端: 启动调试 (README env)",
+        "前端: npm run dev"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "前端: 启动并打开浏览器",
+      "configurations": [
+        "前端: npm run dev",
+        "浏览器: 打开前端"
+      ],
+      "stopAll": true
+    }
+  ],
+  "inputs": [
+    {
+      "id": "dbUsername",
+      "type": "promptString",
+      "description": "MySQL 用户名",
+      "default": "root"
+    },
+    {
+      "id": "dbPassword",
+      "type": "promptString",
+      "description": "MySQL 密码",
+      "password": true
+    }
+  ]
+}
