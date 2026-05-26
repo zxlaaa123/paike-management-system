@@ -29,7 +29,7 @@ public class V3ScheduleGenerateService {
 
     private static final String DEFAULT_STRATEGY = "COMPREHENSIVE";
     private static final DateTimeFormatter PLAN_NAME_SUFFIX = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
-    private static final boolean USE_DELTA_PENALTY_SCORING = false;
+    private static final boolean USE_DELTA_PENALTY_SCORING = true;
 
     private final SemesterService semesterService;
     private final ScheduleRuleService ruleService;
