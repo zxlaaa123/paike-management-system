@@ -13,7 +13,7 @@ Spring Boot 启动时依次执行：
 | 阶段 | 入口 | 触发点 | 备注 |
 |---|---|---|---|
 | ① | `db/schema.sql` | `spring.sql.init` | 全新库建表基线 |
-| ② | `db/v2_*.sql` → `v7_*.sql`（共 14 个，按 `application.yml` 列出的字典序） | `spring.sql.init` | 增量演进 ALTER/CREATE，全部幂等 |
+| ② | `db/v2_*.sql` → `v12_*.sql`（按 `application.yml` 列出的顺序） | `spring.sql.init` | 增量演进 ALTER/CREATE，全部幂等 |
 | ③ | `SemesterSchemaInitializer.run()` | `CommandLineRunner`，在 sql.init 之后 | 运行时兜底（含 Java 代码内嵌的 CREATE TABLE / ALTER） |
 | ④ | `AdminUserInitializer.run()` | `CommandLineRunner` | 创建默认 admin 账号 |
 
@@ -66,6 +66,16 @@ Spring Boot 启动时依次执行：
 |---|---|
 | `v7_soft_delete_plan_semester.sql` | `schedule_plan` / `schedule_plan_item` / `semester` 加 `deleted` 列。**使用 `SET @ddl + PREPARE/EXECUTE` 模式**，是 Spring ScriptUtils 正式支持的幂等写法，新 SQL 文件应参考此风格 |
 
+### v8_*.sql - v12_*.sql — 后续补丁与 V6 审计基础
+
+| 文件 | 内容 |
+|---|---|
+| `v8_unscheduled_task_semester.sql` | 未排任务学期字段补齐 |
+| `v9_auto_schedule_batch_update_time.sql` | 自动排课批次更新时间字段补齐 |
+| `v10_teaching_task_index.sql` | 教学任务索引补齐 |
+| `v11_soft_delete_three_tables.sql` | 锁定、调整日志、未排任务软删除字段补齐 |
+| `v12_system_audit_log.sql` | V6 第一阶段：新增 `system_audit_log` 审计日志表 |
+
 ---
 
 ## 3. Java 兜底：`SemesterSchemaInitializer`
@@ -90,7 +100,7 @@ Spring Boot 启动时依次执行：
 
 ## 4. 新增 schema 改动时的约定
 
-1. **新文件命名**：`v8_xxx.sql` 起步；按字典序排在最末，自动晚于现有所有文件执行。
+1. **新文件命名**：使用下一个可用序号；当前最后一项为 `v12_system_audit_log.sql`。
 2. **幂等写法**：优先 `SET @ddl + PREPARE/EXECUTE`（参见 `v7_soft_delete_plan_semester.sql`），避开 `DELIMITER + CREATE PROCEDURE`（Spring ScriptUtils 不正式支持）。
 3. **注册到 `application.yml`**：把新文件加到 `spring.sql.init.schema-locations` 末尾。
 4. **不要扩 `SemesterSchemaInitializer`**：能写在 SQL 文件的就不写 Java。Initializer 只为兜底极老库。

@@ -42,6 +42,7 @@ public class SchedulePlanService {
     private final TeacherUnavailableTimeService unavailableTimeService;
     private final ScheduleScoreService scoreService;
     private final SchedulePlanExplainService explainService;
+    private final SystemAuditLogService auditLogService;
 
     public Page<SchedulePlan> list(Long semesterId, String status, String strategyType, String keyword, int page, int size) {
         LambdaQueryWrapper<SchedulePlan> wrapper = new LambdaQueryWrapper<SchedulePlan>()
@@ -265,6 +266,10 @@ public class SchedulePlanService {
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> applyPlan(Long id) {
+        return applyPlanWithAudit(id, SystemAuditLogService.ACTION_APPLY_PLAN);
+    }
+
+    private Map<String, Object> applyPlanWithAudit(Long id, String actionType) {
         SchedulePlan plan = planMapper.selectById(id);
         if (plan == null) {
             throw new BusinessException("排课方案不存在");
@@ -281,7 +286,15 @@ public class SchedulePlanService {
         if ("APPLIED".equals(plan.getStatus())) {
             throw new BusinessException("该方案已应用，无需重复应用");
         }
-        return applyPlanInternal(plan);
+        Map<String, Object> result = applyPlanInternal(plan);
+        auditLogService.recordSuccess(
+                actionType,
+                SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                plan.getId(),
+                plan.getSemesterId(),
+                plan.getId(),
+                "正式课表已应用，排课数=" + result.get("appliedCount"));
+        return result;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -398,7 +411,7 @@ public class SchedulePlanService {
         }
 
         // 回滚语义：将目标方案重新应用为正式课表（而不是只删除当前正式课表）。
-        return applyPlan(id);
+        return applyPlanWithAudit(id, SystemAuditLogService.ACTION_ROLLBACK_PLAN);
     }
 
     private void assertNoConflictsBeforeApply(Long planId) {
