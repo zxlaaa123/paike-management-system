@@ -326,7 +326,7 @@ public final class DeltaPenaltyScorer {
         items.stream()
                 .map(SchedulePlanItem::getClassroomId)
                 .filter(Objects::nonNull)
-                .forEach(roomId -> counts.merge(roomId, 1L, Long::sum));
+                .forEach(roomId -> counts.merge(roomId, 1L, DeltaPenaltyScorer::sumLongs));
         return counts;
     }
 
@@ -357,8 +357,14 @@ public final class DeltaPenaltyScorer {
 
     private static double ownerVariancePenaltyAfter(Map<Integer, Long> beforeCounts, Integer weekday) {
         Map<Integer, Long> afterCounts = new HashMap<>(beforeCounts == null ? Map.of() : beforeCounts);
-        afterCounts.merge(weekday, 1L, Long::sum);
+        afterCounts.merge(weekday, 1L, DeltaPenaltyScorer::sumLongs);
         return ownerVariancePenalty(afterCounts);
+    }
+
+    private static Long sumLongs(Long left, Long right) {
+        long safeLeft = left == null ? 0L : left;
+        long safeRight = right == null ? 0L : right;
+        return safeLeft + safeRight;
     }
 
     private static BigDecimal duplicateCoursePenalty(long duplicateDays, int totalDays) {

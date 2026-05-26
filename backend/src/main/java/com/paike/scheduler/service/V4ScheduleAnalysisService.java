@@ -83,9 +83,9 @@ public class V4ScheduleAnalysisService {
             roomIds.add(item.getClassroomId());
             courseIds.add(item.getCourseId());
 
-            teacherLoads.merge(item.getTeacherId(), duration, Integer::sum);
-            roomLoads.merge(item.getClassroomId(), duration, Integer::sum);
-            classDailyLoads.merge(item.getClassId() + "_" + item.getWeekday(), duration, Integer::sum);
+            teacherLoads.merge(item.getTeacherId(), duration, V4ScheduleAnalysisService::sumIntegers);
+            roomLoads.merge(item.getClassroomId(), duration, V4ScheduleAnalysisService::sumIntegers);
+            classDailyLoads.merge(item.getClassId() + "_" + item.getWeekday(), duration, V4ScheduleAnalysisService::sumIntegers);
         }
 
         for (Integer load : teacherLoads.values()) {
@@ -346,6 +346,12 @@ public class V4ScheduleAnalysisService {
             return "可用";
         }
         return "需优化";
+    }
+
+    private static Integer sumIntegers(Integer left, Integer right) {
+        int safeLeft = left == null ? 0 : left;
+        int safeRight = right == null ? 0 : right;
+        return safeLeft + safeRight;
     }
 
     private String buildQualitySummary(

@@ -37,8 +37,6 @@ public class ScheduleStatisticsService {
 
         Map<Long, Map<String, Object>> teacherMap = new LinkedHashMap<>();
         Map<Long, Teacher> teacherCache = new HashMap<>();
-        Map<Long, Course> courseCache = new HashMap<>();
-        Map<Long, ClassInfo> classCache = new HashMap<>();
         Map<Long, TimeSlot> timeSlotCache = loadTimeSlotMap(rawItems);
 
         for (Object obj : rawItems) {
@@ -64,11 +62,11 @@ public class ScheduleStatisticsService {
             Map<String, Object> row = teacherMap.get(teacherId);
             row.put("totalPeriods", (int) row.get("totalPeriods") + periods);
             row.computeIfAbsent("courseCount", k -> new HashSet<Long>());
-            ((Set<Long>) row.get("courseCount")).add(courseId);
-            ((Set<Long>) row.get("classCount")).add(classId);
+            longSet(row, "courseCount").add(courseId);
+            longSet(row, "classCount").add(classId);
 
-            Map<Integer, Long> dailyPeriods = (Map<Integer, Long>) row.get("dailyPeriods");
-            dailyPeriods.merge(weekday, (long) periods, Long::sum);
+            Map<Integer, Long> dailyPeriods = integerLongMap(row, "dailyPeriods");
+            dailyPeriods.merge(weekday, (long) periods, ScheduleStatisticsService::sumLongs);
         }
 
         // 填充关联信息 + 计算衍生指标
@@ -80,12 +78,12 @@ public class ScheduleStatisticsService {
             row.put("teacherName", teacher != null ? teacher.getName() : "未知");
             row.put("department", teacher != null ? teacher.getDepartment() : null);
 
-            Set<Long> courseIds = (Set<Long>) row.get("courseCount");
-            Set<Long> classIds = (Set<Long>) row.get("classCount");
+            Set<Long> courseIds = longSet(row, "courseCount");
+            Set<Long> classIds = longSet(row, "classCount");
             row.put("courseCount", courseIds.size());
             row.put("classCount", classIds.size());
 
-            Map<Integer, Long> dailyPeriods = (Map<Integer, Long>) row.get("dailyPeriods");
+            Map<Integer, Long> dailyPeriods = integerLongMap(row, "dailyPeriods");
             int maxDaily = dailyPeriods.values().stream().mapToInt(Long::intValue).max().orElse(0);
             row.put("maxDailyPeriods", maxDaily);
 
@@ -107,7 +105,7 @@ public class ScheduleStatisticsService {
         for (Object obj : rawItems) {
             Long roomId = getRoomId(obj);
             int periods = getPeriodCount(obj);
-            roomUsage.merge(roomId, (long) periods, Long::sum);
+            roomUsage.merge(roomId, (long) periods, ScheduleStatisticsService::sumLongs);
         }
 
         List<Classroom> allRooms = classroomMapper.selectList(
@@ -175,9 +173,8 @@ public class ScheduleStatisticsService {
 
             Map<String, Object> row = classMap.get(classId);
             row.put("totalPeriods", (int) row.get("totalPeriods") + periods);
-            @SuppressWarnings("unchecked")
-            Map<Integer, Long> dailyPeriods = (Map<Integer, Long>) row.get("dailyPeriods");
-            dailyPeriods.merge(weekday, (long) periods, Long::sum);
+            Map<Integer, Long> dailyPeriods = integerLongMap(row, "dailyPeriods");
+            dailyPeriods.merge(weekday, (long) periods, ScheduleStatisticsService::sumLongs);
         }
 
         List<Map<String, Object>> result = new ArrayList<>();
@@ -418,6 +415,22 @@ public class ScheduleStatisticsService {
         double stdDev = Math.sqrt(variance);
         double cv = avg > 0 ? stdDev / avg : 0; // 变异系数
         return Math.max(0, Math.min(1, 1 - cv)); // 归一化到 0-1
+    }
+
+    @SuppressWarnings("unchecked")
+    private Set<Long> longSet(Map<String, Object> row, String key) {
+        return (Set<Long>) row.get(key);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<Integer, Long> integerLongMap(Map<String, Object> row, String key) {
+        return (Map<Integer, Long>) row.get(key);
+    }
+
+    private static Long sumLongs(Long left, Long right) {
+        long safeLeft = left == null ? 0L : left;
+        long safeRight = right == null ? 0L : right;
+        return safeLeft + safeRight;
     }
 
     private String evaluateBalance(double score) {

@@ -25,7 +25,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,7 +38,6 @@ public class V4ScheduleAdjustmentService {
     private final SchedulePlanMapper planMapper;
     private final SchedulePlanItemMapper planItemMapper;
     private final ScheduleMapper scheduleMapper;
-    private final TeachingTaskMapper teachingTaskMapper;
     private final TimeSlotMapper timeSlotMapper;
     private final ClassroomMapper classroomMapper;
     private final CourseMapper courseMapper;
@@ -327,7 +325,6 @@ public class V4ScheduleAdjustmentService {
         context.targetType = TARGET_PLAN_ITEM;
         context.plan = plan;
         context.planItem = item;
-        context.task = teachingTaskMapper.selectById(item.getTeachingTaskId());
         context.course = item.getCourseId() != null ? courseMapper.selectById(item.getCourseId()) : null;
         context.teacher = item.getTeacherId() != null ? teacherMapper.selectById(item.getTeacherId()) : null;
         context.classInfo = item.getClassId() != null ? classInfoMapper.selectById(item.getClassId()) : null;
@@ -352,7 +349,6 @@ public class V4ScheduleAdjustmentService {
         context.targetType = TARGET_SCHEDULE;
         context.schedule = schedule;
         context.plan = schedule.getPlanId() != null ? planMapper.selectById(schedule.getPlanId()) : null;
-        context.task = teachingTaskMapper.selectById(schedule.getTeachingTaskId());
         context.course = schedule.getCourseId() != null ? courseMapper.selectById(schedule.getCourseId()) : null;
         context.teacher = schedule.getTeacherId() != null ? teacherMapper.selectById(schedule.getTeacherId()) : null;
         context.classInfo = schedule.getClassId() != null ? classInfoMapper.selectById(schedule.getClassId()) : null;
@@ -488,7 +484,6 @@ public class V4ScheduleAdjustmentService {
         private SchedulePlan plan;
         private SchedulePlanItem planItem;
         private Schedule schedule;
-        private TeachingTask task;
         private Course course;
         private Teacher teacher;
         private ClassInfo classInfo;

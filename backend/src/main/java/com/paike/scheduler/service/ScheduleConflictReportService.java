@@ -119,9 +119,7 @@ public class ScheduleConflictReportService {
 
     private Context buildContext(List<Schedule> schedules, Long semesterId) {
         Context context = new Context();
-        context.semesterId = semesterId;
         context.schedules = schedules;
-        context.scheduleById = schedules.stream().collect(Collectors.toMap(Schedule::getId, Function.identity(), (a, b) -> a));
 
         List<Long> teacherIds = schedules.stream().map(Schedule::getTeacherId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
         List<Long> classIds = schedules.stream().map(Schedule::getClassId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
@@ -679,9 +677,7 @@ public class ScheduleConflictReportService {
     }
 
     private static class Context {
-        private Long semesterId;
         private List<Schedule> schedules;
-        private Map<Long, Schedule> scheduleById;
         private Map<Long, TeachingTask> taskMap;
         private Map<Long, Teacher> teacherMap;
         private Map<Long, ClassInfo> classMap;

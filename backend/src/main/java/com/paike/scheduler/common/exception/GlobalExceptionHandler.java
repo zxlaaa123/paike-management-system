@@ -34,7 +34,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Result<Void>> handleBusinessException(BusinessException ex) {
         HttpStatus status = BIZ_CODE_HTTP.getOrDefault(ex.getCode(), HttpStatus.BAD_REQUEST);
-        return ResponseEntity.status(status).body(Result.fail(ex.getCode(), ex.getMessage()));
+        return ResponseEntity.status(status.value()).body(Result.fail(ex.getCode(), ex.getMessage()));
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})

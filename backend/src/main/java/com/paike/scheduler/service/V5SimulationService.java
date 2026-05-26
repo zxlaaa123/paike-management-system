@@ -1049,9 +1049,15 @@ public class V5SimulationService {
             if (id == null) {
                 continue;
             }
-            loads.merge(id, periodSpan(item), Integer::sum);
+            loads.merge(id, periodSpan(item), V5SimulationService::sumIntegers);
         }
         return loads;
+    }
+
+    private static Integer sumIntegers(Integer left, Integer right) {
+        int safeLeft = left == null ? 0 : left;
+        int safeRight = right == null ? 0 : right;
+        return safeLeft + safeRight;
     }
 
     private List<V5SimulationRoomUtilizationChangeVo> buildRoomUtilizationChanges(

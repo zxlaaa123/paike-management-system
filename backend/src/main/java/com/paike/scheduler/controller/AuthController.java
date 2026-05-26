@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @RestController
@@ -41,7 +42,7 @@ public class AuthController {
 
         // 设置 httpOnly JWT Cookie（防 XSS 窃取）。secure 由 app.security.cookie-secure 控制：
         // 本地 HTTP 留 false，生产 HTTPS 通过 COOKIE_SECURE=true 切换。
-        ResponseCookie jwtCookie = ResponseCookie.from("paike_token", loginResponse.getToken())
+        ResponseCookie jwtCookie = ResponseCookie.from("paike_token", Objects.requireNonNull(loginResponse.getToken()))
                 .httpOnly(true)
                 .secure(cookieSecure)
                 .path("/api")
@@ -51,7 +52,7 @@ public class AuthController {
         response.addHeader("Set-Cookie", jwtCookie.toString());
 
         // 设置可读 CSRF Cookie（前端读取后放入 X-CSRF-Token 请求头）
-        String csrfToken = UUID.randomUUID().toString();
+        String csrfToken = Objects.requireNonNull(UUID.randomUUID().toString());
         ResponseCookie csrfCookie = ResponseCookie.from("XSRF-TOKEN", csrfToken)
                 .httpOnly(false)
                 .secure(cookieSecure)

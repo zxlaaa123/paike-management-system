@@ -6,6 +6,8 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.Objects;
+
 /**
  * 三套 schema 初始化入口的第三套：运行时兜底。
  *
@@ -341,7 +343,7 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
                 tableName,
                 indexName);
             if (count != null && count == 0) {
-                jdbcTemplate.execute(createSql);
+                jdbcTemplate.execute(Objects.requireNonNull(createSql));
             }
         } catch (Exception e) {
             log.warn("Failed to ensure index {} on {}: {}", indexName, tableName, e.getMessage());

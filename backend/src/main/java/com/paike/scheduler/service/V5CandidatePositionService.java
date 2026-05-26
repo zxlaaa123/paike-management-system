@@ -14,7 +14,6 @@ import com.paike.scheduler.mapper.ScheduleLockedItemMapper;
 import com.paike.scheduler.mapper.SchedulePlanItemMapper;
 import com.paike.scheduler.mapper.SchedulePlanMapper;
 import com.paike.scheduler.mapper.TimeSlotMapper;
-import com.paike.scheduler.service.TeacherUnavailableTimeService;
 import com.paike.scheduler.service.dto.V5CandidateEvaluateRequest;
 import com.paike.scheduler.service.dto.V5CandidatePositionGenerateRequest;
 import com.paike.scheduler.service.vo.V5CandidateEvaluationVo;

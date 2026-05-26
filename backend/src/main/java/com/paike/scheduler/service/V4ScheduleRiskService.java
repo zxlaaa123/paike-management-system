@@ -30,15 +30,12 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -315,7 +312,7 @@ public class V4ScheduleRiskService {
     private void detectTeacherOverload(RiskContext context, AtomicLong idGenerator, List<ScheduleRiskIssueVo> risks) {
         Map<Long, Integer> teacherLoads = new LinkedHashMap<>();
         for (SchedulePlanItem item : context.items) {
-            teacherLoads.merge(item.getTeacherId(), lessonPeriods(item), Integer::sum);
+            teacherLoads.merge(item.getTeacherId(), lessonPeriods(item), V4ScheduleRiskService::sumIntegers);
         }
         for (Map.Entry<Long, Integer> entry : teacherLoads.entrySet()) {
             if (entry.getKey() == null || entry.getValue() < thresholds.getTeacherOverloadMedium()) {
@@ -340,7 +337,7 @@ public class V4ScheduleRiskService {
         Map<String, SchedulePlanItem> firstItemMap = new HashMap<>();
         for (SchedulePlanItem item : context.items) {
             String key = item.getClassId() + "_" + item.getWeekday();
-            classDailyLoads.merge(key, lessonPeriods(item), Integer::sum);
+            classDailyLoads.merge(key, lessonPeriods(item), V4ScheduleRiskService::sumIntegers);
             firstItemMap.putIfAbsent(key, item);
         }
         for (Map.Entry<String, Integer> entry : classDailyLoads.entrySet()) {
@@ -366,7 +363,7 @@ public class V4ScheduleRiskService {
     private void detectRoomUtilization(RiskContext context, AtomicLong idGenerator, List<ScheduleRiskIssueVo> risks) {
         Map<Long, Integer> roomLoads = new LinkedHashMap<>();
         for (SchedulePlanItem item : context.items) {
-            roomLoads.merge(item.getClassroomId(), lessonPeriods(item), Integer::sum);
+            roomLoads.merge(item.getClassroomId(), lessonPeriods(item), V4ScheduleRiskService::sumIntegers);
         }
         BigDecimal denominator = BigDecimal.valueOf(context.totalTimeSlots * 2);
         for (Map.Entry<Long, Integer> entry : roomLoads.entrySet()) {
@@ -479,6 +476,12 @@ public class V4ScheduleRiskService {
             return !RoomType.COMPUTER.getCode().equals(room.getRoomType());
         }
         return false;
+    }
+
+    private static Integer sumIntegers(Integer left, Integer right) {
+        int safeLeft = left == null ? 0 : left;
+        int safeRight = right == null ? 0 : right;
+        return safeLeft + safeRight;
     }
 
     private String buildRoomTypeMismatchDescription(Course course, Classroom room) {

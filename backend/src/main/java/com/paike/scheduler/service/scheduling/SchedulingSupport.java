@@ -8,7 +8,6 @@ import com.paike.scheduler.entity.TeacherUnavailableTime;
 import com.paike.scheduler.entity.TeachingTask;
 import com.paike.scheduler.entity.TimeSlot;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;

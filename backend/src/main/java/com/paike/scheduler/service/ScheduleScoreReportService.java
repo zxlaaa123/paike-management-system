@@ -35,7 +35,6 @@ public class ScheduleScoreReportService {
     private final ScheduleScoreReportMapper scoreReportMapper;
     private final ScheduleMapper scheduleMapper;
     private final TeachingTaskMapper teachingTaskMapper;
-    private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
     private final ClassroomMapper classroomMapper;
     private final CourseMapper courseMapper;
@@ -132,7 +131,6 @@ public class ScheduleScoreReportService {
         Context context = new Context();
         context.schedules = schedules;
 
-        List<Long> teacherIds = schedules.stream().map(Schedule::getTeacherId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
         List<Long> classIds = schedules.stream().map(Schedule::getClassId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
         List<Long> classroomIds = schedules.stream().map(Schedule::getClassroomId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
         List<Long> courseIds = schedules.stream().map(Schedule::getCourseId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
@@ -143,17 +141,13 @@ public class ScheduleScoreReportService {
                 .eq(TeachingTask::getStatus, 1));
         context.taskMap = allTasks.stream().collect(Collectors.toMap(TeachingTask::getId, Function.identity(), (a, b) -> a));
 
-        teacherIds = new ArrayList<>(teacherIds);
         classIds = new ArrayList<>(classIds);
         courseIds = new ArrayList<>(courseIds);
         for (TeachingTask task : allTasks) {
-            if (task.getTeacherId() != null && !teacherIds.contains(task.getTeacherId())) teacherIds.add(task.getTeacherId());
             if (task.getClassId() != null && !classIds.contains(task.getClassId())) classIds.add(task.getClassId());
             if (task.getCourseId() != null && !courseIds.contains(task.getCourseId())) courseIds.add(task.getCourseId());
         }
 
-        context.teacherMap = teacherMapper.selectList(new LambdaQueryWrapper<Teacher>().in(!teacherIds.isEmpty(), Teacher::getId, teacherIds))
-                .stream().collect(Collectors.toMap(Teacher::getId, Function.identity(), (a, b) -> a));
         context.classMap = classInfoMapper.selectList(new LambdaQueryWrapper<ClassInfo>().in(!classIds.isEmpty(), ClassInfo::getId, classIds))
                 .stream().collect(Collectors.toMap(ClassInfo::getId, Function.identity(), (a, b) -> a));
         context.classroomMap = classroomMapper.selectList(new LambdaQueryWrapper<Classroom>().in(!classroomIds.isEmpty(), Classroom::getId, classroomIds))
@@ -398,7 +392,6 @@ public class ScheduleScoreReportService {
     private static class Context {
         private List<Schedule> schedules;
         private Map<Long, TeachingTask> taskMap;
-        private Map<Long, Teacher> teacherMap;
         private Map<Long, ClassInfo> classMap;
         private Map<Long, Classroom> classroomMap;
         private Map<Long, Course> courseMap;

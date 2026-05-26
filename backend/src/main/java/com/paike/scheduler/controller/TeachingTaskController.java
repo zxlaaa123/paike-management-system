@@ -10,7 +10,6 @@ import com.paike.scheduler.service.SemesterService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
-import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -197,15 +196,6 @@ public class TeachingTaskController {
         );
         fillTaskRelations(list);
         return Result.success(list);
-    }
-
-    private void fillRelation(TeachingTask task) {
-        Course course = courseMapper.selectById(task.getCourseId());
-        if (course != null) task.setCourseName(course.getCourseName());
-        Teacher teacher = teacherMapper.selectById(task.getTeacherId());
-        if (teacher != null) task.setTeacherName(teacher.getName());
-        ClassInfo classInfo = classInfoMapper.selectById(task.getClassId());
-        if (classInfo != null) task.setClassName(classInfo.getClassName());
     }
 
     /** 批量填充教学任务关联数据（避免 N+1 查询） */

@@ -211,7 +211,7 @@ public class ScheduleScoreService {
         items.stream()
                 .map(SchedulePlanItem::getClassroomId)
                 .filter(Objects::nonNull)
-                .forEach(roomId -> roomUseCounts.merge(roomId, 1L, Long::sum));
+                .forEach(roomId -> roomUseCounts.merge(roomId, 1L, ScheduleScoreService::sumLongs));
 
         int teacherConflictCount = countConflicts(teacherSlotMap);
         int classConflictCount = countConflicts(classSlotMap);
@@ -335,6 +335,12 @@ public class ScheduleScoreService {
         private boolean matches(String reason) {
             return name().equals(reason) || legacyLabel.equals(reason);
         }
+    }
+
+    private static Long sumLongs(Long left, Long right) {
+        long safeLeft = left == null ? 0L : left;
+        long safeRight = right == null ? 0L : right;
+        return safeLeft + safeRight;
     }
 
     private record MetricResult(BigDecimal score, int violationCount, String message) {

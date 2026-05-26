@@ -3,8 +3,11 @@ package com.paike.scheduler.config;
 import com.paike.scheduler.auth.AuthInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.lang.NonNull;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.util.Objects;
 
 /**
  * Web MVC 配置。
@@ -22,8 +25,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private final AuthInterceptor authInterceptor;
 
     @Override
-    public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(authInterceptor)
+    public void addInterceptors(@NonNull InterceptorRegistry registry) {
+        registry.addInterceptor(Objects.requireNonNull(authInterceptor))
             .addPathPatterns("/api/**")
             .excludePathPatterns(
                 "/api/auth/login",

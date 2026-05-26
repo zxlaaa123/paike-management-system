@@ -82,7 +82,6 @@ public class ScheduleRuleWeightService {
 
     private List<ScheduleRuleWeight> getDefaultRules(Long semesterId, String strategyType) {
         java.util.List<ScheduleRuleWeight> rules = new java.util.ArrayList<>();
-        java.math.BigDecimal ONE = java.math.BigDecimal.ONE;
 
         switch (strategyType) {
             case "TEACHER_PRIORITY":

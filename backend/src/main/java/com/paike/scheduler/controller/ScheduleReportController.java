@@ -18,6 +18,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/v4/schedule-reports")
@@ -48,8 +49,8 @@ public class ScheduleReportController {
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType("HTML".equalsIgnoreCase(report.getFormat()) ? "text/html; charset=UTF-8" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20"));
-        try (InputStream inputStream = Files.newInputStream(file)) {
-            StreamUtils.copy(inputStream, response.getOutputStream());
+        try (InputStream inputStream = Objects.requireNonNull(Files.newInputStream(file))) {
+            StreamUtils.copy(inputStream, Objects.requireNonNull(response.getOutputStream()));
             response.flushBuffer();
         }
     }

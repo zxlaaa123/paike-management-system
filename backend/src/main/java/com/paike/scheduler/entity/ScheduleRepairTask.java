@@ -34,7 +34,7 @@ public class ScheduleRepairTask {
     private Integer processedItemCount;
     private Integer successItemCount;
     private Integer failureItemCount;
-    @TableField(updateStrategy = FieldStrategy.IGNORED)
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Long resultPlanId;
     private LocalDateTime startedAt;
     private LocalDateTime finishedAt;

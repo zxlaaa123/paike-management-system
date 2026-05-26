@@ -45,10 +45,13 @@ public class AuthService {
         SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
             .eq(SysUser::getUsername, request.getUsername()));
 
-        boolean activeUser = user != null && Integer.valueOf(1).equals(user.getStatus());
-        String passwordHash = activeUser ? user.getPassword() : dummyHash;
-        boolean passwordOk = passwordEncoder.matches(request.getPassword(), passwordHash);
-        if (!activeUser || !passwordOk) {
+        if (user == null || !Integer.valueOf(1).equals(user.getStatus())) {
+            passwordEncoder.matches(request.getPassword(), dummyHash);
+            throw new BusinessException(401, "用户名或密码错误");
+        }
+
+        boolean passwordOk = passwordEncoder.matches(request.getPassword(), user.getPassword());
+        if (!passwordOk) {
             throw new BusinessException(401, "用户名或密码错误");
         }
 

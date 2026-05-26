@@ -57,7 +57,7 @@ public class V4ScheduleChartService {
         Map<Long, Integer> teacherHours = new LinkedHashMap<>();
         Map<Long, Set<Long>> teacherCourseIds = new HashMap<>();
         for (SchedulePlanItem item : items) {
-            teacherHours.merge(item.getTeacherId(), lessonPeriods(item), Integer::sum);
+            teacherHours.merge(item.getTeacherId(), lessonPeriods(item), V4ScheduleChartService::sumIntegers);
             teacherCourseIds.computeIfAbsent(item.getTeacherId(), key -> new java.util.LinkedHashSet<>()).add(item.getCourseId());
         }
 
@@ -89,7 +89,7 @@ public class V4ScheduleChartService {
 
         Map<Long, Integer> roomHours = new LinkedHashMap<>();
         for (SchedulePlanItem item : items) {
-            roomHours.merge(item.getClassroomId(), lessonPeriods(item), Integer::sum);
+            roomHours.merge(item.getClassroomId(), lessonPeriods(item), V4ScheduleChartService::sumIntegers);
         }
 
         List<ScheduleRoomUtilizationChartVo.Item> result = roomHours.entrySet().stream()
@@ -122,7 +122,7 @@ public class V4ScheduleChartService {
 
         Map<String, Integer> classDailyLoad = new LinkedHashMap<>();
         for (SchedulePlanItem item : items) {
-            classDailyLoad.merge(item.getClassId() + "_" + item.getWeekday(), lessonPeriods(item), Integer::sum);
+            classDailyLoad.merge(item.getClassId() + "_" + item.getWeekday(), lessonPeriods(item), V4ScheduleChartService::sumIntegers);
         }
 
         List<ScheduleClassDailyLoadChartVo.Item> result = classDailyLoad.entrySet().stream()
@@ -156,7 +156,7 @@ public class V4ScheduleChartService {
                 continue;
             }
             for (int period = item.getStartPeriod(); period <= item.getEndPeriod(); period++) {
-                density.merge(item.getWeekday() + "_" + period, 1, Integer::sum);
+                density.merge(item.getWeekday() + "_" + period, 1, V4ScheduleChartService::sumIntegers);
             }
         }
 
@@ -295,6 +295,12 @@ public class V4ScheduleChartService {
     private String roomTypeText(String roomType) {
         RoomType type = RoomType.fromCode(roomType);
         return type == null ? (roomType == null ? "未知类型" : roomType) : type.getLabel();
+    }
+
+    private static Integer sumIntegers(Integer left, Integer right) {
+        int safeLeft = left == null ? 0 : left;
+        int safeRight = right == null ? 0 : right;
+        return safeLeft + safeRight;
     }
 
     private String mapRadarKey(ScheduleScoreDetail detail) {

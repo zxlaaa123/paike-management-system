@@ -6,7 +6,7 @@ import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DeadlockLoserDataAccessException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,7 +69,7 @@ public class SchedulePlanExplainService {
                 log.setCreatedAt(LocalDateTime.now());
                 generateLogMapper.insert(log);
                 return;
-            } catch (DeadlockLoserDataAccessException ex) {
+            } catch (PessimisticLockingFailureException ex) {
                 if (attempt >= maxRetry) {
                     // 生成日志失败不应阻塞排课主链路，记录后降级忽略。
                     log.warn("appendGenerateLog deadlock dropped: planId={}, type={}, stepNo={}, message={}",

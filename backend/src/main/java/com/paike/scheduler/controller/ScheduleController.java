@@ -12,7 +12,6 @@ import com.paike.scheduler.service.ScheduleConflictService;
 import com.paike.scheduler.service.ScheduleLockGuardService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
