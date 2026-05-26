@@ -114,6 +114,12 @@ public final class DeltaPenaltyScorer {
         private final Map<String, Long> courseDayCounts;
         private final Map<Long, Map<Integer, List<SchedulePlanItem>>> teacherDayItems;
         private final Map<Long, Long> roomUseCounts;
+        private final double classVariancePenaltySum;
+        private final double teacherVariancePenaltySum;
+        private final long duplicateCourseDays;
+        private final double continuousPenaltySum;
+        private final int continuousSampleCount;
+        private final long roomUseSumSquares;
         private final BigDecimal classDailyBalancePenalty;
         private final BigDecimal teacherDailyLoadPenalty;
         private final BigDecimal courseDistributionPenalty;
@@ -139,11 +145,19 @@ public final class DeltaPenaltyScorer {
             this.courseDayCounts = courseDayCounts;
             this.teacherDayItems = teacherDayItems;
             this.roomUseCounts = roomUseCounts;
-            this.classDailyBalancePenalty = ScoringFunctions.penaltyVariance(classDayCounts);
-            this.teacherDailyLoadPenalty = ScoringFunctions.penaltyVariance(teacherDayCounts);
-            this.courseDistributionPenalty = ScoringFunctions.penaltyDuplicateCourse(courseDayCounts);
-            this.continuousPeriodLimitPenalty = ScoringFunctions.penaltyContinuous(teacherDayItems);
-            this.classroomUtilizationPenalty = ScoringFunctions.penaltyClassroomUtilization(roomUseCounts, itemCount);
+            this.classVariancePenaltySum = variancePenaltySum(classDayCounts);
+            this.teacherVariancePenaltySum = variancePenaltySum(teacherDayCounts);
+            this.duplicateCourseDays = courseDayCounts.values().stream().filter(count -> count > 1).count();
+            this.continuousPenaltySum = continuousPenaltySum(teacherDayItems);
+            this.continuousSampleCount = continuousSampleCount(teacherDayItems);
+            this.roomUseSumSquares = roomUseCounts.values().stream()
+                    .mapToLong(count -> count * count)
+                    .sum();
+            this.classDailyBalancePenalty = variancePenalty(classVariancePenaltySum, classDayCounts.size());
+            this.teacherDailyLoadPenalty = variancePenalty(teacherVariancePenaltySum, teacherDayCounts.size());
+            this.courseDistributionPenalty = duplicateCoursePenalty(duplicateCourseDays, courseDayCounts.size());
+            this.continuousPeriodLimitPenalty = continuousPenalty(continuousPenaltySum, continuousSampleCount);
+            this.classroomUtilizationPenalty = classroomPenalty(itemCount, roomUseCounts.size(), roomUseSumSquares);
             this.morningTheoryPriorityPenalty = morningPenalty(itemCount, afternoonCount);
         }
 
@@ -152,27 +166,67 @@ public final class DeltaPenaltyScorer {
             Objects.requireNonNull(candidate, "candidate must not be null");
 
             return switch (ruleCode) {
-                case CLASS_DAILY_BALANCE -> ScoringFunctions.penaltyVariance(
-                        withNestedDayCount(classDayCounts, candidate.getClassId(), candidate.getWeekday())
+                case CLASS_DAILY_BALANCE -> variancePenaltyAfter(
+                        classDayCounts,
+                        classVariancePenaltySum,
+                        candidate.getClassId(),
+                        candidate.getWeekday()
                 ).subtract(classDailyBalancePenalty);
-                case TEACHER_DAILY_LOAD -> ScoringFunctions.penaltyVariance(
-                        withNestedDayCount(teacherDayCounts, candidate.getTeacherId(), candidate.getWeekday())
+                case TEACHER_DAILY_LOAD -> variancePenaltyAfter(
+                        teacherDayCounts,
+                        teacherVariancePenaltySum,
+                        candidate.getTeacherId(),
+                        candidate.getWeekday()
                 ).subtract(teacherDailyLoadPenalty);
-                case COURSE_DISTRIBUTION -> ScoringFunctions.penaltyDuplicateCourse(
-                        withCount(courseDayCounts, courseDayKey(candidate))
-                ).subtract(courseDistributionPenalty);
-                case CONTINUOUS_PERIOD_LIMIT -> ScoringFunctions.penaltyContinuous(
-                        withNestedDayItem(teacherDayItems, candidate.getTeacherId(), candidate.getWeekday(), candidate)
-                ).subtract(continuousPeriodLimitPenalty);
-                case CLASSROOM_UTILIZATION -> ScoringFunctions.penaltyClassroomUtilization(
-                        withCount(roomUseCounts, candidate.getClassroomId()), itemCount + 1
-                ).subtract(classroomUtilizationPenalty);
+                case COURSE_DISTRIBUTION -> duplicateCoursePenaltyAfter(candidate)
+                        .subtract(courseDistributionPenalty);
+                case CONTINUOUS_PERIOD_LIMIT -> continuousPenaltyAfter(candidate)
+                        .subtract(continuousPeriodLimitPenalty);
+                case CLASSROOM_UTILIZATION -> classroomPenaltyAfter(candidate)
+                        .subtract(classroomUtilizationPenalty);
                 case MORNING_THEORY_PRIORITY -> morningPenalty(
                         itemCount + 1,
                         afternoonCount + (isAfternoon(candidate, afternoonStartPeriod) ? 1 : 0)
                 ).subtract(morningTheoryPriorityPenalty);
                 default -> BigDecimal.ZERO;
             };
+        }
+
+        private BigDecimal variancePenaltyAfter(
+                Map<Long, Map<Integer, Long>> countsByOwner,
+                double penaltySum,
+                Long ownerId,
+                Integer weekday
+        ) {
+            Map<Integer, Long> beforeCounts = countsByOwner.get(ownerId);
+            double beforeOwnerPenalty = ownerVariancePenalty(beforeCounts);
+            double afterOwnerPenalty = ownerVariancePenaltyAfter(beforeCounts, weekday);
+            int ownerCount = countsByOwner.containsKey(ownerId) ? countsByOwner.size() : countsByOwner.size() + 1;
+            return variancePenalty(penaltySum - beforeOwnerPenalty + afterOwnerPenalty, ownerCount);
+        }
+
+        private BigDecimal duplicateCoursePenaltyAfter(SchedulePlanItem candidate) {
+            long beforeCount = courseDayCounts.getOrDefault(courseDayKey(candidate), 0L);
+            long afterDuplicateDays = duplicateCourseDays + (beforeCount == 1L ? 1L : 0L);
+            int afterTotalDays = courseDayCounts.size() + (beforeCount == 0L ? 1 : 0);
+            return duplicateCoursePenalty(afterDuplicateDays, afterTotalDays);
+        }
+
+        private BigDecimal continuousPenaltyAfter(SchedulePlanItem candidate) {
+            List<SchedulePlanItem> beforeItems = teacherDayItems
+                    .getOrDefault(candidate.getTeacherId(), Map.of())
+                    .get(candidate.getWeekday());
+            double beforeSamplePenalty = continuousSamplePenalty(beforeItems);
+            double afterSamplePenalty = continuousSamplePenaltyAfter(beforeItems, candidate);
+            int afterSampleCount = continuousSampleCount + (beforeItems == null ? 1 : 0);
+            return continuousPenalty(continuousPenaltySum - beforeSamplePenalty + afterSamplePenalty, afterSampleCount);
+        }
+
+        private BigDecimal classroomPenaltyAfter(SchedulePlanItem candidate) {
+            long beforeCount = roomUseCounts.getOrDefault(candidate.getClassroomId(), 0L);
+            int afterRoomCount = roomUseCounts.size() + (beforeCount == 0L ? 1 : 0);
+            long afterSumSquares = roomUseSumSquares - beforeCount * beforeCount + (beforeCount + 1) * (beforeCount + 1);
+            return classroomPenalty(itemCount + 1, afterRoomCount, afterSumSquares);
         }
     }
 
@@ -226,37 +280,102 @@ public final class DeltaPenaltyScorer {
         return items.stream().collect(Collectors.groupingBy(SchedulePlanItem::getClassroomId, Collectors.counting()));
     }
 
-    private static Map<Long, Map<Integer, Long>> withNestedDayCount(
-            Map<Long, Map<Integer, Long>> source,
-            Long ownerId,
-            Integer weekday
-    ) {
-        Map<Long, Map<Integer, Long>> result = new HashMap<>(source);
-        Map<Integer, Long> dayCounts = new HashMap<>(result.getOrDefault(ownerId, Map.of()));
-        dayCounts.merge(weekday, 1L, Long::sum);
-        result.put(ownerId, dayCounts);
-        return result;
+    private static double variancePenaltySum(Map<Long, Map<Integer, Long>> countsByOwner) {
+        return countsByOwner.values().stream()
+                .mapToDouble(DeltaPenaltyScorer::ownerVariancePenalty)
+                .sum();
     }
 
-    private static <K> Map<K, Long> withCount(Map<K, Long> source, K key) {
-        Map<K, Long> result = new HashMap<>(source);
-        result.merge(key, 1L, Long::sum);
-        return result;
+    private static BigDecimal variancePenalty(double penaltySum, int ownerCount) {
+        if (ownerCount == 0) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf(penaltySum / ownerCount).setScale(4, RoundingMode.HALF_UP);
     }
 
-    private static Map<Long, Map<Integer, List<SchedulePlanItem>>> withNestedDayItem(
-            Map<Long, Map<Integer, List<SchedulePlanItem>>> source,
-            Long ownerId,
-            Integer weekday,
-            SchedulePlanItem candidate
-    ) {
-        Map<Long, Map<Integer, List<SchedulePlanItem>>> result = new HashMap<>(source);
-        Map<Integer, List<SchedulePlanItem>> dayItems = new HashMap<>(result.getOrDefault(ownerId, Map.of()));
-        List<SchedulePlanItem> items = new ArrayList<>(dayItems.getOrDefault(weekday, List.of()));
-        items.add(candidate);
-        dayItems.put(weekday, items);
-        result.put(ownerId, dayItems);
-        return result;
+    private static double ownerVariancePenalty(Map<Integer, Long> dayCounts) {
+        if (dayCounts == null || dayCounts.size() <= 1) {
+            return 0D;
+        }
+        double avg = dayCounts.values().stream().mapToLong(Long::longValue).average().orElse(0D);
+        double variance = dayCounts.values().stream()
+                .mapToDouble(count -> Math.pow(count - avg, 2))
+                .average()
+                .orElse(0D);
+        return Math.min(1D, variance / 4D);
+    }
+
+    private static double ownerVariancePenaltyAfter(Map<Integer, Long> beforeCounts, Integer weekday) {
+        Map<Integer, Long> afterCounts = new HashMap<>(beforeCounts == null ? Map.of() : beforeCounts);
+        afterCounts.merge(weekday, 1L, Long::sum);
+        return ownerVariancePenalty(afterCounts);
+    }
+
+    private static BigDecimal duplicateCoursePenalty(long duplicateDays, int totalDays) {
+        if (totalDays == 0) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf((double) duplicateDays / totalDays).setScale(4, RoundingMode.HALF_UP);
+    }
+
+    private static double continuousPenaltySum(Map<Long, Map<Integer, List<SchedulePlanItem>>> teacherDayItems) {
+        return teacherDayItems.values().stream()
+                .flatMap(dayItems -> dayItems.values().stream())
+                .mapToDouble(DeltaPenaltyScorer::continuousSamplePenalty)
+                .sum();
+    }
+
+    private static int continuousSampleCount(Map<Long, Map<Integer, List<SchedulePlanItem>>> teacherDayItems) {
+        return teacherDayItems.values().stream()
+                .mapToInt(Map::size)
+                .sum();
+    }
+
+    private static BigDecimal continuousPenalty(double penaltySum, int sampleCount) {
+        if (sampleCount == 0) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf(penaltySum / sampleCount).setScale(4, RoundingMode.HALF_UP);
+    }
+
+    private static double continuousSamplePenalty(List<SchedulePlanItem> items) {
+        if (items == null || items.isEmpty()) {
+            return 0D;
+        }
+        List<Integer> starts = items.stream()
+                .map(SchedulePlanItem::getStartPeriod)
+                .sorted()
+                .toList();
+        return continuousStartsPenalty(starts);
+    }
+
+    private static double continuousSamplePenaltyAfter(List<SchedulePlanItem> beforeItems, SchedulePlanItem candidate) {
+        List<Integer> starts = new ArrayList<>();
+        if (beforeItems != null) {
+            starts.addAll(beforeItems.stream().map(SchedulePlanItem::getStartPeriod).toList());
+        }
+        starts.add(candidate.getStartPeriod());
+        starts.sort(Integer::compareTo);
+        return continuousStartsPenalty(starts);
+    }
+
+    private static double continuousStartsPenalty(List<Integer> starts) {
+        int consecutiveChains = 0;
+        for (int i = 1; i < starts.size(); i++) {
+            if (starts.get(i) - starts.get(i - 1) == 2) {
+                consecutiveChains++;
+            }
+        }
+        return Math.min(1D, consecutiveChains / 2D);
+    }
+
+    private static BigDecimal classroomPenalty(int totalItems, int roomCount, long sumSquares) {
+        if (totalItems <= 0 || roomCount == 0) {
+            return BigDecimal.ZERO;
+        }
+        double avg = (double) totalItems / roomCount;
+        double variance = (double) sumSquares / roomCount - avg * avg;
+        return BigDecimal.valueOf(Math.min(1D, variance / Math.max(1D, avg * avg))).setScale(4, RoundingMode.HALF_UP);
     }
 
     private static String courseDayKey(SchedulePlanItem item) {
