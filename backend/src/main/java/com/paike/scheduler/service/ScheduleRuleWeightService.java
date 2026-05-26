@@ -110,6 +110,7 @@ public class ScheduleRuleWeightService {
                 addRule(rules, semesterId, strategyType, "TEACHER_DAILY_LOAD", "教师每日负载", "SOFT", new java.math.BigDecimal("20"), "教师每天上课数量尽量合理");
                 break;
             default: // COMPREHENSIVE
+                // 综合策略不强调上午理论课偏好；该软规则仅由班级均衡策略显式启用。
                 addRule(rules, semesterId, strategyType, "TEACHER_TIME_CONFLICT", "教师时间冲突", "HARD", new java.math.BigDecimal("100"), "同一教师同一时间不能上两门课");
                 addRule(rules, semesterId, strategyType, "CLASS_TIME_CONFLICT", "班级时间冲突", "HARD", new java.math.BigDecimal("100"), "同一班级同一时间不能上两门课");
                 addRule(rules, semesterId, strategyType, "CLASSROOM_TIME_CONFLICT", "教室时间冲突", "HARD", new java.math.BigDecimal("100"), "同一教室同一时间不能安排两门课");
