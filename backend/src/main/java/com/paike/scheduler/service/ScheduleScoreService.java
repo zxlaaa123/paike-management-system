@@ -2,10 +2,12 @@ package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.paike.scheduler.config.ScheduleThresholdProperties;
+import com.paike.scheduler.entity.Classroom;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
 import com.paike.scheduler.entity.ScheduleRuleWeight;
 import com.paike.scheduler.entity.ScheduleScoreDetail;
+import com.paike.scheduler.mapper.ClassroomMapper;
 import com.paike.scheduler.mapper.SchedulePlanItemMapper;
 import com.paike.scheduler.mapper.SchedulePlanMapper;
 import com.paike.scheduler.mapper.ScheduleScoreDetailMapper;
@@ -30,6 +32,7 @@ public class ScheduleScoreService {
     private final ScheduleScoreDetailMapper scoreDetailMapper;
     private final SchedulePlanMapper planMapper;
     private final SchedulePlanItemMapper planItemMapper;
+    private final ClassroomMapper classroomMapper;
     private final ScheduleRuleWeightService ruleWeightService;
     private final ScheduleThresholdProperties thresholds;
 
@@ -134,7 +137,8 @@ public class ScheduleScoreService {
      * 事后<b>离线评分</b>：方案生成完调一次，给每条规则算扣分写库。
      * 注意跟 V3ScheduleGenerateService.scoreCandidate（在线、贪心选候选）是<b>双轨</b>关系，
      * 同名规则码（如 CLASSROOM_UTILIZATION）两边公式不同 —— 参见
-     * {@link com.paike.scheduler.service.scheduling.ScoringDimensions#SOFT}。
+     * {@link com.paike.scheduler.service.scheduling.ScoringDimensions#ONLINE_SOFT}
+     * 和 {@link com.paike.scheduler.service.scheduling.ScoringDimensions#OFFLINE_SOFT}。
      * 总分公式：clamp(100 + Σ rule.score, 0, 100)，软规则 score = -weight×min(1,penalty)，
      * 硬规则 score = -weight×violationCount。
      */
@@ -203,7 +207,11 @@ public class ScheduleScoreService {
                 Collectors.counting()
         ));
         Map<Long, Map<Integer, List<SchedulePlanItem>>> teacherDayItems = nestedDayItems(items, SchedulePlanItem::getTeacherId);
-        Map<Long, Long> roomUseCounts = items.stream().collect(Collectors.groupingBy(SchedulePlanItem::getClassroomId, Collectors.counting()));
+        Map<Long, Long> roomUseCounts = activeClassroomUseCounts();
+        items.stream()
+                .map(SchedulePlanItem::getClassroomId)
+                .filter(Objects::nonNull)
+                .forEach(roomId -> roomUseCounts.merge(roomId, 1L, Long::sum));
 
         int teacherConflictCount = countConflicts(teacherSlotMap);
         int classConflictCount = countConflicts(classSlotMap);
@@ -238,6 +246,21 @@ public class ScheduleScoreService {
 
     private <K> Map<String, List<SchedulePlanItem>> groupBy(List<SchedulePlanItem> items, Function<SchedulePlanItem, String> keyFunc) {
         return items.stream().collect(Collectors.groupingBy(keyFunc));
+    }
+
+    private Map<Long, Long> activeClassroomUseCounts() {
+        List<Classroom> classrooms = classroomMapper.selectList(
+                new LambdaQueryWrapper<Classroom>()
+                        .eq(Classroom::getStatus, 1)
+                        .eq(Classroom::getDeleted, 0));
+        if (classrooms == null || classrooms.isEmpty()) {
+            return new HashMap<>();
+        }
+        return classrooms.stream()
+                .map(Classroom::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toMap(Function.identity(), id -> 0L));
     }
 
     private Map<Long, Map<Integer, Long>> nestedDayCounts(List<SchedulePlanItem> items, Function<SchedulePlanItem, Long> ownerFunc) {

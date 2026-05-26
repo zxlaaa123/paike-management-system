@@ -197,7 +197,7 @@ public final class ScoringFunctions {
     }
 
     /**
-     * 教室使用次数方差归一惩罚（离线）：min(1, variance / avg²)。范围 [0, 1]。
+     * 启用教室使用次数方差归一惩罚（离线）：min(1, variance / avg²)。未使用教室按 0 次计，范围 [0, 1]。
      */
     public static BigDecimal penaltyClassroomUtilization(Map<Long, Long> roomUseCounts, int totalItems) {
         if (totalItems <= 0 || roomUseCounts.isEmpty()) {
