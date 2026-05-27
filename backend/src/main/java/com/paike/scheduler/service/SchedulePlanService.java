@@ -247,14 +247,21 @@ public class SchedulePlanService {
                 .collect(Collectors.toMap(Classroom::getId, Function.identity(), (a, b) -> a));
         Map<String, TimeSlot> slotMap = timeSlotMapper.selectList(new LambdaQueryWrapper<TimeSlot>()).stream()
                 .collect(Collectors.toMap(slot -> slot.getDayOfWeek() + "_" + slot.getPeriodNo(), Function.identity(), (a, b) -> a));
+        Map<Long, List<String>> peerConflictReasons = buildPeerConflictReasons(items, teacherMap, classMap, roomMap);
 
         int conflictCount = 0;
         for (SchedulePlanItem item : items) {
-            List<String> reasons = buildConflictReasons(item, items, taskMap, courseMap, teacherMap, classMap, roomMap, slotMap);
-            item.setConflictFlag(reasons.isEmpty() ? 0 : 1);
-            item.setConflictReason(reasons.isEmpty() ? null : String.join("；", reasons));
-            item.setUpdatedAt(LocalDateTime.now());
-            planItemMapper.updateById(item);
+            List<String> reasons = buildConflictReasons(item, peerConflictReasons.getOrDefault(item.getId(), List.of()),
+                    taskMap, courseMap, teacherMap, classMap, roomMap, slotMap);
+            Integer conflictFlag = reasons.isEmpty() ? 0 : 1;
+            String conflictReason = reasons.isEmpty() ? null : String.join("；", reasons);
+            if (!Objects.equals(item.getConflictFlag(), conflictFlag)
+                    || !Objects.equals(item.getConflictReason(), conflictReason)) {
+                item.setConflictFlag(conflictFlag);
+                item.setConflictReason(conflictReason);
+                item.setUpdatedAt(LocalDateTime.now());
+                planItemMapper.updateById(item);
+            }
             if (!reasons.isEmpty()) {
                 conflictCount++;
             }
@@ -500,7 +507,7 @@ public class SchedulePlanService {
 
     private List<String> buildConflictReasons(
             SchedulePlanItem item,
-            List<SchedulePlanItem> items,
+            List<String> peerConflictReasons,
             Map<Long, TeachingTask> taskMap,
             Map<Long, Course> courseMap,
             Map<Long, Teacher> teacherMap,
@@ -531,26 +538,60 @@ public class SchedulePlanService {
                 && !RoomType.COMPUTER.getCode().equals(room.getRoomType())) {
             reasons.add("教室类型不匹配");
         }
-
-        for (SchedulePlanItem other : items) {
-            if (Objects.equals(other.getId(), item.getId())) {
-                continue;
-            }
-            if (!Objects.equals(other.getWeekday(), item.getWeekday()) || !Objects.equals(other.getStartPeriod(), item.getStartPeriod())) {
-                continue;
-            }
-            if (Objects.equals(other.getTeacherId(), item.getTeacherId())) {
-                reasons.add("教师时间冲突：" + safeName(teacher != null ? teacher.getName() : null));
-            }
-            if (Objects.equals(other.getClassId(), item.getClassId())) {
-                reasons.add("班级时间冲突：" + safeName(classInfo != null ? classInfo.getClassName() : null));
-            }
-            if (Objects.equals(other.getClassroomId(), item.getClassroomId())) {
-                reasons.add("教室时间冲突：" + safeName(room != null ? room.getRoomName() : null));
-            }
-        }
+        reasons.addAll(peerConflictReasons);
 
         return reasons.stream().distinct().collect(Collectors.toList());
+    }
+
+    private Map<Long, List<String>> buildPeerConflictReasons(
+            List<SchedulePlanItem> items,
+            Map<Long, Teacher> teacherMap,
+            Map<Long, ClassInfo> classMap,
+            Map<Long, Classroom> roomMap
+    ) {
+        Map<String, List<SchedulePlanItem>> itemsByTime = new LinkedHashMap<>();
+        for (SchedulePlanItem item : items) {
+            if (item.getId() == null || item.getWeekday() == null || item.getStartPeriod() == null) {
+                continue;
+            }
+            String key = item.getWeekday() + "_" + item.getStartPeriod();
+            itemsByTime.computeIfAbsent(key, ignored -> new ArrayList<>()).add(item);
+        }
+
+        Map<Long, List<String>> reasonsByItemId = new LinkedHashMap<>();
+        for (List<SchedulePlanItem> timeItems : itemsByTime.values()) {
+            if (timeItems.size() <= 1) {
+                continue;
+            }
+            addGroupedConflictReasons(timeItems, reasonsByItemId, SchedulePlanItem::getTeacherId,
+                    teacherId -> "教师时间冲突：" + safeName(teacherMap.get(teacherId) == null ? null : teacherMap.get(teacherId).getName()));
+            addGroupedConflictReasons(timeItems, reasonsByItemId, SchedulePlanItem::getClassId,
+                    classId -> "班级时间冲突：" + safeName(classMap.get(classId) == null ? null : classMap.get(classId).getClassName()));
+            addGroupedConflictReasons(timeItems, reasonsByItemId, SchedulePlanItem::getClassroomId,
+                    classroomId -> "教室时间冲突：" + safeName(roomMap.get(classroomId) == null ? null : roomMap.get(classroomId).getRoomName()));
+        }
+        return reasonsByItemId;
+    }
+
+    private void addGroupedConflictReasons(
+            List<SchedulePlanItem> items,
+            Map<Long, List<String>> reasonsByItemId,
+            Function<SchedulePlanItem, Long> keyExtractor,
+            Function<Long, String> reasonBuilder
+    ) {
+        Map<Long, List<SchedulePlanItem>> grouped = new LinkedHashMap<>();
+        for (SchedulePlanItem item : items) {
+            grouped.computeIfAbsent(keyExtractor.apply(item), ignored -> new ArrayList<>()).add(item);
+        }
+        for (Map.Entry<Long, List<SchedulePlanItem>> entry : grouped.entrySet()) {
+            if (entry.getValue().size() <= 1) {
+                continue;
+            }
+            String reason = reasonBuilder.apply(entry.getKey());
+            for (SchedulePlanItem item : entry.getValue()) {
+                reasonsByItemId.computeIfAbsent(item.getId(), ignored -> new ArrayList<>()).add(reason);
+            }
+        }
     }
 
     private TimeSlot resolveTimeSlot(Integer weekday, Integer startPeriod, Integer endPeriod) {

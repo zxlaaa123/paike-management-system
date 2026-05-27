@@ -116,6 +116,12 @@ DEALLOCATE PREPARE stmt;
 SET @ddl = (
     SELECT IF(
         EXISTS(
+            SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'schedule'
+              AND COLUMN_NAME = 'active_key'
+        )
+        AND EXISTS(
             SELECT 1 FROM information_schema.STATISTICS
             WHERE TABLE_SCHEMA = DATABASE()
               AND TABLE_NAME = 'schedule'
@@ -133,6 +139,12 @@ DEALLOCATE PREPARE stmt;
 SET @ddl = (
     SELECT IF(
         EXISTS(
+            SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'schedule'
+              AND COLUMN_NAME = 'active_key'
+        )
+        AND EXISTS(
             SELECT 1 FROM information_schema.STATISTICS
             WHERE TABLE_SCHEMA = DATABASE()
               AND TABLE_NAME = 'schedule'
@@ -150,6 +162,12 @@ DEALLOCATE PREPARE stmt;
 SET @ddl = (
     SELECT IF(
         EXISTS(
+            SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'schedule'
+              AND COLUMN_NAME = 'active_key'
+        )
+        AND EXISTS(
             SELECT 1 FROM information_schema.STATISTICS
             WHERE TABLE_SCHEMA = DATABASE()
               AND TABLE_NAME = 'schedule'
@@ -166,7 +184,13 @@ DEALLOCATE PREPARE stmt;
 
 SET @ddl = (
     SELECT IF(
-        EXISTS(
+        NOT EXISTS(
+            SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'schedule'
+              AND COLUMN_NAME = 'active_key'
+        )
+        OR EXISTS(
             SELECT 1 FROM information_schema.STATISTICS
             WHERE TABLE_SCHEMA = DATABASE()
               AND TABLE_NAME = 'schedule'
@@ -182,7 +206,13 @@ DEALLOCATE PREPARE stmt;
 
 SET @ddl = (
     SELECT IF(
-        EXISTS(
+        NOT EXISTS(
+            SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'schedule'
+              AND COLUMN_NAME = 'active_key'
+        )
+        OR EXISTS(
             SELECT 1 FROM information_schema.STATISTICS
             WHERE TABLE_SCHEMA = DATABASE()
               AND TABLE_NAME = 'schedule'
@@ -198,7 +228,13 @@ DEALLOCATE PREPARE stmt;
 
 SET @ddl = (
     SELECT IF(
-        EXISTS(
+        NOT EXISTS(
+            SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'schedule'
+              AND COLUMN_NAME = 'active_key'
+        )
+        OR EXISTS(
             SELECT 1 FROM information_schema.STATISTICS
             WHERE TABLE_SCHEMA = DATABASE()
               AND TABLE_NAME = 'schedule'

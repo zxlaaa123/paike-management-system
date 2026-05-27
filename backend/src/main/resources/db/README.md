@@ -124,10 +124,14 @@ SHOW INDEX FROM teacher_unavailable_time WHERE Key_name = 'uk_teacher_timeslot';
 -- 3) schedule_plan_item 的唯一约束（避免方案明细重排同一节）
 SHOW INDEX FROM schedule_plan_item WHERE Key_name = 'uk_plan_task_slot';
 
--- 4) semester 至多一个 current 学期的唯一约束
+-- 4) schedule 的软删除安全唯一约束（避免正式课表并发冲突）
+SHOW COLUMNS FROM schedule LIKE 'active_key';
+SHOW INDEX FROM schedule WHERE Key_name IN ('uk_schedule_teacher_slot','uk_schedule_class_slot','uk_schedule_classroom_slot');
+
+-- 5) semester 至多一个 current 学期的唯一约束
 SHOW INDEX FROM semester WHERE Column_name = 'current_marker';
 
--- 5) 软删除列
+-- 6) 软删除列
 SHOW COLUMNS FROM schedule_plan      LIKE 'deleted';
 SHOW COLUMNS FROM schedule_plan_item LIKE 'deleted';
 SHOW COLUMNS FROM semester           LIKE 'deleted';

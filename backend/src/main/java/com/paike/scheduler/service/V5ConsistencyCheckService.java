@@ -40,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -367,43 +368,58 @@ public class V5ConsistencyCheckService {
     private void checkHardConflicts(SchedulePlan plan, List<SchedulePlanItem> items, List<V5ConsistencyIssueVo> issues,
                                     Map<Long, Classroom> roomCache, Map<Long, Teacher> teacherCache,
                                     Map<Long, ClassInfo> classInfoCache) {
-        for (int i = 0; i < items.size(); i++) {
-            SchedulePlanItem a = items.get(i);
-            if (a.getWeekday() == null || a.getStartPeriod() == null || a.getEndPeriod() == null) continue;
-            for (int j = i + 1; j < items.size(); j++) {
-                SchedulePlanItem b = items.get(j);
-                if (!Objects.equals(a.getWeekday(), b.getWeekday())) continue;
-                if (!overlap(a.getStartPeriod(), a.getEndPeriod(), b.getStartPeriod(), b.getEndPeriod())) continue;
-                if (Objects.equals(a.getTeacherId(), b.getTeacherId()) && a.getTeacherId() != null) {
-                    Teacher t = loadTeacher(a.getTeacherId(), teacherCache);
-                    V5ConsistencyIssueVo vo = issue("TEACHER_HARD_CONFLICT", SEVERITY_BLOCKING, "CONFLICT", "教师时间冲突",
-                            "教师 " + safeName(t == null ? null : t.getName()) + " 在周" + a.getWeekday()
-                                    + " 第" + a.getStartPeriod() + "-" + a.getEndPeriod() + "节存在重叠课程",
-                            "调整其中一节课的时间");
-                    fillItemContext(vo, a, roomCache);
-                    vo.setTeacherName(safeName(t == null ? null : t.getName()));
-                    issues.add(vo);
+        Map<Integer, List<SchedulePlanItem>> itemsByWeekday = items.stream()
+                .filter(item -> item.getWeekday() != null && item.getStartPeriod() != null && item.getEndPeriod() != null)
+                .collect(Collectors.groupingBy(SchedulePlanItem::getWeekday, LinkedHashMap::new, Collectors.toList()));
+        for (List<SchedulePlanItem> dayItems : itemsByWeekday.values()) {
+            dayItems.sort(Comparator
+                    .comparing(SchedulePlanItem::getStartPeriod)
+                    .thenComparing(SchedulePlanItem::getEndPeriod)
+                    .thenComparing(item -> item.getId() == null ? Long.MAX_VALUE : item.getId()));
+            List<SchedulePlanItem> active = new ArrayList<>();
+            for (SchedulePlanItem current : dayItems) {
+                active.removeIf(item -> item.getEndPeriod() < current.getStartPeriod());
+                for (SchedulePlanItem previous : active) {
+                    if (overlap(previous.getStartPeriod(), previous.getEndPeriod(), current.getStartPeriod(), current.getEndPeriod())) {
+                        addHardConflictIssues(previous, current, issues, roomCache, teacherCache, classInfoCache);
+                    }
                 }
-                if (Objects.equals(a.getClassId(), b.getClassId()) && a.getClassId() != null) {
-                    ClassInfo c = loadClass(a.getClassId(), classInfoCache);
-                    V5ConsistencyIssueVo vo = issue("CLASS_HARD_CONFLICT", SEVERITY_BLOCKING, "CONFLICT", "班级时间冲突",
-                            "班级 " + safeName(c == null ? null : c.getClassName()) + " 在周" + a.getWeekday()
-                                    + " 第" + a.getStartPeriod() + "-" + a.getEndPeriod() + "节存在重叠课程",
-                            "调整其中一节课的时间");
-                    fillItemContext(vo, a, roomCache);
-                    vo.setClassName(safeName(c == null ? null : c.getClassName()));
-                    issues.add(vo);
-                }
-                if (Objects.equals(a.getClassroomId(), b.getClassroomId()) && a.getClassroomId() != null) {
-                    Classroom r = loadRoom(a.getClassroomId(), roomCache);
-                    V5ConsistencyIssueVo vo = issue("CLASSROOM_HARD_CONFLICT", SEVERITY_BLOCKING, "CONFLICT", "教室时间冲突",
-                            "教室 " + safeName(r == null ? null : r.getRoomName()) + " 在周" + a.getWeekday()
-                                    + " 第" + a.getStartPeriod() + "-" + a.getEndPeriod() + "节被多次占用",
-                            "调整其中一节课的教室或时间");
-                    fillItemContext(vo, a, roomCache);
-                    issues.add(vo);
-                }
+                active.add(current);
             }
+        }
+    }
+
+    private void addHardConflictIssues(SchedulePlanItem a, SchedulePlanItem b, List<V5ConsistencyIssueVo> issues,
+                                       Map<Long, Classroom> roomCache, Map<Long, Teacher> teacherCache,
+                                       Map<Long, ClassInfo> classInfoCache) {
+        if (Objects.equals(a.getTeacherId(), b.getTeacherId()) && a.getTeacherId() != null) {
+            Teacher t = loadTeacher(a.getTeacherId(), teacherCache);
+            V5ConsistencyIssueVo vo = issue("TEACHER_HARD_CONFLICT", SEVERITY_BLOCKING, "CONFLICT", "教师时间冲突",
+                    "教师 " + safeName(t == null ? null : t.getName()) + " 在周" + a.getWeekday()
+                            + " 第" + a.getStartPeriod() + "-" + a.getEndPeriod() + "节存在重叠课程",
+                    "调整其中一节课的时间");
+            fillItemContext(vo, a, roomCache);
+            vo.setTeacherName(safeName(t == null ? null : t.getName()));
+            issues.add(vo);
+        }
+        if (Objects.equals(a.getClassId(), b.getClassId()) && a.getClassId() != null) {
+            ClassInfo c = loadClass(a.getClassId(), classInfoCache);
+            V5ConsistencyIssueVo vo = issue("CLASS_HARD_CONFLICT", SEVERITY_BLOCKING, "CONFLICT", "班级时间冲突",
+                    "班级 " + safeName(c == null ? null : c.getClassName()) + " 在周" + a.getWeekday()
+                            + " 第" + a.getStartPeriod() + "-" + a.getEndPeriod() + "节存在重叠课程",
+                    "调整其中一节课的时间");
+            fillItemContext(vo, a, roomCache);
+            vo.setClassName(safeName(c == null ? null : c.getClassName()));
+            issues.add(vo);
+        }
+        if (Objects.equals(a.getClassroomId(), b.getClassroomId()) && a.getClassroomId() != null) {
+            Classroom r = loadRoom(a.getClassroomId(), roomCache);
+            V5ConsistencyIssueVo vo = issue("CLASSROOM_HARD_CONFLICT", SEVERITY_BLOCKING, "CONFLICT", "教室时间冲突",
+                    "教室 " + safeName(r == null ? null : r.getRoomName()) + " 在周" + a.getWeekday()
+                            + " 第" + a.getStartPeriod() + "-" + a.getEndPeriod() + "节被多次占用",
+                    "调整其中一节课的教室或时间");
+            fillItemContext(vo, a, roomCache);
+            issues.add(vo);
         }
     }
 

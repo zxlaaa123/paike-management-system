@@ -9,7 +9,9 @@ import com.paike.scheduler.service.dto.V4ScheduleReportGenerateRequest;
 import com.paike.scheduler.service.vo.ScheduleAnalysisSummaryVo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -31,6 +33,8 @@ class V4ScheduleReportServiceTest {
     private ScheduleReportMapper scheduleReportMapper;
     private V4ScheduleAnalysisService scheduleAnalysisService;
     private V4ScheduleReportService service;
+    @TempDir
+    Path tempDir;
 
     @BeforeEach
     void setUp() {
@@ -42,6 +46,7 @@ class V4ScheduleReportServiceTest {
                 scheduleReportMapper,
                 scheduleAnalysisService,
                 mock(V4ScheduleRiskService.class));
+        ReflectionTestUtils.setField(service, "reportDir", tempDir.resolve("reports").toString());
     }
 
     @Test
@@ -72,7 +77,7 @@ class V4ScheduleReportServiceTest {
     void resolveDownloadFile_rejectsPathOutsideReportDirectory() {
         ScheduleReport report = new ScheduleReport();
         report.setId(1L);
-        report.setFilePath(Path.of("..", "secret.txt").toString());
+        report.setFilePath(tempDir.resolve("secret.txt").toString());
         when(scheduleReportMapper.selectById(1L)).thenReturn(report);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service.resolveDownloadFile(1L));
@@ -82,7 +87,7 @@ class V4ScheduleReportServiceTest {
 
     @Test
     void resolveDownloadFile_allowsFileInsideReportDirectory() throws Exception {
-        Path reportDir = Path.of("data", "reports").toAbsolutePath().normalize();
+        Path reportDir = tempDir.resolve("reports").toAbsolutePath().normalize();
         Files.createDirectories(reportDir);
         Path file = reportDir.resolve("download-test.txt");
         Files.writeString(file, "ok", StandardCharsets.UTF_8);

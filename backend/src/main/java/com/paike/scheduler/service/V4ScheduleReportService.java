@@ -14,8 +14,8 @@ import com.paike.scheduler.service.vo.ScheduleRiskListVo;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -42,7 +42,9 @@ public class V4ScheduleReportService {
     private final V4ScheduleAnalysisService scheduleAnalysisService;
     private final V4ScheduleRiskService scheduleRiskService;
 
-    @Transactional(rollbackFor = Exception.class)
+    @Value("${paike.report.dir:data/reports}")
+    private String reportDir = "data/reports";
+
     public ScheduleReportItemVo generateReport(Long planId, V4ScheduleReportGenerateRequest request) {
         SchedulePlan plan = schedulePlanMapper.selectById(planId);
         if (plan == null) {
@@ -150,7 +152,7 @@ public class V4ScheduleReportService {
 
     private Path ensureReportDir() {
         try {
-            Path dir = Path.of("data", "reports").toAbsolutePath().normalize();
+            Path dir = Path.of(reportDir).toAbsolutePath().normalize();
             Files.createDirectories(dir);
             return dir;
         } catch (IOException e) {

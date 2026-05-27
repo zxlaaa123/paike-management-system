@@ -1,6 +1,11 @@
 server:
   port: 8090
 
+paike:
+  report:
+    # 绝对路径，或相对于后端进程工作目录的路径；部署环境推荐使用绝对路径。
+    dir: ${PAIKE_REPORT_DIR:data/reports}
+
 spring:
   application:
     name: scheduler-backend

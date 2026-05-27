@@ -41,7 +41,9 @@ import com.paike.scheduler.service.vo.V5SimulationPlanDetailVo;
 import com.paike.scheduler.service.vo.V5SimulationRoomUtilizationChangeVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -56,6 +58,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
@@ -79,9 +82,14 @@ public class V5SimulationService {
     private final SchedulePlanExplainService explainService;
     private final V5ConsistencyCheckService consistencyCheckService;
     private final ObjectMapper objectMapper;
+    private final PlatformTransactionManager transactionManager;
 
-    @Transactional(rollbackFor = Exception.class)
     public V5SimulationPlanDetailVo generate(Long taskId, Long suggestionId) {
+        Long simulationPlanId = runInTransaction(() -> generateInTransaction(taskId, suggestionId));
+        return detail(taskId, simulationPlanId);
+    }
+
+    private Long generateInTransaction(Long taskId, Long suggestionId) {
         ScheduleRepairTask task = requireTask(taskId);
         if (isTerminal(task.getStatus())) {
             throw new BusinessException("已结束任务不能生成试算方案");
@@ -139,11 +147,17 @@ public class V5SimulationService {
         task.setFinishedAt(LocalDateTime.now());
         repairTaskMapper.updateById(task);
 
-        return detail(taskId, simulation.getId());
+        return simulation.getId();
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public V5SimulationPlanDetailVo localReplan(Long taskId, V5LocalReplanRequest request) {
+        LocalReplanResult result = runInTransaction(() -> localReplanInTransaction(taskId, request));
+        V5SimulationPlanDetailVo detail = detail(taskId, result.planId());
+        detail.setLocalReplanSummary(result.summary());
+        return detail;
+    }
+
+    private LocalReplanResult localReplanInTransaction(Long taskId, V5LocalReplanRequest request) {
         ScheduleRepairTask task = requireTask(taskId);
         if (isTerminal(task.getStatus())) {
             throw new BusinessException("已结束任务不能生成局部重排试算方案");
@@ -266,9 +280,7 @@ public class V5SimulationService {
         summary.setFailedItemIds(failedItemIds);
         summary.setLogs(logs);
 
-        V5SimulationPlanDetailVo detail = detail(taskId, simulation.getId());
-        detail.setLocalReplanSummary(summary);
-        return detail;
+        return new LocalReplanResult(simulation.getId(), summary);
     }
 
     public V5SimulationPlanDetailVo detail(Long taskId, Long planId) {
@@ -1330,10 +1342,17 @@ public class V5SimulationService {
                 || V5RepairTaskStatus.APPLIED.getCode().equals(status);
     }
 
+    private <T> T runInTransaction(Supplier<T> action) {
+        return new TransactionTemplate(transactionManager).execute(status -> action.get());
+    }
+
     private record SuggestionMove(Long targetClassroomId, Integer targetWeekday, Integer targetStartPeriod, Integer targetEndPeriod) {
         private boolean executable() {
             return targetClassroomId != null && targetWeekday != null && targetStartPeriod != null && targetEndPeriod != null;
         }
+    }
+
+    private record LocalReplanResult(Long planId, V5LocalReplanSummaryVo summary) {
     }
 
     private record CandidatePlacement(Long classroomId, Integer weekday, Integer startPeriod, Integer endPeriod, BigDecimal score) {

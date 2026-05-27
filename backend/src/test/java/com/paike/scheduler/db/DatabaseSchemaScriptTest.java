@@ -52,6 +52,8 @@ class DatabaseSchemaScriptTest {
         assertTrue(all.contains("uk_schedule_teacher_slot (time_slot_id, teacher_id, active_key)"));
         assertTrue(all.contains("uk_schedule_class_slot (time_slot_id, class_id, active_key)"));
         assertTrue(all.contains("uk_schedule_classroom_slot (time_slot_id, classroom_id, active_key)"));
+        assertTrue(count(v14, "COLUMN_NAME = 'active_key'") >= 7,
+                "v14 must keep old unique keys unless active_key exists");
         assertFalse(all.contains("ADD UNIQUE KEY uk_schedule_teacher_slot (time_slot_id, teacher_id, deleted)"));
         assertFalse(all.contains("ADD UNIQUE KEY uk_schedule_class_slot (time_slot_id, class_id, deleted)"));
         assertFalse(all.contains("ADD UNIQUE KEY uk_schedule_classroom_slot (time_slot_id, classroom_id, deleted)"));
@@ -81,5 +83,9 @@ class DatabaseSchemaScriptTest {
             assertNotNull(inputStream, "Missing resource " + path);
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         }
+    }
+
+    private int count(String source, String needle) {
+        return source.split(java.util.regex.Pattern.quote(needle), -1).length - 1;
     }
 }
