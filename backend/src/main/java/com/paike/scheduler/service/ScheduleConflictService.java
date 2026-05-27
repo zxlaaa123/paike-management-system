@@ -54,7 +54,7 @@ public class ScheduleConflictService {
      */
     public String checkConflict(Long taskId, Long timeSlotId, Long classroomId, Long excludeScheduleId) {
         TeachingTask task = teachingTaskMapper.selectById(taskId);
-        if (task == null || task.getDeleted() == 1) {
+        if (task == null || Integer.valueOf(1).equals(task.getDeleted())) {
             return tagReason("TASK_NOT_FOUND", "所选教学任务不存在");
         }
         TimeSlot timeSlot = timeSlotMapper.selectById(timeSlotId);
@@ -62,7 +62,7 @@ public class ScheduleConflictService {
             return tagReason("TIME_SLOT_NOT_FOUND", "所选时间段不存在");
         }
         Classroom classroom = classroomMapper.selectById(classroomId);
-        if (classroom == null || classroom.getDeleted() == 1) {
+        if (classroom == null || Integer.valueOf(1).equals(classroom.getDeleted())) {
             return tagReason("CLASSROOM_NOT_FOUND", "所选教室不存在");
         }
 
@@ -71,7 +71,7 @@ public class ScheduleConflictService {
         ClassInfo classInfo = classInfoMapper.selectById(task.getClassId());
 
         // 1. 停用教师不能参与排课
-        if (teacher != null && teacher.getStatus() != 1) {
+        if (teacher != null && !Integer.valueOf(1).equals(teacher.getStatus())) {
             return tagReason("TEACHER_DISABLED", "排课失败:" + teacher.getName() + "老师已停用,不能参与排课");
         }
         // 1.5 教师禁排时间检查（teacher 可能因被软删而为 null，需要兜底显示名）
@@ -80,15 +80,21 @@ public class ScheduleConflictService {
             return tagReason("TEACHER_UNAVAILABLE", "排课失败:" + displayName + "在" + timeSlot.getTimeLabel() + "设置了禁排时间");
         }
         // 2. 停用班级不能参与排课
-        if (classInfo != null && classInfo.getStatus() != 1) {
+        if (classInfo != null && !Integer.valueOf(1).equals(classInfo.getStatus())) {
             return tagReason("CLASS_DISABLED", "排课失败:" + classInfo.getClassName() + "已停用,不能参与排课");
         }
         // 3. 停用教室不能参与排课
-        if (classroom.getStatus() != 1) {
+        if (!Integer.valueOf(1).equals(classroom.getStatus())) {
             return tagReason("CLASSROOM_DISABLED", "排课失败:" + classroom.getRoomName() + "教室已停用,不能参与排课");
         }
 
         // 4. 班级人数不能大于教室容量
+        if (classInfo != null && classInfo.getStudentCount() == null) {
+            return tagReason("CLASSROOM_CAPACITY_NOT_ENOUGH", "排课失败:" + classInfo.getClassName() + "人数未配置");
+        }
+        if (classInfo != null && classroom.getCapacity() == null) {
+            return tagReason("CLASSROOM_CAPACITY_NOT_ENOUGH", "排课失败:" + classroom.getRoomName() + "教室容量未配置");
+        }
         if (classInfo != null && classroom.getCapacity() < classInfo.getStudentCount()) {
             return tagReason("CLASSROOM_CAPACITY_NOT_ENOUGH", "排课失败:" + classInfo.getClassName() + "人数为" + classInfo.getStudentCount() + ",当前教室容量为" + classroom.getCapacity());
         }
@@ -135,17 +141,17 @@ public class ScheduleConflictService {
             TeachingTask existingTask = existingTaskMap.get(s.getTeachingTaskId());
 
             // 7. 同一教师同一时间不能有两门课
-            if (existingTask != null && existingTask.getTeacherId().equals(teacherId)) {
+            if (existingTask != null && Objects.equals(existingTask.getTeacherId(), teacherId)) {
                 return tagReason("TEACHER_CONFLICT", "排课失败:" + teacherName + "老师在" + timeLabel + "已有课程");
             }
 
             // 8. 同一班级同一时间不能有两门课
-            if (existingTask != null && existingTask.getClassId().equals(classId)) {
+            if (existingTask != null && Objects.equals(existingTask.getClassId(), classId)) {
                 return tagReason("CLASS_CONFLICT", "排课失败:" + className + "在" + timeLabel + "已有课程");
             }
 
             // 9. 同一教室同一时间不能安排两门课
-            if (s.getClassroomId().equals(classroomId)) {
+            if (Objects.equals(s.getClassroomId(), classroomId)) {
                 return tagReason("ROOM_CONFLICT", "排课失败:" + classroom.getRoomName() + "教室在" + timeLabel + "已被占用");
             }
         }

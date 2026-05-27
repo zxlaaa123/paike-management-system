@@ -35,13 +35,22 @@ public class V5Stage1DataService {
 
     @Transactional(rollbackFor = Exception.class)
     public V5RepairTaskVo createRepairTask(V5RepairTaskCreateRequest request) {
+        String taskCode = trimToNull(request.getTaskCode());
+        if (taskCode == null) {
+            throw new BusinessException("任务编号不能为空");
+        }
+        String taskType = trimToNull(request.getTaskType());
+        if (taskType == null) {
+            throw new BusinessException("任务类型不能为空");
+        }
+
         ScheduleRepairTask task = new ScheduleRepairTask();
         task.setSemesterId(request.getSemesterId());
         task.setPlanId(request.getPlanId());
         task.setSourcePlanId(request.getSourcePlanId());
         task.setSourceScheduleId(request.getSourceScheduleId());
-        task.setTaskCode(request.getTaskCode().trim());
-        task.setTaskType(request.getTaskType().trim().toUpperCase(Locale.ROOT));
+        task.setTaskCode(taskCode);
+        task.setTaskType(taskType.toUpperCase(Locale.ROOT));
         task.setStatus(V5RepairTaskStatus.CREATED.getCode());
         task.setTriggerSource(normalizeOrDefault(request.getTriggerSource(), "MANUAL"));
         task.setRiskTypes(trimToNull(request.getRiskTypes()));

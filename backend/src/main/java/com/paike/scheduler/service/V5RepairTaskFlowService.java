@@ -48,6 +48,11 @@ public class V5RepairTaskFlowService {
 
     @Transactional(rollbackFor = Exception.class)
     public V5RepairTaskDetailVo createTask(V5RepairTaskFlowCreateRequest request) {
+        String taskType = trimToNull(request.getTaskType());
+        if (taskType == null) {
+            throw new BusinessException("任务类型不能为空");
+        }
+
         if (request.getPlanId() == null && request.getSourceScheduleId() == null) {
             throw new BusinessException("修复任务至少需要绑定方案或正式课表");
         }
@@ -84,7 +89,7 @@ public class V5RepairTaskFlowService {
         task.setSourceScheduleId(request.getSourceScheduleId());
         task.setTaskCode("RPT-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT));
         task.setTitle(trimToNull(request.getTitle()));
-        task.setTaskType(request.getTaskType().trim().toUpperCase(Locale.ROOT));
+        task.setTaskType(taskType.toUpperCase(Locale.ROOT));
         task.setStatus(V5RepairTaskStatus.CREATED.getCode());
         task.setTriggerSource(trimToNull(request.getTriggerSource()) == null ? "MANUAL" : request.getTriggerSource().trim().toUpperCase(Locale.ROOT));
         task.setRiskTypes(writeJson(request.getRiskTypes() == null ? List.of() : request.getRiskTypes()));
@@ -280,4 +285,3 @@ public class V5RepairTaskFlowService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 }
-

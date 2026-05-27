@@ -107,6 +107,11 @@ public class SchedulePlanService {
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> adjustPlanItem(Long itemId, SchedulePlanItemAdjustRequest request) {
+        if (request.getAdjustReason() == null || request.getAdjustReason().trim().isEmpty()) {
+            throw new BusinessException("调整原因不能为空");
+        }
+        String adjustReason = request.getAdjustReason().trim();
+
         SchedulePlanItem item = planItemMapper.selectById(itemId);
         if (item == null) {
             throw new BusinessException("方案明细不存在");
@@ -178,7 +183,7 @@ public class SchedulePlanService {
         log.setBeforeScore(beforeScore);
         log.setAfterScore(normalizeScore(refreshedPlan.getTotalScore()));
         log.setConflictFlag(refreshedItem.getConflictFlag());
-        log.setAdjustReason(request.getAdjustReason().trim());
+        log.setAdjustReason(adjustReason);
         explainService.appendAdjustLog(log);
 
         Map<String, Object> result = new LinkedHashMap<>();
