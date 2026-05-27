@@ -23,10 +23,7 @@ public class ScheduleConflictService {
      */
     private final ScheduleMapper scheduleMapper;
     private final TeachingTaskMapper teachingTaskMapper;
-    private final TeacherMapper teacherMapper;
-    private final ClassInfoMapper classInfoMapper;
     private final ClassroomMapper classroomMapper;
-    private final CourseMapper courseMapper;
     private final TimeSlotMapper timeSlotMapper;
     private final TeacherUnavailableTimeService unavailableTimeService;
     private final ScheduleRuleService ruleService;
@@ -53,8 +50,8 @@ public class ScheduleConflictService {
      * @return null 表示无冲突,否则返回冲突描述信息
      */
     public String checkConflict(Long taskId, Long timeSlotId, Long classroomId, Long excludeScheduleId) {
-        TeachingTask task = teachingTaskMapper.selectById(taskId);
-        if (task == null || Integer.valueOf(1).equals(task.getDeleted())) {
+        TeachingTask task = teachingTaskMapper.selectConflictCheckById(taskId);
+        if (task == null) {
             return tagReason("TASK_NOT_FOUND", "所选教学任务不存在");
         }
         TimeSlot timeSlot = timeSlotMapper.selectById(timeSlotId);
@@ -66,22 +63,18 @@ public class ScheduleConflictService {
             return tagReason("CLASSROOM_NOT_FOUND", "所选教室不存在");
         }
 
-        Course course = courseMapper.selectById(task.getCourseId());
-        Teacher teacher = teacherMapper.selectById(task.getTeacherId());
-        ClassInfo classInfo = classInfoMapper.selectById(task.getClassId());
-
         // 1. 停用教师不能参与排课
-        if (teacher != null && !Integer.valueOf(1).equals(teacher.getStatus())) {
-            return tagReason("TEACHER_DISABLED", "排课失败:" + teacher.getName() + "老师已停用,不能参与排课");
+        if (task.getTeacherStatus() != null && !Integer.valueOf(1).equals(task.getTeacherStatus())) {
+            return tagReason("TEACHER_DISABLED", "排课失败:" + task.getTeacherName() + "老师已停用,不能参与排课");
         }
         // 1.5 教师禁排时间检查（teacher 可能因被软删而为 null，需要兜底显示名）
         if (unavailableTimeService.isUnavailable(task.getTeacherId(), timeSlotId)) {
-            String displayName = teacher != null ? teacher.getName() + "老师" : "该教师";
+            String displayName = task.getTeacherName() != null ? task.getTeacherName() + "老师" : "该教师";
             return tagReason("TEACHER_UNAVAILABLE", "排课失败:" + displayName + "在" + timeSlot.getTimeLabel() + "设置了禁排时间");
         }
         // 2. 停用班级不能参与排课
-        if (classInfo != null && !Integer.valueOf(1).equals(classInfo.getStatus())) {
-            return tagReason("CLASS_DISABLED", "排课失败:" + classInfo.getClassName() + "已停用,不能参与排课");
+        if (task.getClassStatus() != null && !Integer.valueOf(1).equals(task.getClassStatus())) {
+            return tagReason("CLASS_DISABLED", "排课失败:" + task.getClassName() + "已停用,不能参与排课");
         }
         // 3. 停用教室不能参与排课
         if (!Integer.valueOf(1).equals(classroom.getStatus())) {
@@ -89,23 +82,23 @@ public class ScheduleConflictService {
         }
 
         // 4. 班级人数不能大于教室容量
-        if (classInfo != null && classInfo.getStudentCount() == null) {
-            return tagReason("CLASSROOM_CAPACITY_NOT_ENOUGH", "排课失败:" + classInfo.getClassName() + "人数未配置");
+        if (task.getClassId() != null && task.getStudentCount() == null) {
+            return tagReason("CLASSROOM_CAPACITY_NOT_ENOUGH", "排课失败:" + task.getClassName() + "人数未配置");
         }
-        if (classInfo != null && classroom.getCapacity() == null) {
+        if (task.getClassId() != null && classroom.getCapacity() == null) {
             return tagReason("CLASSROOM_CAPACITY_NOT_ENOUGH", "排课失败:" + classroom.getRoomName() + "教室容量未配置");
         }
-        if (classInfo != null && classroom.getCapacity() < classInfo.getStudentCount()) {
-            return tagReason("CLASSROOM_CAPACITY_NOT_ENOUGH", "排课失败:" + classInfo.getClassName() + "人数为" + classInfo.getStudentCount() + ",当前教室容量为" + classroom.getCapacity());
+        if (task.getStudentCount() != null && classroom.getCapacity() != null && classroom.getCapacity() < task.getStudentCount()) {
+            return tagReason("CLASSROOM_CAPACITY_NOT_ENOUGH", "排课失败:" + task.getClassName() + "人数为" + task.getStudentCount() + ",当前教室容量为" + classroom.getCapacity());
         }
 
         // 5. 实验课必须安排在实验室
-        if (course != null && CourseType.EXPERIMENT.getCode().equals(course.getCourseType())
+        if (CourseType.EXPERIMENT.getCode().equals(task.getCourseType())
                 && !RoomType.LAB.getCode().equals(classroom.getRoomType())) {
             return tagReason("ROOM_TYPE_MISMATCH", "排课失败:实验课必须安排在实验室");
         }
         // 6. 机房课必须安排在机房
-        if (course != null && CourseType.COMPUTER.getCode().equals(course.getCourseType())
+        if (CourseType.COMPUTER.getCode().equals(task.getCourseType())
                 && !RoomType.COMPUTER.getCode().equals(classroom.getRoomType())) {
             return tagReason("ROOM_TYPE_MISMATCH", "排课失败:机房课必须安排在机房");
         }
@@ -122,8 +115,8 @@ public class ScheduleConflictService {
         List<Schedule> existingSchedules = scheduleMapper.selectList(baseWrapper);
 
         String timeLabel = timeSlot.getTimeLabel();
-        String teacherName = teacher != null ? teacher.getName() : "";
-        String className = classInfo != null ? classInfo.getClassName() : "";
+        String teacherName = task.getTeacherName() != null ? task.getTeacherName() : "";
+        String className = task.getClassName() != null ? task.getClassName() : "";
         Long teacherId = task.getTeacherId();
         Long classId = task.getClassId();
 

@@ -28,4 +28,22 @@
         ORDER BY tt.create_time DESC
     </select>
 
+    <select id="selectConflictCheckById" resultType="com.paike.scheduler.entity.TeachingTask">
+        SELECT
+            tt.*,
+            c.course_type AS courseType,
+            t.name AS teacherName,
+            t.status AS teacherStatus,
+            cl.class_name AS className,
+            cl.status AS classStatus,
+            cl.student_count AS studentCount
+        FROM teaching_task tt
+        LEFT JOIN course c ON tt.course_id = c.id AND c.deleted = 0
+        LEFT JOIN teacher t ON tt.teacher_id = t.id AND t.deleted = 0
+        LEFT JOIN class_info cl ON tt.class_id = cl.id AND cl.deleted = 0
+        WHERE tt.id = #{id}
+            AND tt.deleted = 0
+        LIMIT 1
+    </select>
+
 </mapper>

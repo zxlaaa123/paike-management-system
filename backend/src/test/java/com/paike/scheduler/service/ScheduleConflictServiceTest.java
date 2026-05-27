@@ -14,20 +14,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ScheduleConflictServiceTest {
 
     private ScheduleMapper scheduleMapper;
     private TeachingTaskMapper teachingTaskMapper;
-    private TeacherMapper teacherMapper;
-    private ClassInfoMapper classInfoMapper;
     private ClassroomMapper classroomMapper;
     private TimeSlotMapper timeSlotMapper;
     private TeacherUnavailableTimeService unavailableTimeService;
     private ScheduleConflictService service;
     private Classroom classroom;
-    private ClassInfo classInfo;
 
     @BeforeEach
     void setUp() {
@@ -36,18 +35,13 @@ class ScheduleConflictServiceTest {
                 Schedule.class);
         scheduleMapper = mock(ScheduleMapper.class);
         teachingTaskMapper = mock(TeachingTaskMapper.class);
-        teacherMapper = mock(TeacherMapper.class);
-        classInfoMapper = mock(ClassInfoMapper.class);
         classroomMapper = mock(ClassroomMapper.class);
         timeSlotMapper = mock(TimeSlotMapper.class);
         unavailableTimeService = mock(TeacherUnavailableTimeService.class);
         service = new ScheduleConflictService(
                 scheduleMapper,
                 teachingTaskMapper,
-                teacherMapper,
-                classInfoMapper,
                 classroomMapper,
-                mock(CourseMapper.class),
                 timeSlotMapper,
                 unavailableTimeService,
                 mock(ScheduleRuleService.class));
@@ -89,6 +83,18 @@ class ScheduleConflictServiceTest {
         assertEquals("[ROOM_CONFLICT]排课失败:A101教室在周一第一节已被占用", reason);
     }
 
+    @Test
+    void checkConflict_loadsTaskRelatedResourcesWithSingleDetailQuery() {
+        when(scheduleMapper.selectList(any())).thenReturn(List.of());
+        when(scheduleMapper.selectCount(any())).thenReturn(0L);
+
+        String reason = service.checkConflict(1L, 2L, 3L, null);
+
+        assertEquals("[TASK_NOT_FULLY_SCHEDULED]排课失败:该教学任务每周课时为0学时,最多排0个大节,当前已排0个大节", reason);
+        verify(teachingTaskMapper).selectConflictCheckById(1L);
+        verify(teachingTaskMapper, never()).selectById(1L);
+    }
+
     private void seedActiveResources() {
         TeachingTask task = new TeachingTask();
         task.setId(1L);
@@ -97,16 +103,14 @@ class ScheduleConflictServiceTest {
         task.setClassId(20L);
         task.setCourseId(30L);
         task.setSemesterId(40L);
+        task.setTeacherName("张");
+        task.setTeacherStatus(1);
+        task.setClassName("软件一班");
+        task.setClassStatus(1);
+        task.setStudentCount(40);
         TimeSlot timeSlot = new TimeSlot();
         timeSlot.setId(2L);
         timeSlot.setTimeLabel("周一第一节");
-        Teacher teacher = new Teacher();
-        teacher.setStatus(1);
-        teacher.setName("张");
-        classInfo = new ClassInfo();
-        classInfo.setStatus(1);
-        classInfo.setStudentCount(40);
-        classInfo.setClassName("软件一班");
         classroom = new Classroom();
         classroom.setId(3L);
         classroom.setDeleted(0);
@@ -114,11 +118,9 @@ class ScheduleConflictServiceTest {
         classroom.setCapacity(50);
         classroom.setRoomName("A101");
 
-        when(teachingTaskMapper.selectById(1L)).thenReturn(task);
+        when(teachingTaskMapper.selectConflictCheckById(1L)).thenReturn(task);
         when(timeSlotMapper.selectById(2L)).thenReturn(timeSlot);
         when(classroomMapper.selectById(3L)).thenReturn(classroom);
-        when(teacherMapper.selectById(10L)).thenReturn(teacher);
-        when(classInfoMapper.selectById(20L)).thenReturn(classInfo);
         when(unavailableTimeService.isUnavailable(10L, 2L)).thenReturn(false);
     }
 }
