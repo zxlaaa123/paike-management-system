@@ -3,6 +3,7 @@ import type { ApiResponse, PageResult } from './types'
 
 export interface ScheduleScoreReport {
   id: number
+  semesterId: number
   score: number
   grade: string
   gradeName: string
@@ -29,8 +30,8 @@ export interface ScheduleScoreResult {
   suggestion: string[]
 }
 
-export function generateScheduleScore() {
-  return request.post<ApiResponse<ScheduleScoreResult>>('/schedule-score/generate', {})
+export function generateScheduleScore(semesterId?: number) {
+  return request.post<ApiResponse<ScheduleScoreResult>>('/schedule-score/generate', {}, { params: { semesterId } })
     .then((r) => {
       if (!r.data) {
         throw new Error('响应数据为空')
@@ -39,8 +40,8 @@ export function generateScheduleScore() {
     })
 }
 
-export function getLatestScheduleScore() {
-  return request.get<ApiResponse<ScheduleScoreReport>>('/schedule-score/latest')
+export function getLatestScheduleScore(semesterId?: number) {
+  return request.get<ApiResponse<ScheduleScoreReport>>('/schedule-score/latest', { params: { semesterId } })
     .then((r) => {
       if (!r.data) {
         throw new Error('响应数据为空')
@@ -50,6 +51,7 @@ export function getLatestScheduleScore() {
 }
 
 export function getScheduleScoreHistory(params: {
+  semesterId?: number
   grade?: string
   startTime?: string
   endTime?: string

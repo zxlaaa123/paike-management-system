@@ -18,23 +18,28 @@ public class ScheduleScoreReportController {
     private final ScheduleScoreReportService scheduleScoreReportService;
 
     @PostMapping("/generate")
-    public Result<ScheduleScoreReportService.ScoreResult> generate() {
-        return Result.success(scheduleScoreReportService.generate());
+    public Result<ScheduleScoreReportService.ScoreResult> generate(
+            @RequestParam(required = false) Long semesterId
+    ) {
+        return Result.success(scheduleScoreReportService.generate(semesterId));
     }
 
     @GetMapping("/latest")
-    public Result<ScheduleScoreReport> latest() {
-        return Result.success(scheduleScoreReportService.getLatest());
+    public Result<ScheduleScoreReport> latest(
+            @RequestParam(required = false) Long semesterId
+    ) {
+        return Result.success(scheduleScoreReportService.getLatest(semesterId));
     }
 
     @GetMapping("/reports")
     public Result<Page<ScheduleScoreReport>> list(
+            @RequestParam(required = false) Long semesterId,
             @RequestParam(required = false) String grade,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return Result.success(scheduleScoreReportService.list(grade, startTime, endTime, page, size));
+        return Result.success(scheduleScoreReportService.list(semesterId, grade, startTime, endTime, page, size));
     }
 }

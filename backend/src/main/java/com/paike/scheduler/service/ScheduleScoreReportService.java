@@ -41,15 +41,28 @@ public class ScheduleScoreReportService {
     private final TimeSlotMapper timeSlotMapper;
     private final TeacherUnavailableTimeMapper unavailableTimeMapper;
     private final ScheduleRuleService ruleService;
+    private final SemesterService semesterService;
 
     public ScheduleScoreReport getLatest() {
+        return getLatest(null);
+    }
+
+    public ScheduleScoreReport getLatest(Long semesterId) {
+        Long effectiveSemesterId = resolveSemesterId(semesterId);
         return scoreReportMapper.selectOne(new LambdaQueryWrapper<ScheduleScoreReport>()
+                .eq(ScheduleScoreReport::getSemesterId, effectiveSemesterId)
                 .orderByDesc(ScheduleScoreReport::getCreateTime)
                 .last("LIMIT 1"));
     }
 
     public Page<ScheduleScoreReport> list(String grade, LocalDateTime startTime, LocalDateTime endTime, int page, int size) {
+        return list(null, grade, startTime, endTime, page, size);
+    }
+
+    public Page<ScheduleScoreReport> list(Long semesterId, String grade, LocalDateTime startTime, LocalDateTime endTime, int page, int size) {
+        Long effectiveSemesterId = resolveSemesterId(semesterId);
         LambdaQueryWrapper<ScheduleScoreReport> wrapper = new LambdaQueryWrapper<ScheduleScoreReport>()
+                .eq(ScheduleScoreReport::getSemesterId, effectiveSemesterId)
                 .orderByDesc(ScheduleScoreReport::getCreateTime);
         if (grade != null && !grade.isBlank()) {
             wrapper.eq(ScheduleScoreReport::getGrade, grade.trim());
@@ -68,10 +81,17 @@ public class ScheduleScoreReportService {
      */
     @Transactional(rollbackFor = Exception.class)
     public ScoreResult generate() {
-        List<Schedule> schedules = scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
-                .eq(Schedule::getDeleted, 0));
+        return generate(null);
+    }
 
-        Context context = buildContext(schedules);
+    @Transactional(rollbackFor = Exception.class)
+    public ScoreResult generate(Long semesterId) {
+        Long effectiveSemesterId = resolveSemesterId(semesterId);
+        List<Schedule> schedules = scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getDeleted, 0)
+                .eq(Schedule::getSemesterId, effectiveSemesterId));
+
+        Context context = buildContext(effectiveSemesterId, schedules);
 
         int hardConflictCount = countHardConflicts(context);
         int unfinishedTaskCount = countUnfinishedTasks(context);
@@ -96,6 +116,7 @@ public class ScheduleScoreReportService {
                 classOverloadCount, fridayAfternoonCount);
 
         ScheduleScoreReport report = new ScheduleScoreReport();
+        report.setSemesterId(effectiveSemesterId);
         report.setScore(score);
         report.setGrade(grade);
         report.setGradeName(gradeNameText(grade));
@@ -127,7 +148,7 @@ public class ScheduleScoreReportService {
      * 把评分过程中会重复使用的基础数据一次性查出，避免后续各项统计重复访问数据库。
      * 同时把“已排课数据”和“全部启用中的教学任务”放到同一上下文里，便于判断未排满任务。
      */
-    private Context buildContext(List<Schedule> schedules) {
+    private Context buildContext(Long semesterId, List<Schedule> schedules) {
         Context context = new Context();
         context.schedules = schedules;
 
@@ -138,7 +159,8 @@ public class ScheduleScoreReportService {
 
         List<TeachingTask> allTasks = teachingTaskMapper.selectList(new LambdaQueryWrapper<TeachingTask>()
                 .eq(TeachingTask::getDeleted, 0)
-                .eq(TeachingTask::getStatus, 1));
+                .eq(TeachingTask::getStatus, 1)
+                .eq(TeachingTask::getSemesterId, semesterId));
         context.taskMap = allTasks.stream().collect(Collectors.toMap(TeachingTask::getId, Function.identity(), (a, b) -> a));
 
         classIds = new ArrayList<>(classIds);
@@ -166,6 +188,14 @@ public class ScheduleScoreReportService {
         context.teacherDailyLimit = ruleService.getIntValue("TEACHER_MAX_DAILY_SLOTS");
         context.classDailyLimit = ruleService.getIntValue("CLASS_MAX_DAILY_SLOTS");
         return context;
+    }
+
+    private Long resolveSemesterId(Long semesterId) {
+        if (semesterId != null) {
+            semesterService.getById(semesterId);
+            return semesterId;
+        }
+        return semesterService.getCurrentSemester().getId();
     }
 
     /**

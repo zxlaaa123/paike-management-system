@@ -4,6 +4,7 @@ import lombok.Getter;
 
 @Getter
 public enum V5RepairTaskStatus {
+    PENDING("PENDING"),
     CREATED("CREATED"),
     ANALYZING("ANALYZING"),
     SUGGESTED("SUGGESTED"),
