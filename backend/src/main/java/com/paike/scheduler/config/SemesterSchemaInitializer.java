@@ -221,7 +221,8 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
                     reason_code VARCHAR(100) NOT NULL COMMENT '未排原因编码',
                     reason_message VARCHAR(1000) NOT NULL COMMENT '未排原因说明',
                     suggestion VARCHAR(1000) NULL COMMENT '处理建议',
-                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除'
                 ) COMMENT='未排任务原因表'
                 """);
             ensureIndex("schedule_unassigned_task", "idx_unassigned_plan", "CREATE INDEX idx_unassigned_plan ON schedule_unassigned_task(plan_id)");
@@ -254,7 +255,8 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
                     after_score DECIMAL(6,2) NULL COMMENT '调整后总分',
                     conflict_flag TINYINT NOT NULL DEFAULT 0 COMMENT '调整后是否冲突',
                     adjust_reason VARCHAR(500) NULL COMMENT '调整原因',
-                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除'
                 ) COMMENT='手动调整日志表'
                 """);
             ensureIndex("schedule_adjust_log", "idx_adjust_plan", "CREATE INDEX idx_adjust_plan ON schedule_adjust_log(plan_id)");
@@ -280,7 +282,8 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
                     active_key BIGINT GENERATED ALWAYS AS (CASE WHEN active_flag = 1 THEN 0 ELSE NULL END) STORED,
                     unlocked_at DATETIME NULL COMMENT '取消锁定时间',
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除'
                 ) COMMENT='课程锁定记录表'
                 """);
             Integer activeKeyCount = jdbcTemplate.queryForObject(
