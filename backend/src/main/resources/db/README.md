@@ -76,6 +76,7 @@ Spring Boot 启动时依次执行：
 | `v11_soft_delete_three_tables.sql` | 锁定、调整日志、未排任务软删除字段补齐 |
 | `v12_system_audit_log.sql` | V6 第一阶段：新增 `system_audit_log` 审计日志表 |
 | `v14_missing_v4_v5_tables_and_schedule_keys.sql` | C-21/C-22：固化 5 张 V4/V5 表 DDL，修正 `schedule` 软删除安全唯一键 |
+| `v15_sys_user_role.sql` | C-17：给 `sys_user` 增加 `role`，内置 `admin` 标记为 `ADMIN` |
 
 ---
 

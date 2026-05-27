@@ -25,6 +25,8 @@ public class SecurityHeadersFilter implements Filter {
             httpResponse.setHeader("X-Content-Type-Options", "nosniff");
             httpResponse.setHeader("X-Frame-Options", "DENY");
             httpResponse.setHeader("Referrer-Policy", "same-origin");
+            httpResponse.setHeader("Content-Security-Policy",
+                    "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'");
 
             if (request instanceof HttpServletRequest httpRequest && httpRequest.isSecure()) {
                 httpResponse.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");

@@ -10,6 +10,7 @@ export interface UserInfo {
   id: number
   username: string
   realName: string
+  role: 'ADMIN' | 'USER' | string
 }
 
 export interface LoginResponse {

@@ -19,6 +19,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class AuthInterceptor implements HandlerInterceptor {
 
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String ROLE_ADMIN = "ADMIN";
     private final JwtService jwtService;
     private final SysUserMapper sysUserMapper;
 
@@ -70,6 +71,9 @@ public class AuthInterceptor implements HandlerInterceptor {
             if (user == null || !Integer.valueOf(1).equals(user.getStatus())) {
                 throw new BusinessException(401, "未登录或登录已过期");
             }
+            if (requiresAdmin(request) && !ROLE_ADMIN.equalsIgnoreCase(user.getRole())) {
+                throw new BusinessException(403, "当前用户无权执行该操作");
+            }
             AuthUserContext.set(user);
             return true;
         } catch (BusinessException ex) {
@@ -86,6 +90,21 @@ public class AuthInterceptor implements HandlerInterceptor {
             if (name.equals(c.getName())) return c.getValue();
         }
         return null;
+    }
+
+    private static boolean requiresAdmin(HttpServletRequest request) {
+        if (!isStateChanging(request.getMethod())) {
+            return false;
+        }
+        String path = request.getRequestURI();
+        return !"/api/auth/logout".equals(path);
+    }
+
+    private static boolean isStateChanging(String method) {
+        return "POST".equalsIgnoreCase(method)
+                || "PUT".equalsIgnoreCase(method)
+                || "DELETE".equalsIgnoreCase(method)
+                || "PATCH".equalsIgnoreCase(method);
     }
 
     @Override

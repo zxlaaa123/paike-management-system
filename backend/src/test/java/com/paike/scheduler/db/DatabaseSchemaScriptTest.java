@@ -64,6 +64,18 @@ class DatabaseSchemaScriptTest {
         assertTrue(application.contains("classpath:db/v14_missing_v4_v5_tables_and_schedule_keys.sql"));
     }
 
+    @Test
+    void sysUserRoleMigrationIsRegistered() throws IOException {
+        String schema = resource("db/schema.sql");
+        String migration = resource("db/v15_sys_user_role.sql");
+        String application = resource("application.yml");
+
+        assertTrue(schema.contains("role VARCHAR(20) NOT NULL DEFAULT 'USER'"));
+        assertTrue(migration.contains("ALTER TABLE sys_user ADD COLUMN role"));
+        assertTrue(migration.contains("SET role = 'ADMIN'"));
+        assertTrue(application.contains("classpath:db/v15_sys_user_role.sql"));
+    }
+
     private String resource(String path) throws IOException {
         try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(path)) {
             assertNotNull(inputStream, "Missing resource " + path);
