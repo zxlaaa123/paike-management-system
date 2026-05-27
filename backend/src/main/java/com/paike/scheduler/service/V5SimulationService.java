@@ -778,8 +778,9 @@ public class V5SimulationService {
         List<SchedulePlanItem> simulationItems = loadCompareItems(simulation);
         Map<Long, SchedulePlanItem> baselineTaskMap = indexByTeachingTaskId(baselineItems);
         Map<Long, SchedulePlanItem> simulationTaskMap = indexByTeachingTaskId(simulationItems);
+        Map<Long, String> classroomNames = loadClassroomNames(baselineItems, simulationItems, before, after);
         Set<Long> changedLockedItemIds = findChangedLockedItemIds(baseline, baselineTaskMap, simulationTaskMap);
-        List<V5SimulationItemChangeVo> changedItems = buildChangedItems(baselineTaskMap, simulationTaskMap, before, after);
+        List<V5SimulationItemChangeVo> changedItems = buildChangedItems(baselineTaskMap, simulationTaskMap, before, after, classroomNames);
 
         V5SimulationCompareVo vo = new V5SimulationCompareVo();
         vo.setBaselineSemesterId(baseline == null ? null : baseline.getSemesterId());
@@ -821,7 +822,7 @@ public class V5SimulationService {
         vo.setResolvedRisks(diffRisks(baselineRisks, simulationRisks));
         vo.setTeacherLoadChanges(buildLoadChanges(baselineItems, simulationItems, SchedulePlanItem::getTeacherId, SchedulePlanItem::getTeacherName));
         vo.setClassLoadChanges(buildLoadChanges(baselineItems, simulationItems, SchedulePlanItem::getClassId, SchedulePlanItem::getClassName));
-        vo.setRoomUtilizationChanges(buildRoomUtilizationChanges(baselineItems, simulationItems));
+        vo.setRoomUtilizationChanges(buildRoomUtilizationChanges(baselineItems, simulationItems, classroomNames));
         int newHardConflictCount = Math.max(0, vo.getSimulationConflictCount() - vo.getBaselineConflictCount());
         vo.setNewHardConflictCount(newHardConflictCount);
         vo.setHasNewHardConflicts(newHardConflictCount > 0);
@@ -832,7 +833,11 @@ public class V5SimulationService {
         return vo;
     }
 
-    private V5SimulationItemChangeVo buildItemChange(SchedulePlanItem before, SchedulePlanItem after) {
+    private V5SimulationItemChangeVo buildItemChange(
+            SchedulePlanItem before,
+            SchedulePlanItem after,
+            Map<Long, String> classroomNames
+    ) {
         V5SimulationItemChangeVo vo = new V5SimulationItemChangeVo();
         vo.setSourceItemId(before.getId());
         vo.setSimulationItemId(after.getId());
@@ -843,12 +848,12 @@ public class V5SimulationService {
         vo.setBeforeStartPeriod(before.getStartPeriod());
         vo.setBeforeEndPeriod(before.getEndPeriod());
         vo.setBeforeClassroomId(before.getClassroomId());
-        vo.setBeforeClassroomName(classroomName(before.getClassroomId()));
+        vo.setBeforeClassroomName(classroomName(before.getClassroomId(), classroomNames));
         vo.setAfterWeekday(after.getWeekday());
         vo.setAfterStartPeriod(after.getStartPeriod());
         vo.setAfterEndPeriod(after.getEndPeriod());
         vo.setAfterClassroomId(after.getClassroomId());
-        vo.setAfterClassroomName(classroomName(after.getClassroomId()));
+        vo.setAfterClassroomName(classroomName(after.getClassroomId(), classroomNames));
         vo.setConflictFlag(after.getConflictFlag());
         vo.setConflictReason(after.getConflictReason());
         return vo;
@@ -918,18 +923,19 @@ public class V5SimulationService {
             Map<Long, SchedulePlanItem> baselineTaskMap,
             Map<Long, SchedulePlanItem> simulationTaskMap,
             SchedulePlanItem acceptedBefore,
-            SchedulePlanItem acceptedAfter
+            SchedulePlanItem acceptedAfter,
+            Map<Long, String> classroomNames
     ) {
         Map<Long, V5SimulationItemChangeVo> changed = new LinkedHashMap<>();
         for (Map.Entry<Long, SchedulePlanItem> entry : simulationTaskMap.entrySet()) {
             SchedulePlanItem source = baselineTaskMap.get(entry.getKey());
             SchedulePlanItem target = entry.getValue();
             if (source != null && hasPlacementChanged(source, target)) {
-                changed.put(entry.getKey(), buildItemChange(source, target));
+                changed.put(entry.getKey(), buildItemChange(source, target, classroomNames));
             }
         }
         if (acceptedBefore != null && acceptedAfter != null && acceptedAfter.getTeachingTaskId() != null) {
-            changed.putIfAbsent(acceptedAfter.getTeachingTaskId(), buildItemChange(acceptedBefore, acceptedAfter));
+            changed.putIfAbsent(acceptedAfter.getTeachingTaskId(), buildItemChange(acceptedBefore, acceptedAfter, classroomNames));
         }
         return new ArrayList<>(changed.values());
     }
@@ -1062,7 +1068,8 @@ public class V5SimulationService {
 
     private List<V5SimulationRoomUtilizationChangeVo> buildRoomUtilizationChanges(
             List<SchedulePlanItem> baselineItems,
-            List<SchedulePlanItem> simulationItems
+            List<SchedulePlanItem> simulationItems,
+            Map<Long, String> classroomNames
     ) {
         int totalPeriods = Math.max(1, timeSlotMapper.selectList(null).size() * 2);
         Map<Long, Integer> baselineLoads = aggregateLoad(baselineItems, SchedulePlanItem::getClassroomId);
@@ -1079,7 +1086,7 @@ public class V5SimulationService {
             }
             V5SimulationRoomUtilizationChangeVo vo = new V5SimulationRoomUtilizationChangeVo();
             vo.setClassroomId(roomId);
-            vo.setClassroomName(classroomName(roomId));
+            vo.setClassroomName(classroomName(roomId, classroomNames));
             vo.setBaselineUsedPeriods(baselineLoad);
             vo.setSimulationUsedPeriods(simulationLoad);
             vo.setDeltaPeriods(simulationLoad - baselineLoad);
@@ -1225,10 +1232,40 @@ public class V5SimulationService {
         }
     }
 
-    private String classroomName(Long classroomId) {
+    private Map<Long, String> loadClassroomNames(
+            List<SchedulePlanItem> baselineItems,
+            List<SchedulePlanItem> simulationItems,
+            SchedulePlanItem before,
+            SchedulePlanItem after
+    ) {
+        Set<Long> ids = new LinkedHashSet<>();
+        addClassroomIds(ids, baselineItems);
+        addClassroomIds(ids, simulationItems);
+        if (before != null && before.getClassroomId() != null) {
+            ids.add(before.getClassroomId());
+        }
+        if (after != null && after.getClassroomId() != null) {
+            ids.add(after.getClassroomId());
+        }
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return classroomMapper.selectBatchIds(ids).stream()
+                .filter(classroom -> classroom.getId() != null)
+                .collect(Collectors.toMap(Classroom::getId, Classroom::getRoomName, (a, b) -> a));
+    }
+
+    private void addClassroomIds(Set<Long> ids, List<SchedulePlanItem> items) {
+        for (SchedulePlanItem item : items) {
+            if (item.getClassroomId() != null) {
+                ids.add(item.getClassroomId());
+            }
+        }
+    }
+
+    private String classroomName(Long classroomId, Map<Long, String> classroomNames) {
         if (classroomId == null) return null;
-        Classroom classroom = classroomMapper.selectById(classroomId);
-        return classroom == null ? null : classroom.getRoomName();
+        return classroomNames.get(classroomId);
     }
 
     private BigDecimal scoreOf(SchedulePlan plan) {
