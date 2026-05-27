@@ -95,7 +95,17 @@ public class V4ScheduleReportService {
         if (report == null) {
             throw new BusinessException(404, "报告不存在");
         }
-        Path filePath = Path.of(report.getFilePath());
+        if (report.getFilePath() == null || report.getFilePath().isBlank()) {
+            throw new BusinessException(404, "报告文件不存在，请重新生成");
+        }
+        Path reportDir = ensureReportDir();
+        Path rawPath = Path.of(report.getFilePath());
+        Path filePath = rawPath.isAbsolute()
+                ? rawPath.normalize()
+                : rawPath.toAbsolutePath().normalize();
+        if (!filePath.startsWith(reportDir)) {
+            throw new BusinessException(403, "报告文件路径非法");
+        }
         if (!Files.exists(filePath) || !Files.isRegularFile(filePath)) {
             throw new BusinessException(404, "报告文件不存在，请重新生成");
         }
@@ -140,7 +150,7 @@ public class V4ScheduleReportService {
 
     private Path ensureReportDir() {
         try {
-            Path dir = Path.of("data", "reports");
+            Path dir = Path.of("data", "reports").toAbsolutePath().normalize();
             Files.createDirectories(dir);
             return dir;
         } catch (IOException e) {
@@ -164,13 +174,13 @@ public class V4ScheduleReportService {
                 .append("<style>body{font-family:Arial,sans-serif;padding:24px;color:#1f2937}h1,h2{color:#0f172a}table{border-collapse:collapse;width:100%;margin-top:8px}th,td{border:1px solid #dbe2ea;padding:8px;text-align:left}</style>")
                 .append("</head><body>");
         html.append("<h1>V4 排课分析报告</h1>");
-        html.append("<p>方案：").append(safe(plan.getName())).append("（ID ").append(plan.getId()).append("）</p>");
+        html.append("<p>方案：").append(safeHtml(plan.getName())).append("（ID ").append(plan.getId()).append("）</p>");
         html.append("<p>报告类型：").append(reportType).append("，生成时间：").append(DISPLAY_TIME.format(LocalDateTime.now())).append("</p>");
         html.append("<h2>质量总览</h2><table>")
                 .append("<tr><th>总分</th><th>已排任务</th><th>未排任务</th><th>冲突数量</th><th>质量等级</th></tr>")
                 .append("<tr><td>").append(summary.getTotalScore()).append("</td><td>").append(summary.getScheduledCount())
                 .append("</td><td>").append(summary.getUnscheduledCount()).append("</td><td>").append(summary.getConflictCount())
-                .append("</td><td>").append(safe(summary.getQualityLevel())).append("</td></tr></table>");
+                .append("</td><td>").append(safeHtml(summary.getQualityLevel())).append("</td></tr></table>");
 
         if (includeRisks && riskList != null) {
             html.append("<h2>风险统计</h2><table>")
@@ -183,7 +193,7 @@ public class V4ScheduleReportService {
         if (includeSuggestions && summary.getSuggestions() != null && !summary.getSuggestions().isEmpty()) {
             html.append("<h2>优化建议</h2><ul>");
             for (String suggestion : summary.getSuggestions()) {
-                html.append("<li>").append(safe(suggestion)).append("</li>");
+                html.append("<li>").append(safeHtml(suggestion)).append("</li>");
             }
             html.append("</ul>");
         }
@@ -216,7 +226,7 @@ public class V4ScheduleReportService {
             XSSFSheet sheet = workbook.createSheet("分析报告");
             int row = 0;
             sheet.createRow(row++).createCell(0).setCellValue("V4 排课分析报告");
-            sheet.createRow(row++).createCell(0).setCellValue("方案：" + safe(plan.getName()) + "（ID " + plan.getId() + "）");
+            sheet.createRow(row++).createCell(0).setCellValue("方案：" + safeText(plan.getName()) + "（ID " + plan.getId() + "）");
             sheet.createRow(row++).createCell(0).setCellValue("报告类型：" + reportType);
             sheet.createRow(row++).createCell(0).setCellValue("生成时间：" + DISPLAY_TIME.format(LocalDateTime.now()));
             row++;
@@ -231,7 +241,7 @@ public class V4ScheduleReportService {
             sheet.getRow(row).createCell(2).setCellValue("冲突数量");
             sheet.getRow(row++).createCell(3).setCellValue(summary.getConflictCount());
             sheet.createRow(row).createCell(0).setCellValue("质量等级");
-            sheet.getRow(row++).createCell(1).setCellValue(safe(summary.getQualityLevel()));
+            sheet.getRow(row++).createCell(1).setCellValue(safeText(summary.getQualityLevel()));
             row++;
 
             if (includeRisks && riskList != null) {
@@ -278,7 +288,18 @@ public class V4ScheduleReportService {
         return "schedule-report-plan-" + planId + "-" + reportType.toLowerCase(Locale.ROOT) + "-" + FILE_TIME.format(LocalDateTime.now()) + "." + ext;
     }
 
-    private String safe(String value) {
+    private String safeText(String value) {
         return value == null || value.isBlank() ? "-" : value.trim();
+    }
+
+    private String safeHtml(String value) {
+        String text = safeText(value);
+        return text
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#x27;")
+                .replace("/", "&#x2F;");
     }
 }
