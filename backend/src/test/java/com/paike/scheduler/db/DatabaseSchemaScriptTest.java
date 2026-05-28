@@ -60,6 +60,18 @@ class DatabaseSchemaScriptTest {
     }
 
     @Test
+    void v6BugfixConstraintsUseActiveKeyForSoftDeleteUniqueKeys() throws IOException {
+        String v6 = resource("db/v6_bugfix_constraints.sql");
+
+        assertTrue(v6.contains("active_key BIGINT GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN 0 ELSE NULL END) STORED"));
+        assertTrue(v6.contains("uk_teacher_timeslot (teacher_id, time_slot_id, active_key)"));
+        assertTrue(v6.contains("uk_plan_task_slot (plan_id, teaching_task_id, weekday, start_period, end_period)"));
+        assertTrue(v6.contains("uk_locked_plan_item (plan_item_id, active_key)"));
+        assertTrue(v6.contains("uk_locked_schedule (schedule_id, active_key)"));
+        assertFalse(v6.contains("uk_teacher_timeslot (teacher_id, time_slot_id, deleted)"));
+    }
+
+    @Test
     void applicationRegistersV14Script() throws IOException {
         String application = resource("application.yml");
 
