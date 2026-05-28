@@ -7,6 +7,7 @@ import com.paike.scheduler.service.CourseService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -80,15 +81,20 @@ public class CourseController {
     @Getter
     public static class CourseForm {
         @NotBlank(message = "课程编号不能为空")
+        @Size(max = 50, message = "课程编号不能超过50字符")
         private String courseNo;
         @NotBlank(message = "课程名称不能为空")
+        @Size(max = 100, message = "课程名称不能超过100字符")
         private String courseName;
+        @Size(max = 30, message = "课程类型不能超过30字符")
         private String courseType;
+        @Size(max = 50, message = "课程性质不能超过50字符")
         private String courseNature;
         @Min(value = 1, message = "总学时必须大于0")
         private Integer totalHours;
         @Min(value = 1, message = "每周课时必须大于0")
         private Integer weeklyHours;
+        @Size(max = 255, message = "备注不能超过255字符")
         private String remark;
     }
 }

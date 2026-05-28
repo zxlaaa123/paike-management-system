@@ -10,6 +10,7 @@ import com.paike.scheduler.service.SemesterService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -247,6 +248,7 @@ public class TeachingTaskController {
         private Integer weeklyHours;
         private Integer needContinuous;
         private Integer status;
+        @Size(max = 255, message = "备注不能超过255字符")
         private String remark;
     }
 }

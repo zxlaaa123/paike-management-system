@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -89,13 +90,18 @@ public class ClassInfoController {
     @Getter
     public static class ClassForm {
         @NotBlank(message = "班级名称不能为空")
+        @Size(max = 100, message = "班级名称不能超过100字符")
         private String className;
+        @Size(max = 100, message = "专业名称不能超过100字符")
         private String major;
+        @Size(max = 20, message = "年级不能超过20字符")
         private String grade;
         @Min(value = 1, message = "班级人数必须大于0")
         private Integer studentCount;
+        @Size(max = 50, message = "班主任不能超过50字符")
         private String headTeacher;
         private Integer status;
+        @Size(max = 255, message = "备注不能超过255字符")
         private String remark;
     }
 

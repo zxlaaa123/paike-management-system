@@ -7,6 +7,7 @@ import com.paike.scheduler.service.TeacherService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -86,12 +87,17 @@ public class TeacherController {
     @Getter
     public static class TeacherForm {
         @NotBlank(message = "教师编号不能为空")
+        @Size(max = 50, message = "教师编号不能超过50字符")
         private String teacherNo;
         @NotBlank(message = "教师姓名不能为空")
+        @Size(max = 50, message = "教师姓名不能超过50字符")
         private String name;
+        @Size(max = 100, message = "所属部门不能超过100字符")
         private String department;
+        @Size(max = 30, message = "联系电话不能超过30字符")
         private String phone;
         private Integer status;
+        @Size(max = 255, message = "备注不能超过255字符")
         private String remark;
     }
 
