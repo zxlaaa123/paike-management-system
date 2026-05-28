@@ -17,6 +17,8 @@ public class AutoScheduleBatch {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private Long semesterId;
+
     private String batchNo;
 
     private Integer totalTaskCount;

@@ -3,6 +3,7 @@ import type { ApiResponse, PageResult } from './types'
 
 export interface ScheduleConflictReport {
   id: number
+  semesterId?: number
   reportNo: string
   conflictType: string
   objectType?: string
@@ -22,8 +23,10 @@ export interface ScheduleConflictGenerateResult {
   message: string
 }
 
-export function generateScheduleConflictReport() {
-  return request.post<ApiResponse<ScheduleConflictGenerateResult>>('/schedule-conflict-reports/generate', {})
+export function generateScheduleConflictReport(semesterId?: number) {
+  return request.post<ApiResponse<ScheduleConflictGenerateResult>>('/schedule-conflict-reports/generate', {}, {
+    params: semesterId ? { semesterId } : undefined,
+  })
     .then((r) => {
       if (!r.data) {
         throw new Error('响应数据为空')
@@ -33,6 +36,7 @@ export function generateScheduleConflictReport() {
 }
 
 export function getScheduleConflictReportList(params: {
+  semesterId?: number
   reportNo?: string
   conflictType?: string
   objectType?: string

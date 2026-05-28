@@ -3,6 +3,7 @@ import type { ApiResponse, PageResult } from './types'
 
 export interface AutoScheduleBatch {
   batchId: number
+  semesterId?: number
   batchNo: string
   totalTaskCount: number
   successTaskCount: number
@@ -13,6 +14,7 @@ export interface AutoScheduleBatch {
 }
 
 export function getBatchList(params: {
+  semesterId?: number
   batchNo?: string
   status?: string
   page?: number
@@ -36,6 +38,7 @@ export function getBatchById(id: number) {
 }
 
 export function runAutoSchedule(data: {
+  semesterId?: number
   taskIds?: number[]
   clearOldAutoSchedule?: boolean
   clearAllSchedule?: boolean
