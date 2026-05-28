@@ -105,29 +105,7 @@ public class TeacherUnavailableTimeService {
      */
     @Transactional(rollbackFor = Exception.class)
     public TeacherUnavailableTime create(TeacherUnavailableTimeForm form) {
-        // 校验教师是否存在且启用
-        Teacher teacher = teacherMapper.selectById(form.getTeacherId());
-        if (teacher == null || Integer.valueOf(1).equals(teacher.getDeleted())) {
-            throw new BusinessException("所选教师不存在");
-        }
-        if (teacher.getStatus() != 1) {
-            throw new BusinessException("停用教师不能设置禁排时间");
-        }
-
-        // 校验时间段是否存在
-        TimeSlot timeSlot = timeSlotMapper.selectById(form.getTimeSlotId());
-        if (timeSlot == null) {
-            throw new BusinessException("所选时间段不存在");
-        }
-
-        // 校验同一教师同一时间段不能重复
-        long count = unavailableTimeMapper.selectCount(new LambdaQueryWrapper<TeacherUnavailableTime>()
-                .eq(TeacherUnavailableTime::getTeacherId, form.getTeacherId())
-                .eq(TeacherUnavailableTime::getTimeSlotId, form.getTimeSlotId())
-                .eq(TeacherUnavailableTime::getDeleted, 0));
-        if (count > 0) {
-            throw new BusinessException(teacher.getName() + "老师在" + timeSlot.getTimeLabel() + "已存在禁排时间");
-        }
+        UnavailableReference reference = validateUnavailableReference(form, null);
 
         TeacherUnavailableTime entity = new TeacherUnavailableTime();
         entity.setTeacherId(form.getTeacherId());
@@ -141,7 +119,7 @@ public class TeacherUnavailableTimeService {
         try {
             unavailableTimeMapper.insert(entity);
         } catch (DuplicateKeyException e) {
-            throw new BusinessException(409, teacher.getName() + "老师在" + timeSlot.getTimeLabel() + "已存在禁排时间");
+            throw new BusinessException(409, duplicateMessage(reference));
         }
         fillRelationFields(java.util.Collections.singletonList(entity));
         return entity;
@@ -157,30 +135,7 @@ public class TeacherUnavailableTimeService {
             throw new BusinessException("禁排时间记录不存在");
         }
 
-        // 校验教师是否存在且启用
-        Teacher teacher = teacherMapper.selectById(form.getTeacherId());
-        if (teacher == null || Integer.valueOf(1).equals(teacher.getDeleted())) {
-            throw new BusinessException("所选教师不存在");
-        }
-        if (teacher.getStatus() != 1) {
-            throw new BusinessException("停用教师不能设置禁排时间");
-        }
-
-        // 校验时间段是否存在
-        TimeSlot timeSlot = timeSlotMapper.selectById(form.getTimeSlotId());
-        if (timeSlot == null) {
-            throw new BusinessException("所选时间段不存在");
-        }
-
-        // 校验同一教师同一时间段不能重复（排除自身）
-        long count = unavailableTimeMapper.selectCount(new LambdaQueryWrapper<TeacherUnavailableTime>()
-                .eq(TeacherUnavailableTime::getTeacherId, form.getTeacherId())
-                .eq(TeacherUnavailableTime::getTimeSlotId, form.getTimeSlotId())
-                .eq(TeacherUnavailableTime::getDeleted, 0)
-                .ne(TeacherUnavailableTime::getId, id));
-        if (count > 0) {
-            throw new BusinessException(teacher.getName() + "老师在" + timeSlot.getTimeLabel() + "已存在禁排时间");
-        }
+        validateUnavailableReference(form, id);
 
         existing.setTeacherId(form.getTeacherId());
         existing.setTimeSlotId(form.getTimeSlotId());
@@ -191,6 +146,39 @@ public class TeacherUnavailableTimeService {
         unavailableTimeMapper.updateById(existing);
         fillRelationFields(java.util.Collections.singletonList(existing));
         return existing;
+    }
+
+    private UnavailableReference validateUnavailableReference(TeacherUnavailableTimeForm form, Long excludedId) {
+        Teacher teacher = teacherMapper.selectById(form.getTeacherId());
+        if (teacher == null || Integer.valueOf(1).equals(teacher.getDeleted())) {
+            throw new BusinessException("所选教师不存在");
+        }
+        if (teacher.getStatus() != 1) {
+            throw new BusinessException("停用教师不能设置禁排时间");
+        }
+
+        TimeSlot timeSlot = timeSlotMapper.selectById(form.getTimeSlotId());
+        if (timeSlot == null) {
+            throw new BusinessException("所选时间段不存在");
+        }
+
+        long count = unavailableTimeMapper.selectCount(new LambdaQueryWrapper<TeacherUnavailableTime>()
+                .eq(TeacherUnavailableTime::getTeacherId, form.getTeacherId())
+                .eq(TeacherUnavailableTime::getTimeSlotId, form.getTimeSlotId())
+                .eq(TeacherUnavailableTime::getDeleted, 0)
+                .ne(excludedId != null, TeacherUnavailableTime::getId, excludedId));
+        if (count > 0) {
+            throw new BusinessException(duplicateMessage(new UnavailableReference(teacher, timeSlot)));
+        }
+
+        return new UnavailableReference(teacher, timeSlot);
+    }
+
+    private String duplicateMessage(UnavailableReference reference) {
+        return reference.teacher().getName() + "老师在" + reference.timeSlot().getTimeLabel() + "已存在禁排时间";
+    }
+
+    private record UnavailableReference(Teacher teacher, TimeSlot timeSlot) {
     }
 
     /**

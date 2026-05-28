@@ -390,24 +390,10 @@ public class AutoScheduleService {
 
     /**
      * 未排课记录需要稳定的失败类型编码，便于前端筛选和后续统计。
-     * 这里把冲突检测返回的中文原因归一化为枚举风格字符串。
+     * 冲突检测返回形如 [TYPE]message 的结构化标签，这里只读取标签，避免依赖中文文案。
      */
     private String categorizeReason(String reason) {
         if (reason == null || reason.isBlank()) return "UNKNOWN";
-        String taggedType = ScheduleConflictService.extractReasonType(reason);
-        if (!"UNKNOWN".equals(taggedType)) return taggedType;
-        if (reason.contains("教师禁排")) return "TEACHER_UNAVAILABLE";
-        if (reason.contains("已有课程") && reason.contains("老师")) return "TEACHER_CONFLICT";
-        if (reason.contains("已有课程") && !reason.contains("老师")) return "CLASS_CONFLICT";
-        if (reason.contains("教室") && reason.contains("占用")) return "ROOM_CONFLICT";
-        if (reason.contains("容量")) return "CLASSROOM_CAPACITY_NOT_ENOUGH";
-        if (reason.contains("实验课")) return "ROOM_TYPE_MISMATCH";
-        if (reason.contains("机房课")) return "ROOM_TYPE_MISMATCH";
-        if (reason.contains("每周课时")) return "TASK_NOT_FULLY_SCHEDULED";
-        if (reason.contains("教师每天")) return "TEACHER_DAILY_LIMIT";
-        if (reason.contains("班级每天")) return "CLASS_DAILY_LIMIT";
-        if (reason.contains("同一课程同一天")) return "SAME_COURSE_SAME_DAY";
-        if (reason.contains("没有符合")) return "NO_MATCHED_CLASSROOM";
-        return "UNKNOWN";
+        return ScheduleConflictService.extractReasonType(reason);
     }
 }

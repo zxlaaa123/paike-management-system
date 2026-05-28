@@ -29,7 +29,6 @@ public class V3ScheduleGenerateService {
 
     private static final String DEFAULT_STRATEGY = "COMPREHENSIVE";
     private static final DateTimeFormatter PLAN_NAME_SUFFIX = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
-    private static final boolean USE_DELTA_PENALTY_SCORING = true;
 
     private final SemesterService semesterService;
     private final ScheduleRuleService ruleService;
@@ -361,7 +360,7 @@ public class V3ScheduleGenerateService {
                         "教学任务：" + taskLabel + " 跳过候选 " + slot.getTimeLabel() + " / " + room.getRoomName() + "，资源冲突", stepCounter.next());
                 continue;
             }
-            double score = scoreCandidate(task, slot, room, generatedItems, refData, penaltyContext);
+            double score = scoreCandidate(task, slot, room, refData, penaltyContext);
             explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "INFO", "CALCULATE_SCORE",
                     "候选位置：" + slot.getTimeLabel() + "，教室 " + room.getRoomName() + "，得分 " + String.format(Locale.ROOT, "%.2f", score),
                     stepCounter.next());
@@ -432,43 +431,6 @@ public class V3ScheduleGenerateService {
             TeachingTask task,
             TimeSlot slot,
             Classroom room,
-            List<SchedulePlanItem> generatedItems,
-            SchedulingReferenceData refData,
-            DeltaPenaltyScorer.PenaltyContext penaltyContext
-    ) {
-        if (USE_DELTA_PENALTY_SCORING) {
-            return scoreCandidateDeltaPenalty(task, slot, room, refData, penaltyContext);
-        }
-        return scoreCandidateLegacy(task, slot, room, generatedItems, refData);
-    }
-
-    private double scoreCandidateLegacy(
-            TeachingTask task,
-            TimeSlot slot,
-            Classroom room,
-            List<SchedulePlanItem> generatedItems,
-            SchedulingReferenceData refData
-    ) {
-        double score = 0D;
-        String courseType = SchedulingSupport.getCourseType(task.getCourseId(), refData.courseMap());
-        int studentCount = SchedulingSupport.getClassStudentCount(task.getClassId(), refData.classMap());
-
-        score += weight(refData,"CLASSROOM_UTILIZATION") * ScoringFunctions.candidateClassroomUtilization(room, studentCount);
-        score += weight(refData,"CLASS_DAILY_BALANCE") * ScoringFunctions.candidateBalance(generatedItems, item -> Objects.equals(item.getClassId(), task.getClassId()), slot.getDayOfWeek());
-        score += weight(refData,"TEACHER_DAILY_LOAD") * ScoringFunctions.candidateBalance(generatedItems, item -> Objects.equals(item.getTeacherId(), task.getTeacherId()), slot.getDayOfWeek());
-        score += weight(refData,"COURSE_DISTRIBUTION") * ScoringFunctions.candidateCourseDistribution(generatedItems, task, slot.getDayOfWeek());
-        score += weight(refData,"CONTINUOUS_PERIOD_LIMIT") * ScoringFunctions.candidateContinuousLimit(generatedItems, task, slot);
-        score += weight(refData,"MORNING_THEORY_PRIORITY") * ScoringFunctions.candidateMorningPriority(courseType, slot);
-
-        // 稳定偏好：更早的时间段略优，避免在候选分相同时结果抖动。
-        score += stableTieBreaker(slot);
-        return score;
-    }
-
-    private double scoreCandidateDeltaPenalty(
-            TeachingTask task,
-            TimeSlot slot,
-            Classroom room,
             SchedulingReferenceData refData,
             DeltaPenaltyScorer.PenaltyContext penaltyContext
     ) {
@@ -483,10 +445,6 @@ public class V3ScheduleGenerateService {
 
     private double stableTieBreaker(TimeSlot slot) {
         return Math.max(0, 100 - slot.getSortOrder()) * 0.0001D;
-    }
-
-    private double weight(SchedulingReferenceData refData, String ruleCode) {
-        return refData.weightMap().getOrDefault(ruleCode, BigDecimal.ZERO).doubleValue();
     }
 
     private SchedulePlanItem toPlanItem(Long planId, TeachingTask task, TimeSlot slot, Classroom room) {

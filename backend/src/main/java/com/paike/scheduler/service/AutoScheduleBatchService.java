@@ -2,11 +2,13 @@ package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.AutoScheduleBatch;
 import com.paike.scheduler.entity.Schedule;
 import com.paike.scheduler.mapper.AutoScheduleBatchMapper;
 import com.paike.scheduler.mapper.ScheduleMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,8 @@ import java.util.concurrent.ThreadLocalRandom;
 @Service
 @RequiredArgsConstructor
 public class AutoScheduleBatchService {
+
+    private static final int BATCH_NO_MAX_ATTEMPTS = 5;
 
     private final AutoScheduleBatchMapper batchMapper;
     private final ScheduleMapper scheduleMapper;
@@ -38,6 +42,22 @@ public class AutoScheduleBatchService {
     }
 
     public AutoScheduleBatch createBatch(int totalTaskCount, boolean clearOldSchedule) {
+        for (int attempt = 1; attempt <= BATCH_NO_MAX_ATTEMPTS; attempt++) {
+            AutoScheduleBatch batch = buildBatch(totalTaskCount, clearOldSchedule);
+            try {
+                batchMapper.insert(batch);
+                return batch;
+            } catch (DuplicateKeyException ex) {
+                if (attempt == BATCH_NO_MAX_ATTEMPTS) {
+                    throw new BusinessException("自动排课批次号生成失败，请重试");
+                }
+            }
+        }
+        throw new BusinessException("自动排课批次号生成失败，请重试");
+    }
+
+    private AutoScheduleBatch buildBatch(int totalTaskCount, boolean clearOldSchedule) {
+        LocalDateTime now = LocalDateTime.now();
         AutoScheduleBatch batch = new AutoScheduleBatch();
         batch.setBatchNo(generateBatchNo());
         batch.setTotalTaskCount(totalTaskCount);
@@ -46,9 +66,8 @@ public class AutoScheduleBatchService {
         batch.setGeneratedScheduleCount(0);
         batch.setClearOldSchedule(clearOldSchedule ? 1 : 0);
         batch.setStatus("RUNNING");
-        batch.setStartTime(LocalDateTime.now());
-        batch.setCreateTime(LocalDateTime.now());
-        batchMapper.insert(batch);
+        batch.setStartTime(now);
+        batch.setCreateTime(now);
         return batch;
     }
 
