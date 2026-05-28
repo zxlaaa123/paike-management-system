@@ -11,8 +11,7 @@ public enum V5RepairTaskStatus {
     SIMULATED("SIMULATED"),
     APPLIED("APPLIED"),
     CANCELLED("CANCELLED"),
-    FAILED("FAILED"),
-    ;
+    FAILED("FAILED");
 
     private final String code;
 
