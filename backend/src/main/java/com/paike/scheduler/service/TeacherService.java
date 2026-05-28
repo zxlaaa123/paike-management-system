@@ -39,7 +39,7 @@ public class TeacherService {
 
     public Teacher getById(Long id) {
         Teacher teacher = teacherMapper.selectById(id);
-        if (teacher == null || teacher.getDeleted() == 1) {
+        if (teacher == null || Integer.valueOf(1).equals(teacher.getDeleted())) {
             throw new BusinessException(404, "教师不存在");
         }
         return teacher;

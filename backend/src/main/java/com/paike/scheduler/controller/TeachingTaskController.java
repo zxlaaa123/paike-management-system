@@ -78,7 +78,7 @@ public class TeachingTaskController {
     @GetMapping("/{id}")
     public Result<TeachingTask> getById(@PathVariable Long id) {
         TeachingTask task = teachingTaskMapper.selectById(id);
-        if (task == null || task.getDeleted() == 1) {
+        if (task == null || Integer.valueOf(1).equals(task.getDeleted())) {
             throw new BusinessException(404, "教学任务不存在");
         }
         fillTaskRelations(List.of(task));
@@ -89,12 +89,12 @@ public class TeachingTaskController {
     public Result<TeachingTask> create(@Valid @RequestBody TaskForm form) {
         // 校验课程是否存在
         Course course = courseMapper.selectById(form.getCourseId());
-        if (course == null || course.getDeleted() == 1) {
+        if (course == null || Integer.valueOf(1).equals(course.getDeleted())) {
             throw new BusinessException(400, "所选课程不存在");
         }
         // 校验教师是否存在且启用
         Teacher teacher = teacherMapper.selectById(form.getTeacherId());
-        if (teacher == null || teacher.getDeleted() == 1) {
+        if (teacher == null || Integer.valueOf(1).equals(teacher.getDeleted())) {
             throw new BusinessException(400, "所选教师不存在");
         }
         if (teacher.getStatus() != 1) {
@@ -102,7 +102,7 @@ public class TeachingTaskController {
         }
         // 校验班级是否存在且启用
         ClassInfo classInfo = classInfoMapper.selectById(form.getClassId());
-        if (classInfo == null || classInfo.getDeleted() == 1) {
+        if (classInfo == null || Integer.valueOf(1).equals(classInfo.getDeleted())) {
             throw new BusinessException(400, "所选班级不存在");
         }
         if (classInfo.getStatus() != 1) {
@@ -133,17 +133,17 @@ public class TeachingTaskController {
     @PutMapping("/{id}")
     public Result<TeachingTask> update(@PathVariable Long id, @Valid @RequestBody TaskForm form) {
         TeachingTask task = teachingTaskMapper.selectById(id);
-        if (task == null || task.getDeleted() == 1) {
+        if (task == null || Integer.valueOf(1).equals(task.getDeleted())) {
             throw new BusinessException(404, "教学任务不存在");
         }
         // 校验课程是否存在
         Course course = courseMapper.selectById(form.getCourseId());
-        if (course == null || course.getDeleted() == 1) {
+        if (course == null || Integer.valueOf(1).equals(course.getDeleted())) {
             throw new BusinessException(400, "所选课程不存在");
         }
         // 校验教师是否存在且启用
         Teacher teacher = teacherMapper.selectById(form.getTeacherId());
-        if (teacher == null || teacher.getDeleted() == 1) {
+        if (teacher == null || Integer.valueOf(1).equals(teacher.getDeleted())) {
             throw new BusinessException(400, "所选教师不存在");
         }
         if (teacher.getStatus() != 1) {
@@ -151,7 +151,7 @@ public class TeachingTaskController {
         }
         // 校验班级是否存在且启用
         ClassInfo classInfo = classInfoMapper.selectById(form.getClassId());
-        if (classInfo == null || classInfo.getDeleted() == 1) {
+        if (classInfo == null || Integer.valueOf(1).equals(classInfo.getDeleted())) {
             throw new BusinessException(400, "所选班级不存在");
         }
         if (classInfo.getStatus() != 1) {
@@ -184,7 +184,7 @@ public class TeachingTaskController {
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         TeachingTask task = teachingTaskMapper.selectById(id);
-        if (task == null || task.getDeleted() == 1) {
+        if (task == null || Integer.valueOf(1).equals(task.getDeleted())) {
             throw new BusinessException(404, "教学任务不存在");
         }
         teachingTaskMapper.deleteById(id);

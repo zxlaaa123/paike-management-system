@@ -36,7 +36,7 @@ public class CourseService {
 
     public Course getById(Long id) {
         Course course = courseMapper.selectById(id);
-        if (course == null || course.getDeleted() == 1) {
+        if (course == null || Integer.valueOf(1).equals(course.getDeleted())) {
             throw new BusinessException(404, "课程不存在");
         }
         return course;

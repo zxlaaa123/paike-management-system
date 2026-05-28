@@ -341,7 +341,7 @@ public class V4ScheduleAdjustmentService {
             throw new BusinessException("正式课表记录 ID 不能为空");
         }
         Schedule schedule = scheduleMapper.selectById(scheduleId);
-        if (schedule == null || schedule.getDeleted() == 1) {
+        if (schedule == null || Integer.valueOf(1).equals(schedule.getDeleted())) {
             throw new BusinessException("正式课表记录不存在");
         }
 
@@ -380,7 +380,7 @@ public class V4ScheduleAdjustmentService {
             throw new BusinessException("新教室不能为空");
         }
         Classroom room = classroomMapper.selectById(roomId);
-        if (room == null || room.getDeleted() == 1) {
+        if (room == null || Integer.valueOf(1).equals(room.getDeleted())) {
             throw new BusinessException("所选教室不存在");
         }
         if (room.getStatus() == null || room.getStatus() != 1) {
