@@ -3,6 +3,7 @@ package com.paike.scheduler.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Getter;
 import lombok.Setter;
@@ -18,6 +19,8 @@ public class ScheduleReport {
     private Long id;
 
     private Long planId;
+
+    private Long semesterId;
 
     private String reportType;
 
@@ -38,5 +41,7 @@ public class ScheduleReport {
 
     @TableField("updated_at")
     private LocalDateTime updatedAt;
-}
 
+    @TableLogic
+    private Integer deleted;
+}

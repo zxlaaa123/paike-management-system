@@ -104,6 +104,24 @@ class DatabaseSchemaScriptTest {
         assertTrue(application.contains("classpath:db/v17_report_batch_semester.sql"));
     }
 
+    @Test
+    void scheduleReportSemesterDeletedMigrationIsRegistered() throws IOException {
+        String v14 = resource("db/v14_missing_v4_v5_tables_and_schedule_keys.sql");
+        String migration = resource("db/v18_schedule_report_semester_deleted.sql");
+        String application = resource("application.yml");
+
+        assertTrue(v14.contains("CREATE TABLE IF NOT EXISTS schedule_report"));
+        assertTrue(v14.contains("semester_id BIGINT NULL COMMENT '所属学期ID'"));
+        assertTrue(v14.contains("deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除'"));
+        assertTrue(migration.contains("TABLE_NAME = 'schedule_report'"));
+        assertTrue(migration.contains("ADD COLUMN semester_id BIGINT NULL COMMENT '所属学期ID'"));
+        assertTrue(migration.contains("ADD COLUMN deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除'"));
+        assertTrue(migration.contains("idx_schedule_report_plan_deleted"));
+        assertTrue(migration.contains("idx_schedule_report_semester_deleted_created"));
+        assertTrue(migration.contains("JOIN schedule_plan p ON p.id = r.plan_id"));
+        assertTrue(application.contains("classpath:db/v18_schedule_report_semester_deleted.sql"));
+    }
+
     private String resource(String path) throws IOException {
         try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(path)) {
             assertNotNull(inputStream, "Missing resource " + path);

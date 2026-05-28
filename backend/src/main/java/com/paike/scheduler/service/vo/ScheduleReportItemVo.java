@@ -13,6 +13,8 @@ public class ScheduleReportItemVo {
 
     private Long planId;
 
+    private Long semesterId;
+
     private String reportType;
 
     private String format;
@@ -23,4 +25,3 @@ public class ScheduleReportItemVo {
 
     private LocalDateTime createdAt;
 }
-

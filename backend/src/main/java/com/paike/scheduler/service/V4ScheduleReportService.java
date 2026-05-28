@@ -65,6 +65,7 @@ public class V4ScheduleReportService {
 
         ScheduleReport report = new ScheduleReport();
         report.setPlanId(planId);
+        report.setSemesterId(plan.getSemesterId());
         report.setReportType(reportType);
         report.setFormat(format);
         report.setStatus(STATUS_GENERATED);
@@ -88,6 +89,7 @@ public class V4ScheduleReportService {
                         .orderByDesc(ScheduleReport::getId));
         ScheduleReportListVo result = new ScheduleReportListVo();
         result.setPlanId(planId);
+        result.setSemesterId(plan.getSemesterId());
         result.setItems(records.stream().map(this::toItemVo).toList());
         return result;
     }
@@ -126,6 +128,7 @@ public class V4ScheduleReportService {
         ScheduleReportItemVo item = new ScheduleReportItemVo();
         item.setReportId(report.getId());
         item.setPlanId(report.getPlanId());
+        item.setSemesterId(report.getSemesterId());
         item.setReportType(report.getReportType());
         item.setFormat(report.getFormat());
         item.setStatus(report.getStatus());

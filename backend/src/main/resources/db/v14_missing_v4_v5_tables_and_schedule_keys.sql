@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS schedule_locked_item (
 CREATE TABLE IF NOT EXISTS schedule_report (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '报告ID',
     plan_id BIGINT NOT NULL COMMENT '排课方案ID',
+    semester_id BIGINT NULL COMMENT '所属学期ID',
     report_type VARCHAR(40) NOT NULL COMMENT '报告类型',
     format VARCHAR(20) NOT NULL COMMENT '导出格式',
     status VARCHAR(20) NOT NULL DEFAULT 'GENERATED' COMMENT '生成状态',
@@ -92,7 +93,9 @@ CREATE TABLE IF NOT EXISTS schedule_report (
     file_path VARCHAR(500) NOT NULL COMMENT '报告文件路径',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    KEY idx_schedule_report_plan (plan_id),
+    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除',
+    KEY idx_schedule_report_plan_deleted (plan_id, deleted),
+    KEY idx_schedule_report_semester_deleted_created (semester_id, deleted, created_at),
     KEY idx_schedule_report_type (report_type),
     KEY idx_schedule_report_created (created_at)
 ) COMMENT='V4 排课分析报告表';

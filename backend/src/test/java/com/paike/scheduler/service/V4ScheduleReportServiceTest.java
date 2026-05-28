@@ -7,6 +7,8 @@ import com.paike.scheduler.mapper.SchedulePlanMapper;
 import com.paike.scheduler.mapper.ScheduleReportMapper;
 import com.paike.scheduler.service.dto.V4ScheduleReportGenerateRequest;
 import com.paike.scheduler.service.vo.ScheduleAnalysisSummaryVo;
+import com.paike.scheduler.service.vo.ScheduleReportItemVo;
+import com.paike.scheduler.service.vo.ScheduleReportListVo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -25,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class V4ScheduleReportServiceTest {
@@ -53,6 +56,7 @@ class V4ScheduleReportServiceTest {
     void generateReport_escapesHtmlFieldsInHtmlOutput() throws Exception {
         SchedulePlan plan = new SchedulePlan();
         plan.setId(9L);
+        plan.setSemesterId(202601L);
         plan.setName("<script>alert('x')</script>");
         when(schedulePlanMapper.selectById(9L)).thenReturn(plan);
         when(scheduleAnalysisService.getPlanSummary(9L)).thenReturn(summaryWithUnsafeText());
@@ -61,10 +65,12 @@ class V4ScheduleReportServiceTest {
         request.setFormat("HTML");
         request.setIncludeRisks(false);
         request.setIncludeCharts(false);
-        service.generateReport(9L, request);
+        ScheduleReportItemVo item = service.generateReport(9L, request);
 
         ArgumentCaptor<ScheduleReport> captor = ArgumentCaptor.forClass(ScheduleReport.class);
-        org.mockito.Mockito.verify(scheduleReportMapper).insert(captor.capture());
+        verify(scheduleReportMapper).insert(captor.capture());
+        assertEquals(202601L, captor.getValue().getSemesterId());
+        assertEquals(202601L, item.getSemesterId());
         String html = Files.readString(Path.of(captor.getValue().getFilePath()), StandardCharsets.UTF_8);
 
         assertFalse(html.contains("<script>"));
@@ -97,6 +103,30 @@ class V4ScheduleReportServiceTest {
         when(scheduleReportMapper.selectById(2L)).thenReturn(report);
 
         assertEquals(file, service.resolveDownloadFile(2L));
+    }
+
+    @Test
+    void listPlanReports_returnsPlanSemesterIdAndItemSemesterId() {
+        SchedulePlan plan = new SchedulePlan();
+        plan.setId(9L);
+        plan.setSemesterId(202601L);
+        when(schedulePlanMapper.selectById(9L)).thenReturn(plan);
+
+        ScheduleReport report = new ScheduleReport();
+        report.setId(3L);
+        report.setPlanId(9L);
+        report.setSemesterId(202601L);
+        report.setReportType("ANALYSIS");
+        report.setFormat("HTML");
+        report.setStatus("GENERATED");
+        when(scheduleReportMapper.selectList(any())).thenReturn(List.of(report));
+
+        ScheduleReportListVo result = service.listPlanReports(9L);
+
+        assertEquals(9L, result.getPlanId());
+        assertEquals(202601L, result.getSemesterId());
+        assertEquals(1, result.getItems().size());
+        assertEquals(202601L, result.getItems().get(0).getSemesterId());
     }
 
     private ScheduleAnalysisSummaryVo summaryWithUnsafeText() {
