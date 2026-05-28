@@ -438,8 +438,11 @@ CREATE TABLE IF NOT EXISTS schedule_score_detail (
     violation_count INT NOT NULL DEFAULT 0 COMMENT '违规次数',
     detail_message VARCHAR(1000) NULL COMMENT '评分说明',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除',
     INDEX idx_score_detail_plan (plan_id),
+    INDEX idx_score_detail_plan_deleted (plan_id, deleted),
     INDEX idx_score_detail_semester (semester_id),
+    INDEX idx_score_detail_semester_deleted (semester_id, deleted),
     INDEX idx_score_detail_rule (rule_code)
 ) COMMENT='排课评分明细表';
 

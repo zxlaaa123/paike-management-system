@@ -196,6 +196,20 @@ class ScheduleScoreServiceTest {
         assertEquals(0, plan.getConflictCount());
     }
 
+    @Test
+    void rescore_deletesOldDetailsBeforeInsertNewDetails() {
+        SchedulePlan plan = newPlan(5L);
+
+        when(planItemMapper.selectList(any())).thenReturn(List.of());
+        when(ruleWeightService.list(2L, "COMPREHENSIVE", null)).thenReturn(List.of(
+                rule("TEACHER_TIME_CONFLICT", "HARD", "100")));
+
+        service.rescore(plan);
+
+        verify(scoreDetailMapper).delete(any());
+        captureDetailsByCode(1);
+    }
+
     /**
      * MORNING_THEORY_PRIORITY fixture：4 条 item（2 上午 startPeriod=1/3，2 下午 startPeriod=5/7），
      * 跨不同 teacher/class/room/weekday 避免触发其他冲突维度。

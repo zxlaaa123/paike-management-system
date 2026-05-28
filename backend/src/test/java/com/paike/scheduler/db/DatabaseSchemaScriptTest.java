@@ -122,6 +122,23 @@ class DatabaseSchemaScriptTest {
         assertTrue(application.contains("classpath:db/v18_schedule_report_semester_deleted.sql"));
     }
 
+    @Test
+    void scoreDetailDeletedMigrationIsRegistered() throws IOException {
+        String schema = resource("db/v3_score.sql");
+        String migration = resource("db/v19_score_detail_deleted.sql");
+        String application = resource("application.yml");
+
+        assertTrue(schema.contains("CREATE TABLE IF NOT EXISTS schedule_score_detail"));
+        assertTrue(schema.contains("deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除'"));
+        assertTrue(schema.contains("idx_score_detail_plan_deleted"));
+        assertTrue(schema.contains("idx_score_detail_semester_deleted"));
+        assertTrue(migration.contains("TABLE_NAME = 'schedule_score_detail'"));
+        assertTrue(migration.contains("ADD COLUMN deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除'"));
+        assertTrue(migration.contains("idx_score_detail_plan_deleted"));
+        assertTrue(migration.contains("idx_score_detail_semester_deleted"));
+        assertTrue(application.contains("classpath:db/v19_score_detail_deleted.sql"));
+    }
+
     private String resource(String path) throws IOException {
         try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(path)) {
             assertNotNull(inputStream, "Missing resource " + path);
