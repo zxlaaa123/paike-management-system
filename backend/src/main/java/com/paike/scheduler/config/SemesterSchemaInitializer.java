@@ -174,8 +174,24 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
                     "AFTER rule_code");
                 log.info("Added rule_type column to schedule_score_detail");
             }
+            Integer deletedCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_score_detail' " +
+                "AND COLUMN_NAME = 'deleted'",
+                Integer.class);
+            if (deletedCount != null && deletedCount == 0) {
+                jdbcTemplate.execute(
+                    "ALTER TABLE schedule_score_detail " +
+                    "ADD COLUMN deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除' " +
+                    "AFTER created_at");
+                log.info("Added deleted column to schedule_score_detail");
+            }
+            ensureIndex("schedule_score_detail", "idx_score_detail_plan_deleted",
+                "CREATE INDEX idx_score_detail_plan_deleted ON schedule_score_detail(plan_id, deleted)");
+            ensureIndex("schedule_score_detail", "idx_score_detail_semester_deleted",
+                "CREATE INDEX idx_score_detail_semester_deleted ON schedule_score_detail(semester_id, deleted)");
         } catch (Exception e) {
-            log.warn("Failed to add rule_type to schedule_score_detail: {}", e.getMessage());
+            log.warn("Failed to ensure schedule_score_detail columns: {}", e.getMessage());
         }
     }
 
