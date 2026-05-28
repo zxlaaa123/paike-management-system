@@ -24,6 +24,7 @@ public class ScheduleConflictReportController {
 
     @GetMapping
     public Result<Page<ScheduleConflictReport>> list(
+            @RequestParam(required = false) Long semesterId,
             @RequestParam(required = false) String reportNo,
             @RequestParam(required = false) String conflictType,
             @RequestParam(required = false) String objectType,
@@ -34,7 +35,7 @@ public class ScheduleConflictReportController {
             @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
             @RequestParam(defaultValue = "10") int size
     ) {
-        return Result.success(scheduleConflictReportService.list(reportNo, conflictType, objectType, objectName, page, size));
+        return Result.success(scheduleConflictReportService.list(semesterId, reportNo, conflictType, objectType, objectName, page, size));
     }
 
     @DeleteMapping

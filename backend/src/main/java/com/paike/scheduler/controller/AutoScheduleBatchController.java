@@ -24,6 +24,7 @@ public class AutoScheduleBatchController {
     /** 查询自动排课批次列表 */
     @GetMapping("/batches")
     public Result<Page<AutoScheduleBatch>> listBatches(
+            @RequestParam(required = false) Long semesterId,
             @RequestParam(required = false) String batchNo,
             @RequestParam(required = false) String status,
             @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
@@ -32,7 +33,7 @@ public class AutoScheduleBatchController {
             @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
             @RequestParam(defaultValue = "10") int size
     ) {
-        return Result.success(batchService.list(batchNo, status, page, size));
+        return Result.success(batchService.list(semesterId, batchNo, status, page, size));
     }
 
     /** 查询批次详情 */

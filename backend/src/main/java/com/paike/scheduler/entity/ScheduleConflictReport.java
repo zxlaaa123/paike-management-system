@@ -17,6 +17,8 @@ public class ScheduleConflictReport {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private Long semesterId;
+
     private String reportNo;
 
     private String conflictType;

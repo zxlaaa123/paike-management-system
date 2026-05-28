@@ -55,7 +55,7 @@ public class AutoScheduleService {
 
         List<TeachingTask> targetTasks = loadTargetTasks(semesterId, request.getTaskIds());
         AutoScheduleBatch batch = batchService.createBatch(
-                targetTasks.size(), request.isClearOldAutoSchedule());
+                semesterId, targetTasks.size(), request.isClearOldAutoSchedule());
 
         SchedulingReferenceData refData = referenceLoader.loadForAutoSchedule();
         RuleConfig rules = loadRuleConfig();

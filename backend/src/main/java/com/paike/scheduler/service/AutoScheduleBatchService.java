@@ -25,8 +25,11 @@ public class AutoScheduleBatchService {
     private final AutoScheduleBatchMapper batchMapper;
     private final ScheduleMapper scheduleMapper;
 
-    public Page<AutoScheduleBatch> list(String batchNo, String status, int page, int size) {
+    public Page<AutoScheduleBatch> list(Long semesterId, String batchNo, String status, int page, int size) {
         LambdaQueryWrapper<AutoScheduleBatch> wrapper = new LambdaQueryWrapper<>();
+        if (semesterId != null) {
+            wrapper.eq(AutoScheduleBatch::getSemesterId, semesterId);
+        }
         if (batchNo != null && !batchNo.isBlank()) {
             wrapper.like(AutoScheduleBatch::getBatchNo, batchNo);
         }
@@ -41,9 +44,9 @@ public class AutoScheduleBatchService {
         return batchMapper.selectById(id);
     }
 
-    public AutoScheduleBatch createBatch(int totalTaskCount, boolean clearOldSchedule) {
+    public AutoScheduleBatch createBatch(Long semesterId, int totalTaskCount, boolean clearOldSchedule) {
         for (int attempt = 1; attempt <= BATCH_NO_MAX_ATTEMPTS; attempt++) {
-            AutoScheduleBatch batch = buildBatch(totalTaskCount, clearOldSchedule);
+            AutoScheduleBatch batch = buildBatch(semesterId, totalTaskCount, clearOldSchedule);
             try {
                 batchMapper.insert(batch);
                 return batch;
@@ -56,9 +59,10 @@ public class AutoScheduleBatchService {
         throw new BusinessException("自动排课批次号生成失败，请重试");
     }
 
-    private AutoScheduleBatch buildBatch(int totalTaskCount, boolean clearOldSchedule) {
+    private AutoScheduleBatch buildBatch(Long semesterId, int totalTaskCount, boolean clearOldSchedule) {
         LocalDateTime now = LocalDateTime.now();
         AutoScheduleBatch batch = new AutoScheduleBatch();
+        batch.setSemesterId(semesterId);
         batch.setBatchNo(generateBatchNo());
         batch.setTotalTaskCount(totalTaskCount);
         batch.setSuccessTaskCount(0);

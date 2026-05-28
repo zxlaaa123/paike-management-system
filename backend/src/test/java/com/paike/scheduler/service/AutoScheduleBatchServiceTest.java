@@ -26,8 +26,9 @@ class AutoScheduleBatchServiceTest {
                 .thenThrow(new DuplicateKeyException("duplicate batch_no"))
                 .thenReturn(1);
 
-        AutoScheduleBatch batch = service.createBatch(3, true);
+        AutoScheduleBatch batch = service.createBatch(2L, 3, true);
 
+        assertEquals(2L, batch.getSemesterId());
         assertNotNull(batch.getBatchNo());
         assertEquals(3, batch.getTotalTaskCount());
         assertEquals(1, batch.getClearOldSchedule());
@@ -42,7 +43,7 @@ class AutoScheduleBatchServiceTest {
         when(batchMapper.insert(any(AutoScheduleBatch.class)))
                 .thenThrow(new DuplicateKeyException("duplicate batch_no"));
 
-        BusinessException ex = assertThrows(BusinessException.class, () -> service.createBatch(3, false));
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.createBatch(2L, 3, false));
 
         assertEquals("自动排课批次号生成失败，请重试", ex.getMessage());
         verify(batchMapper, times(5)).insert(any(AutoScheduleBatch.class));

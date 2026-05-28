@@ -45,8 +45,11 @@ public class ScheduleConflictReportService {
     private final ScheduleRuleService ruleService;
     private final SemesterService semesterService;
 
-    public Page<ScheduleConflictReport> list(String reportNo, String conflictType, String objectType, String objectName, int page, int size) {
+    public Page<ScheduleConflictReport> list(Long semesterId, String reportNo, String conflictType,
+                                             String objectType, String objectName, int page, int size) {
+        Long resolvedSemesterId = resolveSemesterId(semesterId);
         LambdaQueryWrapper<ScheduleConflictReport> wrapper = new LambdaQueryWrapper<ScheduleConflictReport>()
+                .eq(ScheduleConflictReport::getSemesterId, resolvedSemesterId)
                 .orderByDesc(ScheduleConflictReport::getCreateTime)
                 .orderByDesc(ScheduleConflictReport::getId);
         if (reportNo != null && !reportNo.isBlank()) {
@@ -95,6 +98,7 @@ public class ScheduleConflictReportService {
         detectClassDailyOverload(baseReportNo, context, reports);
 
         for (ScheduleConflictReport report : reports) {
+            report.setSemesterId(resolvedSemesterId);
             conflictReportMapper.insert(report);
         }
 

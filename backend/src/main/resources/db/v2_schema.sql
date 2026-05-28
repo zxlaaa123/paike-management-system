@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS schedule_rule_config (
 -- -----------------------------------
 CREATE TABLE IF NOT EXISTS auto_schedule_batch (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    semester_id BIGINT DEFAULT NULL COMMENT '所属学期ID',
     batch_no VARCHAR(50) NOT NULL COMMENT '批次号',
     total_task_count INT NOT NULL DEFAULT 0 COMMENT '参与排课任务数',
     success_task_count INT NOT NULL DEFAULT 0 COMMENT '成功排课任务数',
@@ -77,6 +78,7 @@ CREATE TABLE IF NOT EXISTS unscheduled_task (
 -- -----------------------------------
 CREATE TABLE IF NOT EXISTS schedule_conflict_report (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    semester_id BIGINT DEFAULT NULL COMMENT '所属学期ID',
     report_no VARCHAR(50) NOT NULL COMMENT '报告编号',
     conflict_type VARCHAR(50) NOT NULL COMMENT '冲突类型',
     object_type VARCHAR(50) DEFAULT NULL COMMENT '冲突对象类型：TEACHER教师 CLASS班级 CLASSROOM教室 TASK任务 SCHEDULE排课',

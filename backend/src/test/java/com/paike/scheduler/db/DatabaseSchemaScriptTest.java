@@ -88,6 +88,22 @@ class DatabaseSchemaScriptTest {
         assertTrue(application.contains("classpath:db/v16_schedule_search_order_index.sql"));
     }
 
+    @Test
+    void reportBatchSemesterMigrationIsRegistered() throws IOException {
+        String schema = resource("db/v2_schema.sql");
+        String migration = resource("db/v17_report_batch_semester.sql");
+        String application = resource("application.yml");
+
+        assertTrue(schema.contains("CREATE TABLE IF NOT EXISTS schedule_conflict_report"));
+        assertTrue(schema.contains("CREATE TABLE IF NOT EXISTS auto_schedule_batch"));
+        assertTrue(schema.contains("semester_id BIGINT DEFAULT NULL COMMENT '所属学期ID'"));
+        assertTrue(migration.contains("TABLE_NAME = 'schedule_conflict_report'"));
+        assertTrue(migration.contains("TABLE_NAME = 'auto_schedule_batch'"));
+        assertTrue(migration.contains("idx_conflict_report_semester"));
+        assertTrue(migration.contains("idx_auto_schedule_batch_semester"));
+        assertTrue(application.contains("classpath:db/v17_report_batch_semester.sql"));
+    }
+
     private String resource(String path) throws IOException {
         try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(path)) {
             assertNotNull(inputStream, "Missing resource " + path);
