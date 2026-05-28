@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@org.springframework.validation.annotation.Validated
 @RestController
 @RequestMapping("/api/teaching-tasks")
 @RequiredArgsConstructor
@@ -40,7 +41,10 @@ public class TeachingTaskController {
         @RequestParam(required = false) String className,
         @RequestParam(required = false) Integer status,
         @RequestParam(required = false) Long semesterId,
+        @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
         @RequestParam(defaultValue = "1") int pageNum,
+        @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+        @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
         @RequestParam(defaultValue = "10") int pageSize
     ) {
         // 如果传了 semesterId 则按指定学期查，否则默认按当前学期查

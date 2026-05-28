@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+@org.springframework.validation.annotation.Validated
 @RestController
 @RequestMapping("/api/teacher-unavailable-times")
 @RequiredArgsConstructor
@@ -24,7 +25,10 @@ public class TeacherUnavailableTimeController {
             @RequestParam(required = false) String teacherName,
             @RequestParam(required = false) Long timeSlotId,
             @RequestParam(required = false) Integer status,
+            @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
             @RequestParam(defaultValue = "1") int page,
+            @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+            @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
             @RequestParam(defaultValue = "10") int size
     ) {
         Page<TeacherUnavailableTime> result = unavailableTimeService.list(teacherId, teacherName, timeSlotId, status, page, size);

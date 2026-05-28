@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@org.springframework.validation.annotation.Validated
 @RestController
 @RequestMapping("/api/v3/semesters")
 @RequiredArgsConstructor
@@ -22,7 +23,10 @@ public class SemesterController {
     public Result<Page<Semester>> list(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String status,
+            @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
             @RequestParam(defaultValue = "1") int page,
+            @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+            @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
             @RequestParam(defaultValue = "10") int size
     ) {
         return Result.success(semesterService.list(keyword, status, page, size));

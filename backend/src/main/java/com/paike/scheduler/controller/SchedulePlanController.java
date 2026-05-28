@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@org.springframework.validation.annotation.Validated
 @RestController
 @RequestMapping("/api/v3/schedule-plans")
 @RequiredArgsConstructor
@@ -37,7 +38,10 @@ public class SchedulePlanController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String strategyType,
             @RequestParam(required = false) String keyword,
+            @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
             @RequestParam(defaultValue = "1") int page,
+            @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+            @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
             @RequestParam(defaultValue = "10") int size
     ) {
         Long resolvedSemesterId = semesterId;

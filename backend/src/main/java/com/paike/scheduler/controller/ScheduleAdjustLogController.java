@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@org.springframework.validation.annotation.Validated
 @RestController
 @RequestMapping("/api/v3/schedule-adjust-logs")
 @RequiredArgsConstructor
@@ -24,7 +25,10 @@ public class ScheduleAdjustLogController {
             @RequestParam(required = false) Long semesterId,
             @RequestParam(required = false) Long planId,
             @RequestParam(required = false) Long teachingTaskId,
+            @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
             @RequestParam(defaultValue = "1") int pageNum,
+            @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+            @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
             @RequestParam(defaultValue = "10") int pageSize
     ) {
         Long resolvedSemesterId = semesterId;

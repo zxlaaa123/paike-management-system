@@ -25,6 +25,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 
+@org.springframework.validation.annotation.Validated
 @RestController
 @RequestMapping("/api/schedules")
 @RequiredArgsConstructor
@@ -51,7 +52,10 @@ public class ScheduleController {
         @RequestParam(required = false) String roomName,
         @RequestParam(required = false) Integer dayOfWeek,
         @RequestParam(required = false) Long semesterId,
+        @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
         @RequestParam(defaultValue = "1") int page,
+        @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+        @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
         @RequestParam(defaultValue = "10") int size
     ) {
         // 如果传了 semesterId 则按指定学期查，否则默认按当前学期查
