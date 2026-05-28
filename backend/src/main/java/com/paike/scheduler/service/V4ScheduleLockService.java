@@ -192,7 +192,7 @@ public class V4ScheduleLockService {
             TimeSlot timeSlot = relations.timeSlotMap.get(schedule.getTimeSlotId());
             if (timeSlot != null) {
                 item.setWeekDay(timeSlot.getDayOfWeek());
-                item.setPeriod(formatPeriod(timeSlot.getPeriodNo(), timeSlot.getPeriodNo()));
+                item.setPeriod(formatTimeSlotPeriod(timeSlot.getPeriodNo()));
             }
         }
         return item;
@@ -365,6 +365,14 @@ public class V4ScheduleLockService {
             return String.valueOf(startPeriod);
         }
         return startPeriod + "-" + endPeriod;
+    }
+
+    private String formatTimeSlotPeriod(Integer periodNo) {
+        if (periodNo == null) {
+            return null;
+        }
+        int startPeriod = periodNo * 2 - 1;
+        return formatPeriod(startPeriod, startPeriod + 1);
     }
 
     private String normalizeTargetType(String targetType) {
