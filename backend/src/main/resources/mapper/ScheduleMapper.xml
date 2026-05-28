@@ -31,7 +31,7 @@
         <if test="semesterId != null">
             AND s.semester_id = #{semesterId}
         </if>
-        ORDER BY s.create_time DESC
+        ORDER BY s.create_time DESC, s.id DESC
     </select>
 
     <select id="selectDailyConflictCounts" resultType="java.util.HashMap">
