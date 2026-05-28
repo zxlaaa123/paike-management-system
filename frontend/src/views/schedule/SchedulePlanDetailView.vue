@@ -27,7 +27,7 @@ import { createRepairTask } from '../../api/v5RepairTaskApi'
 import type { ScheduleAdjustmentApplyResult } from '../../api/v4ScheduleAdjustmentApi'
 import type { ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
 import { getScoreDetails, getScoreSummary, rescore, type ScheduleScoreDetail, type ScoreSummary } from '../../api/scheduleScore'
-import { strategyText } from '../../utils/status'
+import { schedulePlanStatusTagType as statusTagType, schedulePlanStatusText as statusText, strategyText } from '../../utils/status'
 import { extractMessage } from '../../utils/errors'
 
 const route = useRoute()
@@ -265,16 +265,6 @@ async function handleAdjustSuccess(_result: ScheduleAdjustmentApplyResult) {
 function handleLocalReplanSuccess(result: ScheduleReplanResult) {
   localReplanVisible.value = false
   router.push(`/v3/schedule-plans/${result.newPlanId}`)
-}
-
-function statusText(status: string) {
-  const map: Record<string, string> = { DRAFT: '草稿', APPLIED: '已应用', ABANDONED: '已废弃' }
-  return map[status] || status
-}
-
-function statusTagType(status: string) {
-  const map: Record<string, string> = { DRAFT: 'primary', APPLIED: 'success', ABANDONED: 'info' }
-  return map[status] || 'info'
 }
 
 function scoreLevelType(level: string) {

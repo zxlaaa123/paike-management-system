@@ -1,5 +1,6 @@
 import request from '../utils/request'
 import type { ApiResponse } from './types'
+import { resolveDownloadFileName, triggerBrowserDownload } from '../utils/download'
 
 export type ScheduleReportType = 'ANALYSIS' | 'COMPARE' | 'RISK' | 'TEACHER_LOAD' | 'ROOM_USAGE'
 export type ScheduleReportFormat = 'HTML' | 'EXCEL'
@@ -31,32 +32,6 @@ export interface ScheduleReportList {
 
 function normalizeDownloadUrl(url: string) {
   return url.startsWith('/api/') ? url.slice(4) : url
-}
-
-function resolveDownloadFileName(contentDisposition?: string, fallback = 'schedule-report') {
-  if (!contentDisposition) {
-    return fallback
-  }
-  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
-  if (utf8Match?.[1]) {
-    return decodeURIComponent(utf8Match[1])
-  }
-  const plainMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/i)
-  if (plainMatch?.[1]) {
-    return plainMatch[1]
-  }
-  return fallback
-}
-
-function triggerBrowserDownload(blob: Blob, fileName: string) {
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = fileName
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  window.URL.revokeObjectURL(url)
 }
 
 export function generateScheduleReport(planId: number, payload: ScheduleReportGenerateRequest) {
