@@ -37,11 +37,6 @@ import static com.paike.scheduler.common.util.StringSanitizer.trimToNull;
 @RequiredArgsConstructor
 public class V5RepairTaskFlowService {
 
-    private static final List<String> TERMINAL_STATUSES = List.of(
-            V5RepairTaskStatus.CANCELLED.getCode(),
-            V5RepairTaskStatus.FAILED.getCode()
-    );
-
     private final ScheduleRepairTaskMapper repairTaskMapper;
     private final SchedulePlanMapper schedulePlanMapper;
     private final ScheduleMapper scheduleMapper;
@@ -156,7 +151,7 @@ public class V5RepairTaskFlowService {
 
     public void ensureCanSimulate(Long taskId) {
         ScheduleRepairTask task = requireTask(taskId);
-        if (TERMINAL_STATUSES.contains(task.getStatus())) {
+        if (V5RepairTaskStatus.CANCELLED.is(task.getStatus()) || V5RepairTaskStatus.FAILED.is(task.getStatus())) {
             throw new BusinessException("已取消或失败的修复任务不能继续生成试算方案，请重新创建任务");
         }
     }
@@ -179,24 +174,36 @@ public class V5RepairTaskFlowService {
         if (isTerminal(current)) {
             throw new BusinessException("已取消或失败任务不能继续流转");
         }
-        switch (next) {
-            case "CREATED" -> throw new BusinessException("不允许回退到 CREATED");
-            case "ANALYZING", "SUGGESTED", "SIMULATED", "APPLIED", "FAILED", "CANCELLED" -> {
+        V5RepairTaskStatus nextStatus = V5RepairTaskStatus.fromCode(next);
+        if (nextStatus == null) {
+            throw new BusinessException("不支持的修复任务状态：" + next);
+        }
+        switch (nextStatus) {
+            case CREATED -> throw new BusinessException("不允许回退到 CREATED");
+            case ANALYZING, SUGGESTED, SIMULATED, APPLIED, FAILED, CANCELLED -> {
             }
             default -> throw new BusinessException("不支持的修复任务状态：" + next);
         }
-        if ("APPLIED".equals(next) && !"SIMULATED".equals(current) && !"SUGGESTED".equals(current)) {
+        if (nextStatus == V5RepairTaskStatus.APPLIED
+                && !V5RepairTaskStatus.SIMULATED.is(current)
+                && !V5RepairTaskStatus.SUGGESTED.is(current)) {
             throw new BusinessException("仅试算或建议完成后可标记为 APPLIED");
         }
     }
 
     private String normalizeStatus(String status) {
         if (trimToNull(status) == null) throw new BusinessException("状态不能为空");
-        return status.trim().toUpperCase(Locale.ROOT);
+        String code = status.trim().toUpperCase(Locale.ROOT);
+        V5RepairTaskStatus parsed = V5RepairTaskStatus.fromCode(code);
+        if (parsed == null) {
+            throw new BusinessException("不支持的修复任务状态：" + code);
+        }
+        return parsed.getCode();
     }
 
     private boolean isTerminal(String status) {
-        return TERMINAL_STATUSES.contains(status) || V5RepairTaskStatus.APPLIED.getCode().equals(status);
+        V5RepairTaskStatus parsed = V5RepairTaskStatus.fromCode(status);
+        return parsed != null && parsed.isTerminal();
     }
 
     private ScheduleRepairTask requireTask(Long taskId) {
