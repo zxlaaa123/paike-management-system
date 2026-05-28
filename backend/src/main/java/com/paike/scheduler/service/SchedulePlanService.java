@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.enums.CourseType;
 import com.paike.scheduler.common.enums.RoomType;
+import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
@@ -50,7 +51,7 @@ public class SchedulePlanService {
         if (status != null && !status.isBlank()) {
             wrapper.eq(SchedulePlan::getStatus, status);
         } else {
-            wrapper.notIn(SchedulePlan::getStatus, List.of("SIMULATION", "CONFIRMED", "DISCARDED"));
+            wrapper.notIn(SchedulePlan::getStatus, List.of(SchedulePlanStatus.SIMULATION.getCode(), SchedulePlanStatus.CONFIRMED.getCode(), SchedulePlanStatus.DISCARDED.getCode()));
         }
         if (strategyType != null && !strategyType.isBlank()) {
             wrapper.eq(SchedulePlan::getStrategyType, strategyType);
@@ -86,7 +87,7 @@ public class SchedulePlanService {
         if (plan == null) {
             throw new BusinessException("排课方案不存在");
         }
-        if (!"DRAFT".equals(plan.getStatus())) {
+        if (!SchedulePlanStatus.DRAFT.is(plan.getStatus())) {
             throw new BusinessException("只能删除草稿方案");
         }
         planItemMapper.delete(new LambdaQueryWrapper<SchedulePlanItem>().eq(SchedulePlanItem::getPlanId, id));
@@ -100,7 +101,7 @@ public class SchedulePlanService {
         if (plan == null) {
             throw new BusinessException("排课方案不存在");
         }
-        plan.setStatus("ABANDONED");
+        plan.setStatus(SchedulePlanStatus.ABANDONED.getCode());
         plan.setUpdatedAt(LocalDateTime.now());
         planMapper.updateById(plan);
     }
@@ -120,7 +121,7 @@ public class SchedulePlanService {
         if (plan == null) {
             throw new BusinessException("排课方案不存在");
         }
-        if ("ABANDONED".equals(plan.getStatus())) {
+        if (SchedulePlanStatus.ABANDONED.is(plan.getStatus())) {
             throw new BusinessException("已废弃方案不能调整");
         }
         ensurePlanItemUnlocked(item.getId(), "该课程已锁定，不能调整");
@@ -161,7 +162,7 @@ public class SchedulePlanService {
         SchedulePlan refreshedPlan = planMapper.selectById(plan.getId());
         SchedulePlanItem refreshedItem = planItemMapper.selectById(itemId);
 
-        boolean syncFormalSchedule = "APPLIED".equals(refreshedPlan.getStatus());
+        boolean syncFormalSchedule = SchedulePlanStatus.APPLIED.is(refreshedPlan.getStatus());
         Long scheduleId = null;
         if (syncFormalSchedule) {
             scheduleId = syncAppliedSchedule(refreshedPlan, before, refreshedItem, timeSlot.getId());
@@ -288,16 +289,16 @@ public class SchedulePlanService {
             if (plan == null) {
                 throw new BusinessException("排课方案不存在");
             }
-            if ("SIMULATION".equals(plan.getStatus()) || "CONFIRMED".equals(plan.getStatus())) {
+            if (SchedulePlanStatus.SIMULATION.is(plan.getStatus()) || SchedulePlanStatus.CONFIRMED.is(plan.getStatus())) {
                 throw new BusinessException("试算方案必须从试算详情页校验后应用");
             }
-            if ("ABANDONED".equals(plan.getStatus())) {
+            if (SchedulePlanStatus.ABANDONED.is(plan.getStatus())) {
                 throw new BusinessException("已废弃方案不能应用");
             }
-            if ("DISCARDED".equals(plan.getStatus())) {
+            if (SchedulePlanStatus.DISCARDED.is(plan.getStatus())) {
                 throw new BusinessException("已放弃试算方案不能应用");
             }
-            if ("APPLIED".equals(plan.getStatus())) {
+            if (SchedulePlanStatus.APPLIED.is(plan.getStatus())) {
                 throw new BusinessException("该方案已应用，无需重复应用");
             }
             Map<String, Object> result = applyPlanInternal(plan);
@@ -343,7 +344,7 @@ public class SchedulePlanService {
         if (plan == null) {
             throw new BusinessException("试算方案不存在");
         }
-        if (!"CONFIRMED".equals(plan.getStatus())) {
+        if (!SchedulePlanStatus.CONFIRMED.is(plan.getStatus())) {
             throw new BusinessException("试算方案确认后才能应用");
         }
         if (plan.getRepairTaskId() == null) {
@@ -363,7 +364,7 @@ public class SchedulePlanService {
         List<SchedulePlan> oldAppliedPlans = planMapper.selectList(
                 new LambdaQueryWrapper<SchedulePlan>()
                         .eq(SchedulePlan::getSemesterId, semesterId)
-                        .eq(SchedulePlan::getStatus, "APPLIED"));
+                        .eq(SchedulePlan::getStatus, SchedulePlanStatus.APPLIED.getCode()));
         ensurePlansUnlocked(oldAppliedPlans, "存在已锁定课程，不能被新方案覆盖，请先解锁");
         for (SchedulePlan oldPlan : oldAppliedPlans) {
             scheduleMapper.update(null,
@@ -372,7 +373,7 @@ public class SchedulePlanService {
                             .eq(Schedule::getPlanId, oldPlan.getId())
                             .set(Schedule::getDeleted, 1)
                             .set(Schedule::getUpdateTime, LocalDateTime.now()));
-            oldPlan.setStatus("DRAFT");
+            oldPlan.setStatus(SchedulePlanStatus.DRAFT.getCode());
             oldPlan.setUpdatedAt(LocalDateTime.now());
             planMapper.updateById(oldPlan);
         }
@@ -414,7 +415,7 @@ public class SchedulePlanService {
             insertedCount++;
         }
 
-        plan.setStatus("APPLIED");
+        plan.setStatus(SchedulePlanStatus.APPLIED.getCode());
         plan.setAppliedAt(LocalDateTime.now());
         plan.setUpdatedAt(LocalDateTime.now());
         planMapper.updateById(plan);
@@ -433,14 +434,14 @@ public class SchedulePlanService {
         if (plan == null) {
             throw new BusinessException("排课方案不存在");
         }
-        if ("ABANDONED".equals(plan.getStatus())) {
+        if (SchedulePlanStatus.ABANDONED.is(plan.getStatus())) {
             throw new BusinessException("已废弃方案不能回滚应用");
         }
         if (plan.getScheduledCount() == null || plan.getScheduledCount() == 0) {
             throw new BusinessException("该方案没有排课明细，无法回滚应用");
         }
 
-        if ("APPLIED".equals(plan.getStatus())) {
+        if (SchedulePlanStatus.APPLIED.is(plan.getStatus())) {
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("planId", plan.getId());
             result.put("semesterId", plan.getSemesterId());

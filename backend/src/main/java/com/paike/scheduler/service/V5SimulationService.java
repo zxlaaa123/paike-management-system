@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.enums.V5RepairTaskStatus;
 import com.paike.scheduler.common.enums.V5SuggestionStatus;
 import com.paike.scheduler.common.exception.BusinessException;
@@ -316,10 +317,10 @@ public class V5SimulationService {
     public V5SimulationPlanDetailVo confirm(Long taskId, Long planId) {
         ScheduleRepairTask task = requireTask(taskId);
         SchedulePlan plan = requireSimulationPlan(task, planId);
-        if (!"SIMULATION".equals(plan.getStatus())) {
+        if (!SchedulePlanStatus.SIMULATION.is(plan.getStatus())) {
             throw new BusinessException("只有试算方案可以确认");
         }
-        plan.setStatus("CONFIRMED");
+        plan.setStatus(SchedulePlanStatus.CONFIRMED.getCode());
         plan.setUpdatedAt(LocalDateTime.now());
         planMapper.updateById(plan);
         return detail(taskId, planId);
@@ -329,7 +330,7 @@ public class V5SimulationService {
     public Map<String, Object> apply(Long taskId, Long planId) {
         ScheduleRepairTask task = requireTask(taskId);
         SchedulePlan plan = requireSimulationPlan(task, planId);
-        if (!"SIMULATION".equals(plan.getStatus()) && !"CONFIRMED".equals(plan.getStatus())) {
+        if (!SchedulePlanStatus.SIMULATION.is(plan.getStatus()) && !SchedulePlanStatus.CONFIRMED.is(plan.getStatus())) {
             throw new BusinessException("只有试算或已确认方案可以应用");
         }
         // apply gate：强制后端重跑一致性校验，存在 BLOCKING 时阻止应用
@@ -348,15 +349,15 @@ public class V5SimulationService {
         if (Boolean.TRUE.equals(compare.getHasNewHardConflicts())) {
             throw new BusinessException("试算方案引入新的硬冲突，不推荐应用");
         }
-        if ("SIMULATION".equals(plan.getStatus())) {
-            plan.setStatus("CONFIRMED");
+        if (SchedulePlanStatus.SIMULATION.is(plan.getStatus())) {
+            plan.setStatus(SchedulePlanStatus.CONFIRMED.getCode());
             plan.setUpdatedAt(LocalDateTime.now());
             planMapper.updateById(plan);
         }
         Map<String, Object> result = schedulePlanService.applySimulationPlan(planId);
         plan = planMapper.selectById(planId);
-        if (plan != null && !"APPLIED".equals(plan.getStatus())) {
-            plan.setStatus("APPLIED");
+        if (plan != null && !SchedulePlanStatus.APPLIED.is(plan.getStatus())) {
+            plan.setStatus(SchedulePlanStatus.APPLIED.getCode());
             plan.setUpdatedAt(LocalDateTime.now());
             planMapper.updateById(plan);
         }
@@ -371,13 +372,13 @@ public class V5SimulationService {
     public V5SimulationPlanDetailVo discard(Long taskId, Long planId) {
         ScheduleRepairTask task = requireTask(taskId);
         SchedulePlan plan = requireSimulationPlan(task, planId);
-        if ("APPLIED".equals(plan.getStatus())) {
+        if (SchedulePlanStatus.APPLIED.is(plan.getStatus())) {
             throw new BusinessException("已应用试算方案不能放弃");
         }
-        if ("DISCARDED".equals(plan.getStatus())) {
+        if (SchedulePlanStatus.DISCARDED.is(plan.getStatus())) {
             throw new BusinessException("试算方案已放弃，不能重复操作");
         }
-        plan.setStatus("DISCARDED");
+        plan.setStatus(SchedulePlanStatus.DISCARDED.getCode());
         plan.setUpdatedAt(LocalDateTime.now());
         planMapper.updateById(plan);
 
@@ -420,7 +421,7 @@ public class V5SimulationService {
         plan.setName("试算方案-" + task.getTaskCode() + "-" + suggestion.getSuggestionCode());
         plan.setStrategyType(baseline == null ? "V5_SIMULATION" : baseline.getStrategyType());
         plan.setPlanMode("SIMULATION");
-        plan.setStatus("SIMULATION");
+        plan.setStatus(SchedulePlanStatus.SIMULATION.getCode());
         plan.setTotalScore(baseline == null ? BigDecimal.ZERO : baseline.getTotalScore());
         plan.setScheduledCount(sourceItems.size());
         plan.setUnscheduledCount(baseline == null ? 0 : baseline.getUnscheduledCount());
@@ -451,7 +452,7 @@ public class V5SimulationService {
         plan.setName(resolveLocalReplanName(request.getNewPlanName(), task, baseline));
         plan.setStrategyType(baseline.getStrategyType());
         plan.setPlanMode("SIMULATION");
-        plan.setStatus("SIMULATION");
+        plan.setStatus(SchedulePlanStatus.SIMULATION.getCode());
         plan.setTotalScore(baseline.getTotalScore());
         plan.setScheduledCount(sourceItems.size());
         plan.setUnscheduledCount(baseline.getUnscheduledCount());
@@ -767,7 +768,7 @@ public class V5SimulationService {
         if (plan == null) {
             throw new BusinessException("试算来源方案不存在");
         }
-        if ("SIMULATION".equals(plan.getStatus()) || "DISCARDED".equals(plan.getStatus())) {
+        if (SchedulePlanStatus.SIMULATION.is(plan.getStatus()) || SchedulePlanStatus.DISCARDED.is(plan.getStatus())) {
             throw new BusinessException("不能基于试算或已放弃方案继续生成试算");
         }
         return plan;
@@ -1183,7 +1184,7 @@ public class V5SimulationService {
         if (!Objects.equals(plan.getRepairTaskId(), task.getId())) {
             throw new BusinessException("试算方案不属于当前修复任务");
         }
-        if (!List.of("SIMULATION", "CONFIRMED", "DISCARDED", "APPLIED").contains(plan.getStatus())) {
+        if (!List.of(SchedulePlanStatus.SIMULATION.getCode(), SchedulePlanStatus.CONFIRMED.getCode(), SchedulePlanStatus.DISCARDED.getCode(), SchedulePlanStatus.APPLIED.getCode()).contains(plan.getStatus())) {
             throw new BusinessException("目标方案不是试算方案");
         }
         return plan;

@@ -2,6 +2,7 @@ package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
@@ -231,7 +232,7 @@ public class V4ScheduleLockService {
         if (plan == null) {
             throw new BusinessException("排课方案不存在");
         }
-        if ("ABANDONED".equalsIgnoreCase(plan.getStatus())) {
+        if (SchedulePlanStatus.ABANDONED.getCode().equalsIgnoreCase(plan.getStatus())) {
             throw new BusinessException("已废弃方案不能锁定");
         }
         SchedulePlanItem item = schedulePlanItemMapper.selectById(request.getPlanItemId());

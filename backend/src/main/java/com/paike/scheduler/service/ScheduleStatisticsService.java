@@ -1,6 +1,7 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.config.ScheduleThresholdProperties;
 import com.paike.scheduler.entity.*;
@@ -228,9 +229,9 @@ public class ScheduleStatisticsService {
                         .eq(SchedulePlan::getSemesterId, semesterId));
 
         overview.put("totalPlans", plans.size());
-        overview.put("draftPlans", plans.stream().filter(p -> "DRAFT".equals(p.getStatus())).count());
-        overview.put("appliedPlans", plans.stream().filter(p -> "APPLIED".equals(p.getStatus())).count());
-        overview.put("abandonedPlans", plans.stream().filter(p -> "ABANDONED".equals(p.getStatus())).count());
+        overview.put("draftPlans", plans.stream().filter(p -> SchedulePlanStatus.DRAFT.is(p.getStatus())).count());
+        overview.put("appliedPlans", plans.stream().filter(p -> SchedulePlanStatus.APPLIED.is(p.getStatus())).count());
+        overview.put("abandonedPlans", plans.stream().filter(p -> SchedulePlanStatus.ABANDONED.is(p.getStatus())).count());
 
         // 最高评分方案
         SchedulePlan bestPlan = plans.stream()
@@ -246,7 +247,7 @@ public class ScheduleStatisticsService {
 
         // 当前已应用的方案
         SchedulePlan appliedPlan = plans.stream()
-                .filter(p -> "APPLIED".equals(p.getStatus()))
+                .filter(p -> SchedulePlanStatus.APPLIED.is(p.getStatus()))
                 .findFirst()
                 .orElse(null);
         overview.put("hasAppliedPlan", appliedPlan != null);

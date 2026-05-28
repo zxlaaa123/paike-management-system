@@ -1,6 +1,7 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.ScheduleLockedItem;
 import com.paike.scheduler.entity.SchedulePlan;
@@ -50,7 +51,7 @@ public class V4ScheduleReplanService {
         if (sourcePlan == null) {
             throw new BusinessException("来源排课方案不存在");
         }
-        if ("ABANDONED".equals(sourcePlan.getStatus())) {
+        if (SchedulePlanStatus.ABANDONED.is(sourcePlan.getStatus())) {
             throw new BusinessException("已废弃方案不能进行局部重排");
         }
         if ("FAILED".equals(sourcePlan.getStatus())) {
@@ -121,7 +122,7 @@ public class V4ScheduleReplanService {
         newPlan.setSemesterId(sourcePlan.getSemesterId());
         newPlan.setName(newPlanName);
         newPlan.setStrategyType(sourcePlan.getStrategyType());
-        newPlan.setStatus("DRAFT");
+        newPlan.setStatus(SchedulePlanStatus.DRAFT.getCode());
         newPlan.setScheduledCount(sourcePlan.getScheduledCount());
         newPlan.setUnscheduledCount(sourcePlan.getUnscheduledCount());
         newPlan.setConflictCount(sourcePlan.getConflictCount());

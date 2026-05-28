@@ -1,6 +1,7 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.config.ScheduleThresholdProperties;
 import com.paike.scheduler.entity.*;
@@ -61,7 +62,7 @@ public class V3ScheduleGenerateService {
         plan.setSemesterId(semesterId);
         plan.setName(planName);
         plan.setStrategyType(strategyType);
-        plan.setStatus("DRAFT");
+        plan.setStatus(SchedulePlanStatus.DRAFT.getCode());
         plan.setScheduledCount(0);
         plan.setUnscheduledCount(0);
         plan.setConflictCount(0);
@@ -175,7 +176,7 @@ public class V3ScheduleGenerateService {
                 new LambdaQueryWrapper<SchedulePlan>()
                         .eq(SchedulePlan::getSemesterId, semesterId)
                         .eq(SchedulePlan::getName, planName)
-                        .eq(SchedulePlan::getStatus, "DRAFT"));
+                        .eq(SchedulePlan::getStatus, SchedulePlanStatus.DRAFT.getCode()));
         if (existingDrafts.isEmpty()) {
             return;
         }

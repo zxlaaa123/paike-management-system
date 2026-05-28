@@ -1,6 +1,7 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.config.ScheduleThresholdProperties;
 import com.paike.scheduler.entity.SchedulePlan;
@@ -128,7 +129,7 @@ public class V4ScheduleAnalysisService {
         vo.setTermName(semester == null ? "未知学期" : semester.getName());
         vo.setStrategyCode(plan.getStrategyType());
         vo.setPlanStatus(plan.getStatus());
-        vo.setIsCurrent(currentSemester != null && currentSemester.getId().equals(plan.getSemesterId()) && "APPLIED".equals(plan.getStatus()));
+        vo.setIsCurrent(currentSemester != null && currentSemester.getId().equals(plan.getSemesterId()) && SchedulePlanStatus.APPLIED.is(plan.getStatus()));
         vo.setTotalScore(plan.getTotalScore());
         vo.setScheduledCount(safeInt(plan.getScheduledCount()));
         vo.setUnscheduledCount(safeInt(plan.getUnscheduledCount()));
