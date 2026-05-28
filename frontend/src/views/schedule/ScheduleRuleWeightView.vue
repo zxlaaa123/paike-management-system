@@ -10,13 +10,7 @@ import {
 } from '../../api/scheduleRuleWeight'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
 import { extractMessage } from '../../utils/errors'
-
-function fallback<T>(promise: Promise<T>, defaultValue: T): Promise<T> {
-  return promise.catch((err) => {
-    console.warn('fetchOptions partial fail:', err)
-    return defaultValue
-  })
-}
+import { fallback } from '../../utils/async'
 
 const loading = ref(false)
 const saving = ref(false)

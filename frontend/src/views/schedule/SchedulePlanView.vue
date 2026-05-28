@@ -9,8 +9,9 @@ import {
   type SchedulePlan,
 } from '../../api/schedulePlan'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
-import { strategyText } from '../../utils/status'
+import { schedulePlanStatusTagType as statusTagType, schedulePlanStatusText as statusText, strategyText } from '../../utils/status'
 import { isCancel } from '../../utils/errors'
+import { fallback } from '../../utils/async'
 
 const router = useRouter()
 
@@ -31,13 +32,6 @@ const semesterList = ref<Semester[]>([])
 const currentSemester = ref<Semester | null>(null)
 
 const hasCurrentSemester = computed(() => currentSemester.value !== null)
-
-function fallback<T>(promise: Promise<T>, defaultValue: T): Promise<T> {
-  return promise.catch((err) => {
-    console.warn('fetchOptions partial fail:', err)
-    return defaultValue
-  })
-}
 
 async function fetchData() {
   loading.value = true
@@ -116,16 +110,6 @@ async function handleAbandon(row: SchedulePlan) {
     if (isCancel(err)) return
     await fetchData()
   }
-}
-
-function statusTagType(status: string) {
-  const map: Record<string, string> = { DRAFT: 'primary', APPLIED: 'success', ABANDONED: 'info' }
-  return map[status] || 'info'
-}
-
-function statusText(status: string) {
-  const map: Record<string, string> = { DRAFT: '草稿', APPLIED: '已应用', ABANDONED: '已废弃' }
-  return map[status] || status
 }
 
 function rowClass({ row }: { row: SchedulePlan }): string {

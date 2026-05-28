@@ -18,6 +18,7 @@ import { getAllTeachingTasks, type TeachingTask } from '../../api/teachingTask'
 import { getAllTimeSlots, type TimeSlot } from '../../api/timeSlot'
 import { getAllClassrooms, type Classroom } from '../../api/classroom'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
+import { fallback } from '../../utils/async'
 
 const router = useRouter()
 const loading = ref(false)
@@ -73,13 +74,6 @@ const timeSlotsByDay = computed(() => {
 })
 
 const dayNames: Record<number, string> = { 1: '周一', 2: '周二', 3: '周三', 4: '周四', 5: '周五', 6: '周六', 7: '周日' }
-
-function fallback<T>(promise: Promise<T>, defaultValue: T): Promise<T> {
-  return promise.catch((err) => {
-    console.warn('fetchOptions partial fail:', err)
-    return defaultValue
-  })
-}
 
 async function fetchData() {
   loading.value = true

@@ -15,6 +15,7 @@ import { getAllClasses, type ClassInfo } from '../../api/classInfo'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
 import { statusText, statusTagType } from '../../utils/status'
 import { extractMessage, isCancel } from '../../utils/errors'
+import { fallback } from '../../utils/async'
 
 const loading = ref(false)
 const tableData = ref<TeachingTask[]>([])
@@ -59,13 +60,6 @@ const semesterList = ref<Semester[]>([])
 const currentSemester = ref<Semester | null>(null)
 
 const hasCurrentSemester = computed(() => currentSemester.value !== null)
-
-function fallback<T>(promise: Promise<T>, defaultValue: T): Promise<T> {
-  return promise.catch((err) => {
-    console.warn('fetchOptions partial fail:', err)
-    return defaultValue
-  })
-}
 
 async function fetchData() {
   loading.value = true

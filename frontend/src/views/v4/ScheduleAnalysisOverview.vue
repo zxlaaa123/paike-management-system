@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getCurrentSemester, type Semester } from '../../api/semester'
 import { getSchedulePlanList, type SchedulePlan } from '../../api/schedulePlan'
-import { strategyText } from '../../utils/status'
+import { schedulePlanStatusText as statusText, strategyText } from '../../utils/status'
 
 const router = useRouter()
 
@@ -43,15 +43,6 @@ function goDetail(planId: number) {
 
 function goV3Plan(planId: number) {
   router.push(`/v3/schedule-plans/${planId}`)
-}
-
-function statusText(status: string) {
-  const map: Record<string, string> = {
-    DRAFT: '草稿',
-    APPLIED: '已应用',
-    ABANDONED: '已废弃',
-  }
-  return map[status] || status
 }
 
 function scoreLevel(score?: number | null) {

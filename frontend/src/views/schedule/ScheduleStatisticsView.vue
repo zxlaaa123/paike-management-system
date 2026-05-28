@@ -14,6 +14,7 @@ import {
   type PlanOverview,
 } from '../../api/scheduleStatistics'
 import { extractMessage } from '../../utils/errors'
+import { fallback } from '../../utils/async'
 
 const loading = ref(false)
 const activeTab = ref('overview')
@@ -33,13 +34,6 @@ const overview = ref<PlanOverview | null>(null)
 const workloadData = ref<TeacherWorkloadItem[]>([])
 const utilizationData = ref<ClassroomUtilizationItem[]>([])
 const balanceData = ref<ClassBalanceItem[]>([])
-
-function fallback<T>(promise: Promise<T>, defaultValue: T): Promise<T> {
-  return promise.catch((err) => {
-    console.warn('fetchOptions partial fail:', err)
-    return defaultValue
-  })
-}
 
 async function fetchOptions() {
   const [semesters, current] = await Promise.all([

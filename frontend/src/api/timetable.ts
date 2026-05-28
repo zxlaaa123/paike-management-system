@@ -1,5 +1,6 @@
 import request from '../utils/request'
 import type { ApiResponse } from './types'
+import { resolveDownloadFileName, triggerBrowserDownload } from '../utils/download'
 
 export interface TimetableItem {
   scheduleId: number
@@ -15,35 +16,9 @@ export interface TimetableItem {
   building: string
 }
 
-function resolveDownloadFileName(contentDisposition?: string) {
-  if (!contentDisposition) {
-    return 'timetable.xlsx'
-  }
-  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
-  if (utf8Match?.[1]) {
-    return decodeURIComponent(utf8Match[1])
-  }
-  const plainMatch = contentDisposition.match(/filename="?([^";]+)"?/i)
-  if (plainMatch?.[1]) {
-    return plainMatch[1]
-  }
-  return 'timetable.xlsx'
-}
-
-function triggerBrowserDownload(blob: Blob, fileName: string) {
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = fileName
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  window.URL.revokeObjectURL(url)
-}
-
 async function exportTimetable(url: string) {
   const response = await request.get<Blob>(url, { responseType: 'blob' })
-  const fileName = resolveDownloadFileName(response.headers['content-disposition'])
+  const fileName = resolveDownloadFileName(response.headers['content-disposition'], 'timetable.xlsx')
   triggerBrowserDownload(response.data, fileName)
 }
 

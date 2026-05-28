@@ -8,17 +8,21 @@ import {
   createRepairTask,
   listRepairTasks,
   type V5RepairTaskCreatePayload,
-  type V5RepairTaskStatus,
   type V5RepairTaskSummary,
 } from '../../api/v5RepairTaskApi'
 import { extractMessage } from '../../utils/errors'
+import {
+  repairTaskStatusOptions as statusOptions,
+  repairTaskStatusTagType as statusTagType,
+  repairTaskStatusText as statusText,
+} from '../../utils/status'
 
 const router = useRouter()
 const loading = ref(false)
 const creating = ref(false)
 const currentSemesterId = ref<number | null>(null)
 const tasks = ref<V5RepairTaskSummary[]>([])
-const statusFilter = ref<V5RepairTaskStatus | ''>('')
+const statusFilter = ref<string>('')
 const createDialogVisible = ref(false)
 const form = ref({
   taskType: 'SMART_FIX',
@@ -26,33 +30,10 @@ const form = ref({
   planId: undefined as number | undefined,
 })
 
-const statusOptions: Array<{ label: string; value: V5RepairTaskStatus }> = [
-  { label: '待处理', value: 'PENDING' },
-  { label: '已创建', value: 'CREATED' },
-  { label: '分析中', value: 'ANALYZING' },
-  { label: '已生成建议', value: 'SUGGESTED' },
-  { label: '已试算', value: 'SIMULATED' },
-  { label: '已应用', value: 'APPLIED' },
-  { label: '已取消', value: 'CANCELLED' },
-  { label: '失败', value: 'FAILED' },
-]
-
 const filteredTasks = computed(() => {
   if (!statusFilter.value) return tasks.value
   return tasks.value.filter((t) => t.status === statusFilter.value)
 })
-
-function statusText(status: V5RepairTaskStatus) {
-  return statusOptions.find((s) => s.value === status)?.label || status
-}
-
-function statusTagType(status: V5RepairTaskStatus) {
-  if (status === 'FAILED') return 'danger'
-  if (status === 'CANCELLED') return 'info'
-  if (status === 'APPLIED') return 'success'
-  if (status === 'SIMULATED' || status === 'SUGGESTED') return 'warning'
-  return 'primary'
-}
 
 async function fetchData() {
   loading.value = true

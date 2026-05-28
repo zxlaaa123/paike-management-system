@@ -18,6 +18,7 @@ import {
 } from '../../api/v5RepairSuggestionApi'
 import { generateLocalReplan, type V5LocalReplanPayload } from '../../api/v5SimulationApi'
 import { extractMessage } from '../../utils/errors'
+import { repairTaskStatusTagType as statusTagType, repairTaskStatusText as statusText } from '../../utils/status'
 
 const route = useRoute()
 const router = useRouter()
@@ -44,29 +45,6 @@ const localReplanForm = ref({
   selectedPlanItemIds: [] as number[],
   candidateLimit: 600,
 })
-
-const statusOptions: Array<{ label: string; value: V5RepairTaskStatus }> = [
-  { label: '待处理', value: 'PENDING' },
-  { label: '已创建', value: 'CREATED' },
-  { label: '分析中', value: 'ANALYZING' },
-  { label: '已生成建议', value: 'SUGGESTED' },
-  { label: '已试算', value: 'SIMULATED' },
-  { label: '已应用', value: 'APPLIED' },
-  { label: '已取消', value: 'CANCELLED' },
-  { label: '失败', value: 'FAILED' },
-]
-
-function statusText(status: V5RepairTaskStatus) {
-  return statusOptions.find((s) => s.value === status)?.label || status
-}
-
-function statusTagType(status: V5RepairTaskStatus) {
-  if (status === 'FAILED') return 'danger'
-  if (status === 'CANCELLED') return 'info'
-  if (status === 'APPLIED') return 'success'
-  if (status === 'SIMULATED' || status === 'SUGGESTED') return 'warning'
-  return 'primary'
-}
 
 async function fetchData() {
   loading.value = true

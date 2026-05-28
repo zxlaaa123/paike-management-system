@@ -41,3 +41,40 @@ export function strategyText(strategy: string): string {
   }
   return map[strategy] || strategy
 }
+
+/** 排课方案状态文本映射 */
+export function schedulePlanStatusText(status: string): string {
+  const map: Record<string, string> = { DRAFT: '草稿', APPLIED: '已应用', ABANDONED: '已废弃' }
+  return map[status] || status
+}
+
+/** 排课方案状态 Tag 类型映射 */
+export function schedulePlanStatusTagType(status: string): string {
+  const map: Record<string, string> = { DRAFT: 'primary', APPLIED: 'success', ABANDONED: 'info' }
+  return map[status] || 'info'
+}
+
+export const repairTaskStatusOptions = [
+  { label: '待处理', value: 'PENDING' },
+  { label: '已创建', value: 'CREATED' },
+  { label: '分析中', value: 'ANALYZING' },
+  { label: '已生成建议', value: 'SUGGESTED' },
+  { label: '已试算', value: 'SIMULATED' },
+  { label: '已应用', value: 'APPLIED' },
+  { label: '已取消', value: 'CANCELLED' },
+  { label: '失败', value: 'FAILED' },
+] as const
+
+/** V5 修复任务状态文本映射 */
+export function repairTaskStatusText(status: string): string {
+  return repairTaskStatusOptions.find((item) => item.value === status)?.label || status
+}
+
+/** V5 修复任务状态 Tag 类型映射 */
+export function repairTaskStatusTagType(status: string): string {
+  if (status === 'FAILED') return 'danger'
+  if (status === 'CANCELLED') return 'info'
+  if (status === 'APPLIED') return 'success'
+  if (status === 'SIMULATED' || status === 'SUGGESTED') return 'warning'
+  return 'primary'
+}
