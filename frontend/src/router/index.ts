@@ -2,6 +2,67 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import BaseLayout from '../layout/BaseLayout.vue'
 import { useAuthStore } from '../stores/auth'
 
+type RouteParamGuard = {
+  params: string[]
+  redirect: (params: Record<string, string>) => string
+}
+
+const routeParamGuards: Record<string, RouteParamGuard> = {
+  SchedulePlanDetail: {
+    params: ['id'],
+    redirect: () => '/v3/schedule-plans',
+  },
+  V4ScheduleAnalysisDetail: {
+    params: ['planId'],
+    redirect: () => '/v4/schedule-analysis',
+  },
+  V4ScheduleScoreDetail: {
+    params: ['planId'],
+    redirect: () => '/v4/schedule-analysis',
+  },
+  V4ScheduleRiskCenter: {
+    params: ['planId'],
+    redirect: () => '/v4/schedule-analysis',
+  },
+  V4ScheduleCharts: {
+    params: ['planId'],
+    redirect: () => '/v4/schedule-analysis',
+  },
+  V4ScheduleLocks: {
+    params: ['planId'],
+    redirect: () => '/v4/schedule-analysis',
+  },
+  V4ScheduleReports: {
+    params: ['planId'],
+    redirect: () => '/v4/schedule-analysis',
+  },
+  V4ScheduleAiAnalysis: {
+    params: ['planId'],
+    redirect: () => '/v4/schedule-analysis',
+  },
+  V5RepairTaskDetail: {
+    params: ['taskId'],
+    redirect: () => '/v5/repair-tasks',
+  },
+  V5SimulationPlanDetail: {
+    params: ['taskId', 'planId'],
+    redirect: (params) => (params.taskId ? `/v5/repair-tasks/${params.taskId}` : '/v5/repair-tasks'),
+  },
+}
+
+function parsePositiveIntegerRouteParam(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    return null
+  }
+
+  const text = String(value ?? '').trim()
+  if (!/^[1-9]\d*$/.test(text)) {
+    return null
+  }
+
+  return text
+}
+
 const routes: RouteRecordRaw[] = [
   {
     path: '/login',
@@ -225,6 +286,18 @@ router.beforeEach(async (to, _from) => {
     } catch (_error) {
       authStore.clearToken()
       return { path: '/login', query: { redirect: to.fullPath } }
+    }
+  }
+
+  const guard = routeParamGuards[String(to.name)]
+  if (guard) {
+    const params: Record<string, string> = {}
+    for (const paramName of guard.params) {
+      const value = parsePositiveIntegerRouteParam(to.params[paramName])
+      if (!value) {
+        return guard.redirect(params)
+      }
+      params[paramName] = value
     }
   }
 })
