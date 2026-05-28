@@ -87,7 +87,7 @@ public class ScheduleController {
     @GetMapping("/{id}")
     public Result<Schedule> getById(@PathVariable Long id) {
         Schedule schedule = scheduleMapper.selectById(id);
-        if (schedule == null || schedule.getDeleted() == 1) {
+        if (schedule == null || Integer.valueOf(1).equals(schedule.getDeleted())) {
             throw new BusinessException(404, "排课记录不存在");
         }
         fillRelation(schedule);
@@ -105,7 +105,7 @@ public class ScheduleController {
         }
 
         TeachingTask task = teachingTaskMapper.selectById(form.getTeachingTaskId());
-        if (task == null || task.getDeleted() == 1) {
+        if (task == null || Integer.valueOf(1).equals(task.getDeleted())) {
             throw new BusinessException(400, "教学任务不存在或已删除");
         }
 
@@ -135,7 +135,7 @@ public class ScheduleController {
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         Schedule schedule = scheduleMapper.selectById(id);
-        if (schedule == null || schedule.getDeleted() == 1) {
+        if (schedule == null || Integer.valueOf(1).equals(schedule.getDeleted())) {
             throw new BusinessException(404, "排课记录不存在");
         }
         lockGuardService.ensureScheduleAndLinkedPlanUnlocked(schedule, "该课程已锁定，不能删除");

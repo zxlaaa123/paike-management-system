@@ -39,7 +39,7 @@ public class ClassInfoService {
 
     public ClassInfo getById(Long id) {
         ClassInfo classInfo = classInfoMapper.selectById(id);
-        if (classInfo == null || classInfo.getDeleted() == 1) {
+        if (classInfo == null || Integer.valueOf(1).equals(classInfo.getDeleted())) {
             throw new BusinessException(404, "班级不存在");
         }
         return classInfo;

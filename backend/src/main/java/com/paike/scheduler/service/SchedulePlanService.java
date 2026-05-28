@@ -127,7 +127,7 @@ public class SchedulePlanService {
         BigDecimal beforeScore = normalizeScore(plan.getTotalScore());
 
         Classroom classroom = classroomMapper.selectById(request.getClassroomId());
-        if (classroom == null || classroom.getDeleted() == 1) {
+        if (classroom == null || Integer.valueOf(1).equals(classroom.getDeleted())) {
             throw new BusinessException("所选教室不存在");
         }
         if (classroom.getStatus() == null || classroom.getStatus() != 1) {

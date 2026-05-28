@@ -107,7 +107,7 @@ public class TeacherUnavailableTimeService {
     public TeacherUnavailableTime create(TeacherUnavailableTimeForm form) {
         // 校验教师是否存在且启用
         Teacher teacher = teacherMapper.selectById(form.getTeacherId());
-        if (teacher == null || teacher.getDeleted() == 1) {
+        if (teacher == null || Integer.valueOf(1).equals(teacher.getDeleted())) {
             throw new BusinessException("所选教师不存在");
         }
         if (teacher.getStatus() != 1) {
@@ -153,13 +153,13 @@ public class TeacherUnavailableTimeService {
     @Transactional(rollbackFor = Exception.class)
     public TeacherUnavailableTime update(Long id, TeacherUnavailableTimeForm form) {
         TeacherUnavailableTime existing = unavailableTimeMapper.selectById(id);
-        if (existing == null || existing.getDeleted() == 1) {
+        if (existing == null || Integer.valueOf(1).equals(existing.getDeleted())) {
             throw new BusinessException("禁排时间记录不存在");
         }
 
         // 校验教师是否存在且启用
         Teacher teacher = teacherMapper.selectById(form.getTeacherId());
-        if (teacher == null || teacher.getDeleted() == 1) {
+        if (teacher == null || Integer.valueOf(1).equals(teacher.getDeleted())) {
             throw new BusinessException("所选教师不存在");
         }
         if (teacher.getStatus() != 1) {
@@ -211,7 +211,7 @@ public class TeacherUnavailableTimeService {
     @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long id, Integer status) {
         TeacherUnavailableTime existing = unavailableTimeMapper.selectById(id);
-        if (existing == null || existing.getDeleted() == 1) {
+        if (existing == null || Integer.valueOf(1).equals(existing.getDeleted())) {
             throw new BusinessException("禁排时间记录不存在");
         }
         existing.setStatus(status);
