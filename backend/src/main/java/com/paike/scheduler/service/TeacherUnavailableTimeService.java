@@ -196,6 +196,7 @@ public class TeacherUnavailableTimeService {
     /**
      * 删除采用逻辑删除（通过 @TableLogic 自动处理），历史数据仍可用于审计和问题排查。
      */
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         TeacherUnavailableTime existing = unavailableTimeMapper.selectById(id);
         if (existing == null) {

@@ -35,6 +35,7 @@ public class ScheduleRuleWeightService {
         return ruleWeightMapper.selectById(id);
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void updateWeight(Long id, java.math.BigDecimal weight, Integer enabled, String description) {
         ScheduleRuleWeight rule = ruleWeightMapper.selectById(id);
         if (rule == null) throw new BusinessException("规则不存在");

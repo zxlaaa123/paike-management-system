@@ -102,9 +102,17 @@ public class V4ScheduleSourceService {
 
     private Semester resolveSemester(Long termId) {
         if (termId != null) {
-            return semesterService.getById(termId);
+            Semester semester = semesterService.getById(termId);
+            if (semester == null) {
+                throw new BusinessException("学期不存在");
+            }
+            return semester;
         }
-        return semesterService.getCurrentSemester();
+        Semester semester = semesterService.getCurrentSemester();
+        if (semester == null) {
+            throw new BusinessException("当前学期不存在");
+        }
+        return semester;
     }
 
     private String formatPeriod(Integer startPeriod, Integer endPeriod) {

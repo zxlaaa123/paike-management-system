@@ -6,6 +6,7 @@ import com.paike.scheduler.entity.Schedule;
 import com.paike.scheduler.entity.ScheduleLockedItem;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
+import com.paike.scheduler.entity.TimeSlot;
 import com.paike.scheduler.mapper.ClassInfoMapper;
 import com.paike.scheduler.mapper.ClassroomMapper;
 import com.paike.scheduler.mapper.CourseMapper;
@@ -24,6 +25,8 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,6 +42,8 @@ class V4ScheduleLockServiceTest {
     private SchedulePlanMapper schedulePlanMapper;
     private SchedulePlanItemMapper schedulePlanItemMapper;
     private ScheduleMapper scheduleMapper;
+    private SchedulePlanService schedulePlanService;
+    private TimeSlotMapper timeSlotMapper;
     private SystemAuditLogService auditLogService;
     private V4ScheduleLockService service;
 
@@ -51,6 +56,8 @@ class V4ScheduleLockServiceTest {
         schedulePlanMapper = mock(SchedulePlanMapper.class);
         schedulePlanItemMapper = mock(SchedulePlanItemMapper.class);
         scheduleMapper = mock(ScheduleMapper.class);
+        schedulePlanService = mock(SchedulePlanService.class);
+        timeSlotMapper = mock(TimeSlotMapper.class);
         auditLogService = mock(SystemAuditLogService.class);
         TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
@@ -63,12 +70,12 @@ class V4ScheduleLockServiceTest {
                 schedulePlanMapper,
                 schedulePlanItemMapper,
                 scheduleMapper,
-                mock(SchedulePlanService.class),
+                schedulePlanService,
                 mock(CourseMapper.class),
                 mock(TeacherMapper.class),
                 mock(ClassInfoMapper.class),
                 mock(ClassroomMapper.class),
-                mock(TimeSlotMapper.class),
+                timeSlotMapper,
                 transactionTemplate,
                 auditLogService);
     }
@@ -140,5 +147,33 @@ class V4ScheduleLockServiceTest {
                 eq(5L),
                 eq(12L),
                 contains("锁定记录=901"));
+    }
+
+    @Test
+    void listPlanLocks_expandsScheduleTimeSlotPeriod() {
+        SchedulePlan plan = new SchedulePlan();
+        plan.setId(11L);
+        plan.setName("当前方案");
+        ScheduleLockedItem lock = new ScheduleLockedItem();
+        lock.setId(902L);
+        lock.setTargetType("SCHEDULE");
+        lock.setPlanId(11L);
+        lock.setScheduleId(44L);
+        Schedule schedule = new Schedule();
+        schedule.setId(44L);
+        schedule.setTimeSlotId(2L);
+        TimeSlot timeSlot = new TimeSlot();
+        timeSlot.setId(2L);
+        timeSlot.setDayOfWeek(1);
+        timeSlot.setPeriodNo(2);
+        when(schedulePlanMapper.selectById(11L)).thenReturn(plan);
+        when(scheduleLockedItemMapper.selectList(any())).thenReturn(List.of(lock));
+        when(schedulePlanService.getPlanItems(11L)).thenReturn(List.of());
+        when(scheduleMapper.selectBatchIds(List.of(44L))).thenReturn(List.of(schedule));
+        when(timeSlotMapper.selectBatchIds(List.of(2L))).thenReturn(List.of(timeSlot));
+
+        String period = service.listPlanLocks(11L).getItems().get(0).getPeriod();
+
+        assertEquals("3-4", period);
     }
 }
