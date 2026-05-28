@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * V5 阶段10：AI 修复解释辅助。
@@ -438,11 +437,5 @@ public class V5RepairExplanationService {
         String applyAdvice;
         Boolean recommendApply;
         String defenseSummary;
-    }
-
-    /** 仅用于类型对齐，避免 unused 警告 */
-    @SuppressWarnings("unused")
-    private void __keepObjects() {
-        Objects.hash(this);
     }
 }
