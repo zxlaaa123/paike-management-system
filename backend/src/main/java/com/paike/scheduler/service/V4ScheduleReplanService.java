@@ -69,7 +69,6 @@ public class V4ScheduleReplanService {
         }
 
         V4ScheduleReplanRequest safeRequest = request == null ? new V4ScheduleReplanRequest() : request;
-        boolean keepLocked = !Boolean.FALSE.equals(safeRequest.getKeepLocked());
         if (Boolean.FALSE.equals(safeRequest.getKeepLocked())) {
             throw new BusinessException("V5 修复约束：锁定课程不可移动，局部重排必须保留锁定项");
         }
@@ -82,16 +81,14 @@ public class V4ScheduleReplanService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        SchedulePlan newPlan = buildNewPlan(sourcePlan, newPlanName, strategyCode, keepLocked);
+        SchedulePlan newPlan = buildNewPlan(sourcePlan, newPlanName, strategyCode);
         schedulePlanMapper.insert(newPlan);
         schedulePlanExplainService.clearPlanArtifacts(newPlan.getId());
 
         Map<Long, Long> itemIdMapping = copyPlanItems(sourceItems, newPlan);
         copyGenerateLogs(sourcePlan, newPlan, lockedPlanItemIds.size(), Math.max(0, sourceItems.size() - lockedPlanItemIds.size()));
         copyUnassignedTasks(sourcePlanId, newPlan.getId(), newPlan.getSemesterId());
-        if (keepLocked) {
-            copyLockedItems(activeLocks, itemIdMapping, newPlan.getId());
-        }
+        copyLockedItems(activeLocks, itemIdMapping, newPlan.getId());
 
         schedulePlanService.refreshPlanConflictState(newPlan.getId());
         SchedulePlan refreshedPlan = schedulePlanMapper.selectById(newPlan.getId());
@@ -109,14 +106,14 @@ public class V4ScheduleReplanService {
         result.setUnscheduledCount(scoredPlan.getUnscheduledCount());
         result.setConflictCount(scoredPlan.getConflictCount());
         result.setTotalScore(normalizeScore(scoredPlan.getTotalScore()));
-        result.setKeepLocked(keepLocked);
+        result.setKeepLocked(true);
         result.setStrategyCode(strategyCode);
         result.setMinimalMode(true);
         result.setMessage("局部重排方案已生成");
         return result;
     }
 
-    private SchedulePlan buildNewPlan(SchedulePlan sourcePlan, String newPlanName, String strategyCode, boolean keepLocked) {
+    private SchedulePlan buildNewPlan(SchedulePlan sourcePlan, String newPlanName, String strategyCode) {
         LocalDateTime now = LocalDateTime.now();
         SchedulePlan newPlan = new SchedulePlan();
         newPlan.setSemesterId(sourcePlan.getSemesterId());
@@ -126,7 +123,7 @@ public class V4ScheduleReplanService {
         newPlan.setScheduledCount(sourcePlan.getScheduledCount());
         newPlan.setUnscheduledCount(sourcePlan.getUnscheduledCount());
         newPlan.setConflictCount(sourcePlan.getConflictCount());
-        newPlan.setDescription(buildDescription(sourcePlan, strategyCode, keepLocked));
+        newPlan.setDescription(buildDescription(sourcePlan, strategyCode));
         newPlan.setGeneratedBy("V4_LOCAL_REPLAN");
         newPlan.setGeneratedAt(now);
         newPlan.setCreatedAt(now);
@@ -250,10 +247,10 @@ public class V4ScheduleReplanService {
         return trimmed == null ? DEFAULT_STRATEGY_CODE : trimmed;
     }
 
-    private String buildDescription(SchedulePlan sourcePlan, String strategyCode, boolean keepLocked) {
+    private String buildDescription(SchedulePlan sourcePlan, String strategyCode) {
         return "V4 阶段 8 局部重排生成方案；来源方案 ID=" + sourcePlan.getId()
                 + "；策略=" + strategyCode
-                + "；保留锁定课程=" + (keepLocked ? "是" : "否")
+                + "；保留锁定课程=是"
                 + "；当前为最小可用版，不直接修改正式课表。";
     }
 
