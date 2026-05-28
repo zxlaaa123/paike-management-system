@@ -13,6 +13,7 @@ import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.dto.SchedulePlanItemAdjustRequest;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -109,6 +111,62 @@ class SchedulePlanServiceTest {
         assertEquals(2, plan.getConflictCount());
         assertEquals("教师时间冲突：张老师；班级时间冲突：一班；教室时间冲突：A101", first.getConflictReason());
         assertEquals("教师时间冲突：张老师；班级时间冲突：一班；教室时间冲突：A101", second.getConflictReason());
+    }
+
+    @Test
+    void refreshPlanConflictState_skipsItemUpdatesWhenLargeInputHasNoChanges() {
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SchedulePlanItemMapper planItemMapper = mock(SchedulePlanItemMapper.class);
+        CourseMapper courseMapper = mock(CourseMapper.class);
+        TeacherMapper teacherMapper = mock(TeacherMapper.class);
+        ClassInfoMapper classInfoMapper = mock(ClassInfoMapper.class);
+        ClassroomMapper classroomMapper = mock(ClassroomMapper.class);
+        TimeSlotMapper timeSlotMapper = mock(TimeSlotMapper.class);
+        TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
+        SchedulePlanService service = new SchedulePlanService(
+                planMapper,
+                planItemMapper,
+                mock(ScheduleMapper.class),
+                mock(ScheduleLockedItemMapper.class),
+                mock(ScheduleLockGuardService.class),
+                courseMapper,
+                teacherMapper,
+                classInfoMapper,
+                classroomMapper,
+                timeSlotMapper,
+                teachingTaskMapper,
+                mock(TeacherUnavailableTimeService.class),
+                mock(ScheduleScoreService.class),
+                mock(SchedulePlanExplainService.class),
+                mock(SystemAuditLogService.class));
+
+        List<SchedulePlanItem> items = new ArrayList<>();
+        List<TeachingTask> tasks = new ArrayList<>();
+        for (long i = 1; i <= 200; i++) {
+            SchedulePlanItem item = planItem(i, 1000L + i, 2000L + i, 3000L + i, 4000L + i, 1, (int) (i * 2 - 1), (int) (i * 2));
+            item.setConflictFlag(0);
+            item.setConflictReason(null);
+            items.add(item);
+            tasks.add(teachingTask(1000L + i, 2000L + i, 3000L + i, 5000L + i));
+        }
+
+        when(planItemMapper.selectList(any())).thenReturn(items);
+        when(teachingTaskMapper.selectBatchIds(any())).thenReturn(tasks);
+        when(courseMapper.selectBatchIds(any())).thenReturn(List.of());
+        when(teacherMapper.selectBatchIds(any())).thenReturn(List.of());
+        when(classInfoMapper.selectBatchIds(any())).thenReturn(List.of());
+        when(classroomMapper.selectBatchIds(any())).thenReturn(List.of());
+        when(timeSlotMapper.selectList(any())).thenReturn(List.of());
+        SchedulePlan plan = new SchedulePlan();
+        plan.setId(10L);
+        when(planMapper.selectById(10L)).thenReturn(plan);
+
+        int conflictCount = service.refreshPlanConflictState(10L);
+
+        assertEquals(0, conflictCount);
+        verify(planItemMapper, never()).updateById(any(SchedulePlanItem.class));
+        verify(planMapper).updateById(plan);
+        assertEquals(0, plan.getConflictCount());
     }
 
     @Test
