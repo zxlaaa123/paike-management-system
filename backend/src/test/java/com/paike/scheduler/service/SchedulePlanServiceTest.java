@@ -1,5 +1,6 @@
 package com.paike.scheduler.service;
 
+import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.ClassInfo;
 import com.paike.scheduler.entity.Classroom;
@@ -133,7 +134,7 @@ class SchedulePlanServiceTest {
         SchedulePlan plan = new SchedulePlan();
         plan.setId(10L);
         plan.setSemesterId(3L);
-        plan.setStatus("ABANDONED");
+        plan.setStatus(SchedulePlanStatus.ABANDONED.getCode());
         when(planMapper.selectById(10L)).thenReturn(plan);
 
         BusinessException error = assertThrows(BusinessException.class, () -> service.applyPlan(10L));

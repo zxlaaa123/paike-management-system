@@ -3,6 +3,7 @@ package com.paike.scheduler.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.paike.scheduler.common.enums.CourseType;
 import com.paike.scheduler.common.enums.RoomType;
+import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
@@ -159,7 +160,7 @@ public class V4ScheduleAdjustmentService {
                 throw new BusinessException("无法定位对应方案明细，请改为从方案详情页发起调整");
             }
             SchedulePlan plan = planMapper.selectById(linkedItem.getPlanId());
-            if (plan == null || "ABANDONED".equals(plan.getStatus())) {
+            if (plan == null || SchedulePlanStatus.ABANDONED.is(plan.getStatus())) {
                 throw new BusinessException("来源方案不可调整，请改为直接调整正式课表记录");
             }
             schedulePlanService.adjustPlanItem(linkedItem.getId(), toPlanAdjustRequest(request));
@@ -317,7 +318,7 @@ public class V4ScheduleAdjustmentService {
         if (plan == null) {
             throw new BusinessException("排课方案不存在");
         }
-        if ("ABANDONED".equals(plan.getStatus())) {
+        if (SchedulePlanStatus.ABANDONED.is(plan.getStatus())) {
             throw new BusinessException("已废弃方案不能调整");
         }
 

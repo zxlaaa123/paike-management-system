@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paike.scheduler.common.enums.CourseType;
 import com.paike.scheduler.common.enums.RoomType;
+import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.enums.V5ConsistencyStatus;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.ClassInfo;
@@ -250,7 +251,7 @@ public class V5ConsistencyCheckService {
     }
 
     private void checkSimulationStatus(SchedulePlan plan, List<V5ConsistencyIssueVo> issues) {
-        if (!"SIMULATION".equals(plan.getStatus()) && !"CONFIRMED".equals(plan.getStatus())) {
+        if (!SchedulePlanStatus.SIMULATION.is(plan.getStatus()) && !SchedulePlanStatus.CONFIRMED.is(plan.getStatus())) {
             issues.add(issue("INVALID_SIMULATION_STATUS", SEVERITY_BLOCKING, "PROCESS", "方案需处于试算状态",
                     "当前方案状态为 " + plan.getStatus() + "，非 SIMULATION/CONFIRMED",
                     "只能基于试算方案进行一致性校验"));
