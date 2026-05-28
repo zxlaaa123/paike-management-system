@@ -284,7 +284,6 @@ router.beforeEach(async (to, _from) => {
     try {
       await authStore.fetchCurrentUser()
     } catch (_error) {
-      authStore.clearToken()
       return { path: '/login', query: { redirect: to.fullPath } }
     }
   }
