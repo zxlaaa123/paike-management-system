@@ -3,8 +3,8 @@ package com.paike.scheduler.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.entity.Schedule;
+import com.paike.scheduler.service.dto.ScheduleDailyConflictCounts;
 import java.util.List;
-import java.util.Map;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -26,9 +26,9 @@ public interface ScheduleMapper extends BaseMapper<Schedule> {
 
     /**
      * 批量统计同一天的教师/班级/同课程排课数量，一次查询替代三次 selectCount。
-     * 返回 Map：{teacherDaily, classDaily, sameCourse}
+     * 返回字段：teacherDaily、classDaily、sameCourse。
      */
-    Map<String, Long> selectDailyConflictCounts(
+    ScheduleDailyConflictCounts selectDailyConflictCounts(
         @Param("teacherId") Long teacherId,
         @Param("classId") Long classId,
         @Param("courseId") Long courseId,

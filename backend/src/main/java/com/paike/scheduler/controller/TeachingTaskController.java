@@ -57,7 +57,7 @@ public class TeachingTaskController {
         }
         // 数据库层面分页 + 过滤
         Page<TeachingTask> pageResult = new Page<>(pageNum, pageSize);
-        List<TeachingTask> records = teachingTaskMapper.selectFilteredTaskIds(
+        List<TeachingTask> records = teachingTaskMapper.selectFilteredTasks(
             courseName, teacherName, className, status, resolvedSemesterId, pageResult);
         pageResult.setRecords(records);
 

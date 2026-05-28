@@ -3,7 +3,7 @@
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.paike.scheduler.mapper.TeachingTaskMapper">
 
-    <select id="selectFilteredTaskIds" resultType="com.paike.scheduler.entity.TeachingTask">
+    <select id="selectFilteredTasks" resultType="com.paike.scheduler.entity.TeachingTask">
         SELECT tt.*
         FROM teaching_task tt
         INNER JOIN course c ON tt.course_id = c.id AND c.deleted = 0

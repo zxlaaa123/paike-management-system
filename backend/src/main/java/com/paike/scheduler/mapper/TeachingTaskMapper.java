@@ -14,7 +14,7 @@ public interface TeachingTaskMapper extends BaseMapper<TeachingTask> {
     /**
      * 分页查询教学任务（数据库层面过滤 + 分页）
      */
-    List<TeachingTask> selectFilteredTaskIds(
+    List<TeachingTask> selectFilteredTasks(
         @Param("courseName") String courseName,
         @Param("teacherName") String teacherName,
         @Param("className") String className,

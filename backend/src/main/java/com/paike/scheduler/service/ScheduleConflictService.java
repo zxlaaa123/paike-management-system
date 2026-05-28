@@ -5,6 +5,7 @@ import com.paike.scheduler.common.enums.CourseType;
 import com.paike.scheduler.common.enums.RoomType;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
+import com.paike.scheduler.service.dto.ScheduleDailyConflictCounts;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -178,11 +179,11 @@ public class ScheduleConflictService {
                 .stream().map(TimeSlot::getId).collect(Collectors.toList());
 
         // 批量统计每日冲突计数,一次查询替代之前的三次 selectCount
-        Map<String, Long> dailyCounts = scheduleMapper.selectDailyConflictCounts(
+        ScheduleDailyConflictCounts dailyCounts = scheduleMapper.selectDailyConflictCounts(
                 teacherId, classId, task.getCourseId(), daySlotIds, task.getSemesterId(), null, excludeScheduleId);
-        long teacherDailyCount = dailyCounts.getOrDefault("teacherDaily", 0L);
-        long classDailyCount = dailyCounts.getOrDefault("classDaily", 0L);
-        long sameCourseCount = dailyCounts.getOrDefault("sameCourse", 0L);
+        long teacherDailyCount = dailyCounts == null ? 0L : dailyCounts.teacherDailyOrZero();
+        long classDailyCount = dailyCounts == null ? 0L : dailyCounts.classDailyOrZero();
+        long sameCourseCount = dailyCounts == null ? 0L : dailyCounts.sameCourseOrZero();
 
         if (teacherMaxDailySlots > 0) {
             // 这里用 >=,因为当前待插入的大节尚未入库；一旦已达到上限,本次排课就必须拒绝。
