@@ -10,6 +10,7 @@ import {
 } from '../../api/autoSchedule'
 import { getAllTeachingTasks, type TeachingTask } from '../../api/teachingTask'
 import { batchStatusText, batchStatusTagType } from '../../utils/status'
+import { extractMessage } from '../../utils/errors'
 
 const router = useRouter()
 const loading = ref(false)
@@ -61,8 +62,8 @@ async function fetchBatches() {
 async function fetchTeachingTasks() {
   try {
     teachingTasks.value = await getAllTeachingTasks()
-  } catch (_e) {
-    console.error(_e)
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载待排教学任务失败'))
   }
 }
 
@@ -104,8 +105,8 @@ async function handleRunAutoSchedule() {
     }
 
     fetchBatches()
-  } catch (_e) {
-    console.error(_e)
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '自动排课失败'))
   } finally {
     running.value = false
   }
@@ -117,8 +118,8 @@ async function handleClearBatchSchedules(batch: AutoScheduleBatch) {
     await clearBatchSchedules(batch.batchId)
     ElMessage.success('清空成功')
     fetchBatches()
-  } catch (_e) {
-    console.error(_e)
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '清空批次排课结果失败'))
   }
 }
 

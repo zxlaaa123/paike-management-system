@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted, computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
 import { getSchedulePlanList, type SchedulePlan } from '../../api/schedulePlan'
 import {
@@ -12,6 +13,7 @@ import {
   type ClassBalanceItem,
   type PlanOverview,
 } from '../../api/scheduleStatistics'
+import { extractMessage } from '../../utils/errors'
 
 const loading = ref(false)
 const activeTab = ref('overview')
@@ -56,8 +58,8 @@ async function fetchPlans() {
   try {
     const result = await getSchedulePlanList({ semesterId: searchForm.semesterId, page: 1, size: 100 })
     planList.value = result.records || []
-  } catch (e) {
-    console.error(e)
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载方案列表失败'))
   }
 }
 
@@ -67,8 +69,8 @@ async function fetchOverview() {
     const params: Record<string, number | undefined> = {}
     if (searchForm.semesterId) params.semesterId = searchForm.semesterId
     overview.value = await getPlanOverview(params)
-  } catch (e) {
-    console.error(e)
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载统计概览失败'))
   } finally {
     loading.value = false
   }
@@ -81,8 +83,8 @@ async function fetchWorkload() {
     if (searchForm.semesterId) params.semesterId = searchForm.semesterId
     if (searchForm.planId) params.planId = searchForm.planId
     workloadData.value = await getTeacherWorkload(params)
-  } catch (e) {
-    console.error(e)
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载教师工作量失败'))
   } finally {
     loading.value = false
   }
@@ -95,8 +97,8 @@ async function fetchUtilization() {
     if (searchForm.semesterId) params.semesterId = searchForm.semesterId
     if (searchForm.planId) params.planId = searchForm.planId
     utilizationData.value = await getClassroomUtilization(params)
-  } catch (e) {
-    console.error(e)
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载教室利用率失败'))
   } finally {
     loading.value = false
   }
@@ -109,8 +111,8 @@ async function fetchBalance() {
     if (searchForm.semesterId) params.semesterId = searchForm.semesterId
     if (searchForm.planId) params.planId = searchForm.planId
     balanceData.value = await getClassBalance(params)
-  } catch (e) {
-    console.error(e)
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '加载班级均衡度失败'))
   } finally {
     loading.value = false
   }
