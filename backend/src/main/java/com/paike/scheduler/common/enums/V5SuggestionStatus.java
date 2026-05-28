@@ -15,5 +15,17 @@ public enum V5SuggestionStatus {
     V5SuggestionStatus(String code) {
         this.code = code;
     }
-}
 
+    public static V5SuggestionStatus fromCode(String code) {
+        for (V5SuggestionStatus status : values()) {
+            if (status.code.equals(code)) {
+                return status;
+            }
+        }
+        return null;
+    }
+
+    public boolean is(String code) {
+        return this.code.equals(code);
+    }
+}

@@ -3,6 +3,7 @@ package com.paike.scheduler.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.paike.scheduler.common.enums.V5RepairTaskStatus;
 import com.paike.scheduler.common.enums.V5SuggestionStatus;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.Classroom;
@@ -52,7 +53,7 @@ public class V5RepairSuggestionService {
     @Transactional(rollbackFor = Exception.class)
     public List<V5RepairSuggestionVo> generate(Long taskId, V5RepairSuggestionGenerateRequest request) {
         ScheduleRepairTask task = requireTask(taskId);
-        if ("CANCELLED".equals(task.getStatus()) || "FAILED".equals(task.getStatus())) {
+        if (isCancelledOrFailed(task.getStatus())) {
             throw new BusinessException("已取消或失败任务不能生成建议");
         }
         if (task.getPlanId() == null) {
@@ -117,14 +118,14 @@ public class V5RepairSuggestionService {
     @Transactional(rollbackFor = Exception.class)
     public V5RepairSuggestionVo markForSimulation(Long taskId, Long suggestionId) {
         ScheduleRepairTask task = requireTask(taskId);
-        if ("CANCELLED".equals(task.getStatus()) || "FAILED".equals(task.getStatus())) {
+        if (isCancelledOrFailed(task.getStatus())) {
             throw new BusinessException("任务已结束，不能进入试算");
         }
         ScheduleRepairSuggestion s = requireSuggestion(taskId, suggestionId);
         s.setStatus(V5SuggestionStatus.ACCEPTED.getCode());
         suggestionMapper.updateById(s);
-        if (!"SIMULATED".equals(task.getStatus())) {
-            task.setStatus("SUGGESTED");
+        if (!V5RepairTaskStatus.SIMULATED.is(task.getStatus())) {
+            task.setStatus(V5RepairTaskStatus.SUGGESTED.getCode());
             repairTaskMapper.updateById(task);
         }
         return toVo(s, loadClassroomNames(List.of(s)));
@@ -265,8 +266,12 @@ public class V5RepairSuggestionService {
     }
 
     private void updateTaskSuggested(ScheduleRepairTask task) {
-        task.setStatus("SUGGESTED");
+        task.setStatus(V5RepairTaskStatus.SUGGESTED.getCode());
         repairTaskMapper.updateById(task);
+    }
+
+    private boolean isCancelledOrFailed(String status) {
+        return V5RepairTaskStatus.CANCELLED.is(status) || V5RepairTaskStatus.FAILED.is(status);
     }
 
     private Map<Long, ScheduleRiskIssueVo> loadRiskMap(Long planId, List<Long> riskIds) {
