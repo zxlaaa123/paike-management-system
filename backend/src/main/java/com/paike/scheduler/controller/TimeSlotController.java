@@ -1,6 +1,7 @@
 package com.paike.scheduler.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.TimeSlot;
 import com.paike.scheduler.mapper.TimeSlotMapper;
@@ -30,7 +31,7 @@ public class TimeSlotController {
     public Result<TimeSlot> getById(@PathVariable Long id) {
         TimeSlot slot = timeSlotMapper.selectById(id);
         if (slot == null) {
-            return Result.fail(404, "时间段不存在");
+            throw new BusinessException(404, "时间段不存在");
         }
         return Result.success(slot);
     }

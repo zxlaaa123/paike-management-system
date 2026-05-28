@@ -2,6 +2,7 @@ package com.paike.scheduler.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.response.Result;
+import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.AutoScheduleBatch;
 import com.paike.scheduler.service.AutoScheduleBatchService;
 import com.paike.scheduler.service.AutoScheduleService;
@@ -39,7 +40,7 @@ public class AutoScheduleBatchController {
     public Result<AutoScheduleBatch> getBatchById(@PathVariable Long batchId) {
         AutoScheduleBatch batch = batchService.getById(batchId);
         if (batch == null) {
-            return Result.fail(404, "批次不存在");
+            throw new BusinessException(404, "批次不存在");
         }
         return Result.success(batch);
     }
