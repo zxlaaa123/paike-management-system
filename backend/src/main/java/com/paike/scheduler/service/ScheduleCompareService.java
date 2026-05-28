@@ -21,6 +21,9 @@ public class ScheduleCompareService {
         if (planIds == null || planIds.size() < 2) {
             throw new BusinessException("至少需要选择两个方案进行对比");
         }
+        if (new HashSet<>(planIds).size() != planIds.size()) {
+            throw new BusinessException("不能选择重复方案进行对比");
+        }
 
         List<Map<String, Object>> plans = new ArrayList<>();
         for (Long planId : planIds) {
