@@ -7,6 +7,7 @@ import com.paike.scheduler.service.TeacherService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@org.springframework.validation.annotation.Validated
 @RestController
 @RequestMapping("/api/teachers")
 @RequiredArgsConstructor
@@ -27,7 +29,10 @@ public class TeacherController {
         @RequestParam(required = false) String teacherNo,
         @RequestParam(required = false) String department,
         @RequestParam(required = false) Integer status,
+        @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
         @RequestParam(defaultValue = "1") int page,
+        @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+        @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
         @RequestParam(defaultValue = "10") int size
     ) {
         return Result.success(teacherService.list(name, teacherNo, department, status, page, size));
@@ -82,12 +87,17 @@ public class TeacherController {
     @Getter
     public static class TeacherForm {
         @NotBlank(message = "教师编号不能为空")
+        @Size(max = 50, message = "教师编号不能超过50字符")
         private String teacherNo;
         @NotBlank(message = "教师姓名不能为空")
+        @Size(max = 50, message = "教师姓名不能超过50字符")
         private String name;
+        @Size(max = 100, message = "所属部门不能超过100字符")
         private String department;
+        @Size(max = 30, message = "联系电话不能超过30字符")
         private String phone;
         private Integer status;
+        @Size(max = 255, message = "备注不能超过255字符")
         private String remark;
     }
 

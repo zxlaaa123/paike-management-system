@@ -34,7 +34,7 @@
         ORDER BY s.create_time DESC, s.id DESC
     </select>
 
-    <select id="selectDailyConflictCounts" resultType="java.util.HashMap">
+    <select id="selectDailyConflictCounts" resultType="com.paike.scheduler.service.dto.ScheduleDailyConflictCounts">
         SELECT
             CAST(COALESCE(SUM(CASE WHEN s.teacher_id = #{teacherId} THEN 1 ELSE 0 END), 0) AS SIGNED INTEGER) AS teacherDaily,
             CAST(COALESCE(SUM(CASE WHEN s.class_id = #{classId} THEN 1 ELSE 0 END), 0) AS SIGNED INTEGER) AS classDaily,

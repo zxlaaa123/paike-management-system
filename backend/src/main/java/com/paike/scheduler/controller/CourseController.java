@@ -7,12 +7,14 @@ import com.paike.scheduler.service.CourseService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@org.springframework.validation.annotation.Validated
 @RestController
 @RequestMapping("/api/courses")
 @RequiredArgsConstructor
@@ -25,7 +27,10 @@ public class CourseController {
         @RequestParam(required = false) String courseName,
         @RequestParam(required = false) String courseNo,
         @RequestParam(required = false) String courseType,
+        @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
         @RequestParam(defaultValue = "1") int page,
+        @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+        @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
         @RequestParam(defaultValue = "10") int size
     ) {
         return Result.success(courseService.list(courseName, courseNo, courseType, page, size));
@@ -76,15 +81,20 @@ public class CourseController {
     @Getter
     public static class CourseForm {
         @NotBlank(message = "课程编号不能为空")
+        @Size(max = 50, message = "课程编号不能超过50字符")
         private String courseNo;
         @NotBlank(message = "课程名称不能为空")
+        @Size(max = 100, message = "课程名称不能超过100字符")
         private String courseName;
+        @Size(max = 30, message = "课程类型不能超过30字符")
         private String courseType;
+        @Size(max = 50, message = "课程性质不能超过50字符")
         private String courseNature;
         @Min(value = 1, message = "总学时必须大于0")
         private Integer totalHours;
         @Min(value = 1, message = "每周课时必须大于0")
         private Integer weeklyHours;
+        @Size(max = 255, message = "备注不能超过255字符")
         private String remark;
     }
 }

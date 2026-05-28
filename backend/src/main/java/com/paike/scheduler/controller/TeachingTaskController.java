@@ -10,6 +10,7 @@ import com.paike.scheduler.service.SemesterService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@org.springframework.validation.annotation.Validated
 @RestController
 @RequestMapping("/api/teaching-tasks")
 @RequiredArgsConstructor
@@ -40,7 +42,10 @@ public class TeachingTaskController {
         @RequestParam(required = false) String className,
         @RequestParam(required = false) Integer status,
         @RequestParam(required = false) Long semesterId,
+        @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
         @RequestParam(defaultValue = "1") int pageNum,
+        @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+        @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
         @RequestParam(defaultValue = "10") int pageSize
     ) {
         // 如果传了 semesterId 则按指定学期查，否则默认按当前学期查
@@ -57,7 +62,7 @@ public class TeachingTaskController {
         }
         // 数据库层面分页 + 过滤
         Page<TeachingTask> pageResult = new Page<>(pageNum, pageSize);
-        List<TeachingTask> records = teachingTaskMapper.selectFilteredTaskIds(
+        List<TeachingTask> records = teachingTaskMapper.selectFilteredTasks(
             courseName, teacherName, className, status, resolvedSemesterId, pageResult);
         pageResult.setRecords(records);
 
@@ -243,6 +248,7 @@ public class TeachingTaskController {
         private Integer weeklyHours;
         private Integer needContinuous;
         private Integer status;
+        @Size(max = 255, message = "备注不能超过255字符")
         private String remark;
     }
 }

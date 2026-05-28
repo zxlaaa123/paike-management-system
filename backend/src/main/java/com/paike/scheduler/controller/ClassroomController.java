@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@org.springframework.validation.annotation.Validated
 @RestController
 @RequestMapping("/api/classrooms")
 @RequiredArgsConstructor
@@ -28,7 +30,10 @@ public class ClassroomController {
         @RequestParam(required = false) String building,
         @RequestParam(required = false) String roomType,
         @RequestParam(required = false) Integer status,
+        @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
         @RequestParam(defaultValue = "1") int page,
+        @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+        @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
         @RequestParam(defaultValue = "10") int size
     ) {
         return Result.success(classroomService.list(roomName, building, roomType, status, page, size));
@@ -83,12 +88,16 @@ public class ClassroomController {
     @Getter
     public static class ClassroomForm {
         @NotBlank(message = "教室名称不能为空")
+        @Size(max = 100, message = "教室名称不能超过100字符")
         private String roomName;
+        @Size(max = 100, message = "教学楼不能超过100字符")
         private String building;
         @Min(value = 1, message = "教室容量必须大于0")
         private Integer capacity;
+        @Size(max = 30, message = "教室类型不能超过30字符")
         private String roomType;
         private Integer status;
+        @Size(max = 255, message = "备注不能超过255字符")
         private String remark;
     }
 

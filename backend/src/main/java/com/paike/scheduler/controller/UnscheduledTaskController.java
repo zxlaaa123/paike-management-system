@@ -7,6 +7,7 @@ import com.paike.scheduler.service.UnscheduledTaskService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+@org.springframework.validation.annotation.Validated
 @RestController
 @RequestMapping("/api/unscheduled-tasks")
 @RequiredArgsConstructor
@@ -22,7 +23,10 @@ public class UnscheduledTaskController {
             @RequestParam(required = false) String teacherName,
             @RequestParam(required = false) String className,
             @RequestParam(required = false) String reasonType,
+            @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
             @RequestParam(defaultValue = "1") int page,
+            @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+            @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
             @RequestParam(defaultValue = "10") int size
     ) {
         return Result.success(unscheduledTaskService.list(batchId, courseName, teacherName, className, reasonType, page, size));
@@ -32,7 +36,10 @@ public class UnscheduledTaskController {
     @GetMapping("/batch/{batchId}")
     public Result<Page<UnscheduledTask>> listByBatch(
             @PathVariable Long batchId,
+            @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
             @RequestParam(defaultValue = "1") int page,
+            @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+            @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
             @RequestParam(defaultValue = "10") int size
     ) {
         return Result.success(unscheduledTaskService.list(batchId, null, null, null, null, page, size));

@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@org.springframework.validation.annotation.Validated
 @RestController
 @RequestMapping("/api/classes")
 @RequiredArgsConstructor
@@ -28,7 +30,10 @@ public class ClassInfoController {
         @RequestParam(required = false) String major,
         @RequestParam(required = false) String grade,
         @RequestParam(required = false) Integer status,
+        @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
         @RequestParam(defaultValue = "1") int page,
+        @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+        @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
         @RequestParam(defaultValue = "10") int size
     ) {
         return Result.success(classInfoService.list(className, major, grade, status, page, size));
@@ -85,13 +90,18 @@ public class ClassInfoController {
     @Getter
     public static class ClassForm {
         @NotBlank(message = "班级名称不能为空")
+        @Size(max = 100, message = "班级名称不能超过100字符")
         private String className;
+        @Size(max = 100, message = "专业名称不能超过100字符")
         private String major;
+        @Size(max = 20, message = "年级不能超过20字符")
         private String grade;
         @Min(value = 1, message = "班级人数必须大于0")
         private Integer studentCount;
+        @Size(max = 50, message = "班主任不能超过50字符")
         private String headTeacher;
         private Integer status;
+        @Size(max = 255, message = "备注不能超过255字符")
         private String remark;
     }
 

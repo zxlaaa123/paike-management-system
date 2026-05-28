@@ -2,6 +2,7 @@ package com.paike.scheduler.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.response.Result;
+import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.AutoScheduleBatch;
 import com.paike.scheduler.service.AutoScheduleBatchService;
 import com.paike.scheduler.service.AutoScheduleService;
@@ -11,6 +12,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+@org.springframework.validation.annotation.Validated
 @RestController
 @RequestMapping("/api/auto-schedule")
 @RequiredArgsConstructor
@@ -24,7 +26,10 @@ public class AutoScheduleBatchController {
     public Result<Page<AutoScheduleBatch>> listBatches(
             @RequestParam(required = false) String batchNo,
             @RequestParam(required = false) String status,
+            @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
             @RequestParam(defaultValue = "1") int page,
+            @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+            @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
             @RequestParam(defaultValue = "10") int size
     ) {
         return Result.success(batchService.list(batchNo, status, page, size));
@@ -35,7 +40,7 @@ public class AutoScheduleBatchController {
     public Result<AutoScheduleBatch> getBatchById(@PathVariable Long batchId) {
         AutoScheduleBatch batch = batchService.getById(batchId);
         if (batch == null) {
-            return Result.fail(404, "批次不存在");
+            throw new BusinessException(404, "批次不存在");
         }
         return Result.success(batch);
     }
