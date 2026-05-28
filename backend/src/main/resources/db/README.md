@@ -75,6 +75,8 @@ Spring Boot 启动时依次执行：
 | `v10_teaching_task_index.sql` | 教学任务索引补齐 |
 | `v11_soft_delete_three_tables.sql` | 锁定、调整日志、未排任务软删除字段补齐 |
 | `v12_system_audit_log.sql` | V6 第一阶段：新增 `system_audit_log` 审计日志表 |
+| `v14_missing_v4_v5_tables_and_schedule_keys.sql` | C-21/C-22：固化 5 张 V4/V5 表 DDL，修正 `schedule` 软删除安全唯一键 |
+| `v15_sys_user_role.sql` | C-17：给 `sys_user` 增加 `role`，内置 `admin` 标记为 `ADMIN` |
 
 ---
 
@@ -122,10 +124,14 @@ SHOW INDEX FROM teacher_unavailable_time WHERE Key_name = 'uk_teacher_timeslot';
 -- 3) schedule_plan_item 的唯一约束（避免方案明细重排同一节）
 SHOW INDEX FROM schedule_plan_item WHERE Key_name = 'uk_plan_task_slot';
 
--- 4) semester 至多一个 current 学期的唯一约束
+-- 4) schedule 的软删除安全唯一约束（避免正式课表并发冲突）
+SHOW COLUMNS FROM schedule LIKE 'active_key';
+SHOW INDEX FROM schedule WHERE Key_name IN ('uk_schedule_teacher_slot','uk_schedule_class_slot','uk_schedule_classroom_slot');
+
+-- 5) semester 至多一个 current 学期的唯一约束
 SHOW INDEX FROM semester WHERE Column_name = 'current_marker';
 
--- 5) 软删除列
+-- 6) 软删除列
 SHOW COLUMNS FROM schedule_plan      LIKE 'deleted';
 SHOW COLUMNS FROM schedule_plan_item LIKE 'deleted';
 SHOW COLUMNS FROM semester           LIKE 'deleted';

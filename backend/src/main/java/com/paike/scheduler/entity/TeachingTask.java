@@ -55,4 +55,16 @@ public class TeachingTask {
 
     @TableField(exist = false)
     private Integer scheduledSlots;
+
+    @TableField(exist = false)
+    private String courseType;
+
+    @TableField(exist = false)
+    private Integer teacherStatus;
+
+    @TableField(exist = false)
+    private Integer classStatus;
+
+    @TableField(exist = false)
+    private Integer studentCount;
 }

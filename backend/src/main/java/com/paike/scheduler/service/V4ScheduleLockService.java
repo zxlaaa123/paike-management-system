@@ -37,6 +37,7 @@ public class V4ScheduleLockService {
     private final ClassroomMapper classroomMapper;
     private final TimeSlotMapper timeSlotMapper;
     private final TransactionTemplate transactionTemplate;
+    private final SystemAuditLogService auditLogService;
 
     public ScheduleLockActionVo lock(ScheduleLockRequest request) {
         return Objects.requireNonNull(transactionTemplate.execute(status -> lockInternal(request)));
@@ -76,6 +77,13 @@ public class V4ScheduleLockService {
         result.setPlanItemId(record.getPlanItemId());
         result.setScheduleId(record.getScheduleId());
         result.setMessage("课程已锁定");
+        auditLogService.recordSuccess(
+                lockActionType(targetType),
+                auditTargetType(targetType),
+                auditTargetId(target),
+                target.semesterId,
+                target.planId,
+                "课程已锁定，目标=" + targetType + "，锁定记录=" + record.getId() + "，原因=" + lockReason);
         return result;
     }
 
@@ -109,6 +117,13 @@ public class V4ScheduleLockService {
         result.setPlanItemId(existing.getPlanItemId());
         result.setScheduleId(existing.getScheduleId());
         result.setMessage("课程已取消锁定");
+        auditLogService.recordSuccess(
+                unlockActionType(targetType),
+                auditTargetType(targetType),
+                auditTargetId(target),
+                target.semesterId,
+                target.planId,
+                "课程已取消锁定，目标=" + targetType + "，锁定记录=" + existing.getId());
         return result;
     }
 
@@ -223,6 +238,7 @@ public class V4ScheduleLockService {
         }
         ResolvedTarget target = new ResolvedTarget();
         target.planId = plan.getId();
+        target.semesterId = plan.getSemesterId();
         target.planItemId = item.getId();
         return target;
     }
@@ -244,8 +260,31 @@ public class V4ScheduleLockService {
         }
         ResolvedTarget target = new ResolvedTarget();
         target.planId = planId;
+        target.semesterId = schedule.getSemesterId();
         target.scheduleId = schedule.getId();
         return target;
+    }
+
+    private String lockActionType(String targetType) {
+        return TARGET_PLAN.equals(targetType)
+                ? SystemAuditLogService.ACTION_LOCK_PLAN_ITEM
+                : SystemAuditLogService.ACTION_LOCK_SCHEDULE;
+    }
+
+    private String unlockActionType(String targetType) {
+        return TARGET_PLAN.equals(targetType)
+                ? SystemAuditLogService.ACTION_UNLOCK_PLAN_ITEM
+                : SystemAuditLogService.ACTION_UNLOCK_SCHEDULE;
+    }
+
+    private String auditTargetType(String targetType) {
+        return TARGET_PLAN.equals(targetType)
+                ? SystemAuditLogService.TARGET_SCHEDULE_PLAN_ITEM
+                : SystemAuditLogService.TARGET_SCHEDULE;
+    }
+
+    private Long auditTargetId(ResolvedTarget target) {
+        return target.planItemId != null ? target.planItemId : target.scheduleId;
     }
 
     private Map<Long, Schedule> loadScheduleMap(List<ScheduleLockedItem> locks) {
@@ -344,6 +383,7 @@ public class V4ScheduleLockService {
 
     private static class ResolvedTarget {
         private Long planId;
+        private Long semesterId;
         private Long planItemId;
         private Long scheduleId;
     }

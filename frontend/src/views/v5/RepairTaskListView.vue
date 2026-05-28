@@ -27,6 +27,7 @@ const form = ref({
 })
 
 const statusOptions: Array<{ label: string; value: V5RepairTaskStatus }> = [
+  { label: '待处理', value: 'PENDING' },
   { label: '已创建', value: 'CREATED' },
   { label: '分析中', value: 'ANALYZING' },
   { label: '已生成建议', value: 'SUGGESTED' },

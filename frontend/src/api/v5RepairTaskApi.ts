@@ -1,7 +1,7 @@
 import request from '../utils/request'
 import type { ApiResponse } from './types'
 
-export type V5RepairTaskStatus = 'CREATED' | 'ANALYZING' | 'SUGGESTED' | 'SIMULATED' | 'APPLIED' | 'CANCELLED' | 'FAILED'
+export type V5RepairTaskStatus = 'PENDING' | 'CREATED' | 'ANALYZING' | 'SUGGESTED' | 'SIMULATED' | 'APPLIED' | 'CANCELLED' | 'FAILED'
 
 export interface V5RepairTaskCreatePayload {
   semesterId: number
@@ -86,4 +86,3 @@ export function cancelRepairTask(taskId: number, reason?: string) {
     return r.data.data
   })
 }
-

@@ -70,13 +70,23 @@ CREATE DATABASE paike CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 ## 后端启动
 
-当前分支不再保留不安全默认值。启动前必须显式设置数据库账号、密码、JWT 密钥。
+当前分支不再保留不安全默认值。启动前必须显式设置数据库地址、数据库用户名、数据库密码、JWT 密钥。
+
+必需环境变量：
+
+| 变量 | 说明 | 示例 |
+|------|------|------|
+| `DB_URL` | MySQL 连接地址 | `jdbc:mysql://127.0.0.1:3306/paike?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai` |
+| `DB_USERNAME` | MySQL 用户名，不是系统登录用户名 | `root` |
+| `DB_PASSWORD` | MySQL 密码 | `你的MySQL密码` |
+| `JWT_SECRET` | JWT 签名密钥，至少 32 字节 | `dev_local_secret_please_change_32_chars_minimum` |
 
 PowerShell 示例：
 
 ```powershell
 cd D:\paike\backend
 
+$env:DB_URL="jdbc:mysql://127.0.0.1:3306/paike?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai"
 $env:DB_USERNAME="root"
 $env:DB_PASSWORD="你的MySQL密码"
 $env:JWT_SECRET="dev_local_secret_please_change_32_chars_minimum"
@@ -87,7 +97,6 @@ mvn spring-boot:run
 可选环境变量：
 
 ```powershell
-$env:DB_URL="jdbc:mysql://127.0.0.1:3306/paike?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai"
 $env:JWT_EXPIRATION_MS="86400000"
 $env:ADMIN_DEFAULT_PASSWORD="仅本地开发可设置的管理员初始密码"
 $env:COOKIE_SECURE="false"
@@ -98,7 +107,7 @@ $env:CORS_ALLOW_CREDENTIALS="false"
 说明：
 
 - `JWT_SECRET` 必须至少 32 字节，不能使用占位符。
-- `DB_USERNAME` 和 `DB_PASSWORD` 必须显式提供。
+- `DB_USERNAME` 和 `DB_PASSWORD` 必须显式提供；`DB_USERNAME` 是 MySQL 账号。
 - `ADMIN_DEFAULT_PASSWORD` 不设置时，首次创建 admin 会生成随机密码并打印到后端启动日志。
 - 生产 HTTPS 部署时应设置 `COOKIE_SECURE=true`。
 

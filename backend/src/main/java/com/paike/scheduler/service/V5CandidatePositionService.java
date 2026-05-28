@@ -2,12 +2,14 @@ package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.paike.scheduler.common.exception.BusinessException;
+import com.paike.scheduler.entity.ClassInfo;
 import com.paike.scheduler.entity.Classroom;
 import com.paike.scheduler.entity.Schedule;
 import com.paike.scheduler.entity.ScheduleLockedItem;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
 import com.paike.scheduler.entity.TimeSlot;
+import com.paike.scheduler.mapper.ClassInfoMapper;
 import com.paike.scheduler.mapper.ClassroomMapper;
 import com.paike.scheduler.mapper.ScheduleMapper;
 import com.paike.scheduler.mapper.ScheduleLockedItemMapper;
@@ -26,6 +28,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -39,6 +42,7 @@ public class V5CandidatePositionService {
     private final ScheduleMapper scheduleMapper;
     private final TimeSlotMapper timeSlotMapper;
     private final ClassroomMapper classroomMapper;
+    private final ClassInfoMapper classInfoMapper;
     private final ScheduleLockedItemMapper scheduleLockedItemMapper;
     private final TeacherUnavailableTimeService unavailableTimeService;
     private final V5RuleEvaluationService ruleEvaluationService;
@@ -67,6 +71,7 @@ public class V5CandidatePositionService {
         int evaluateBudget = includeUnavailable ? Math.min(Math.max(limit * 6, 1), 480) : Math.min(Math.max(limit * 20, 1), 1200);
         List<SchedulePlanItem> planItems = schedulePlanItemMapper.selectList(new LambdaQueryWrapper<SchedulePlanItem>()
                 .eq(SchedulePlanItem::getPlanId, source.planId));
+        Map<Long, Integer> classStudentCounts = loadClassStudentCounts(planItems);
         Set<Long> lockedIds = scheduleLockedItemMapper.selectList(new LambdaQueryWrapper<ScheduleLockedItem>()
                         .eq(ScheduleLockedItem::getPlanId, source.planId)
                         .eq(ScheduleLockedItem::getActiveFlag, 1))
@@ -87,7 +92,7 @@ public class V5CandidatePositionService {
                     stop = true;
                     break;
                 }
-                HardCheck hard = fastHardCheck(source.planItem, room, slot, planItems, lockedIds, sourceLocked);
+                HardCheck hard = fastHardCheck(source.planItem, room, slot, planItems, classStudentCounts, lockedIds, sourceLocked);
                 if (!includeUnavailable && !hard.available) {
                     continue;
                 }
@@ -277,11 +282,33 @@ public class V5CandidatePositionService {
         return "不可用：" + detail;
     }
 
+    private Map<Long, Integer> loadClassStudentCounts(List<SchedulePlanItem> planItems) {
+        Set<Long> classIds = planItems.stream()
+                .map(SchedulePlanItem::getClassId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (classIds.isEmpty()) {
+            return Map.of();
+        }
+        List<ClassInfo> classInfos = classInfoMapper.selectBatchIds(classIds);
+        if (classInfos == null || classInfos.isEmpty()) {
+            return Map.of();
+        }
+        return classInfos.stream()
+                .filter(classInfo -> classInfo.getId() != null)
+                .collect(Collectors.toMap(
+                        ClassInfo::getId,
+                        classInfo -> classInfo.getStudentCount() == null ? 0 : classInfo.getStudentCount(),
+                        (left, right) -> left
+                ));
+    }
+
     private HardCheck fastHardCheck(
             SchedulePlanItem target,
             Classroom room,
             TimeSlot slot,
             List<SchedulePlanItem> all,
+            Map<Long, Integer> classStudentCounts,
             Set<Long> lockedIds,
             boolean sourceLocked
     ) {
@@ -308,14 +335,15 @@ public class V5CandidatePositionService {
         boolean classConflict = overlaps.stream().anyMatch(other -> Objects.equals(other.getClassId(), target.getClassId()));
         boolean roomConflict = overlaps.stream().anyMatch(other -> Objects.equals(other.getClassroomId(), room.getId()));
         boolean unavailable = target.getTeacherId() != null && unavailableTimeService.isUnavailable(target.getTeacherId(), slot.getId());
+        boolean classMissing = false;
         boolean capacityViolation = false;
         if (target.getClassId() != null) {
-            Long classCount = all.stream()
-                    .filter(i -> Objects.equals(i.getClassId(), target.getClassId()))
-                    .map(SchedulePlanItem::getId)
-                    .findFirst()
-                    .map(id -> 0L).orElse(0L);
-            capacityViolation = classCount > 0 && room.getCapacity() != null && classCount > room.getCapacity();
+            Integer studentCount = classStudentCounts.get(target.getClassId());
+            classMissing = studentCount == null;
+            capacityViolation = studentCount != null
+                    && studentCount > 0
+                    && room.getCapacity() != null
+                    && studentCount > room.getCapacity();
         }
         boolean lockedRoomConflict = overlaps.stream()
                 .filter(other -> lockedIds.contains(other.getId()))
@@ -325,6 +353,7 @@ public class V5CandidatePositionService {
         if (classConflict) fail++;
         if (roomConflict) fail++;
         if (unavailable) fail++;
+        if (classMissing) fail++;
         if (capacityViolation) fail++;
         if (lockedRoomConflict) fail++;
         result.hardConflictCount = fail;
@@ -335,6 +364,7 @@ public class V5CandidatePositionService {
             else if (classConflict) result.reason = "班级时间冲突";
             else if (roomConflict) result.reason = "教室时间冲突";
             else if (unavailable) result.reason = "教师禁排时间";
+            else if (classMissing) result.reason = "班级信息不存在";
             else if (capacityViolation) result.reason = "教室容量不足";
             else result.reason = "锁定课程占用冲突";
         } else {

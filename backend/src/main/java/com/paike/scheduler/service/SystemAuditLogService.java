@@ -17,7 +17,13 @@ public class SystemAuditLogService {
 
     public static final String ACTION_APPLY_PLAN = "APPLY_PLAN";
     public static final String ACTION_ROLLBACK_PLAN = "ROLLBACK_PLAN";
+    public static final String ACTION_LOCK_PLAN_ITEM = "LOCK_PLAN_ITEM";
+    public static final String ACTION_UNLOCK_PLAN_ITEM = "UNLOCK_PLAN_ITEM";
+    public static final String ACTION_LOCK_SCHEDULE = "LOCK_SCHEDULE";
+    public static final String ACTION_UNLOCK_SCHEDULE = "UNLOCK_SCHEDULE";
     public static final String TARGET_SCHEDULE_PLAN = "SCHEDULE_PLAN";
+    public static final String TARGET_SCHEDULE_PLAN_ITEM = "SCHEDULE_PLAN_ITEM";
+    public static final String TARGET_SCHEDULE = "SCHEDULE";
 
     private final SystemAuditLogMapper auditLogMapper;
 

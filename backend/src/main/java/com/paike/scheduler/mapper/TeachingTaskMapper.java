@@ -22,4 +22,9 @@ public interface TeachingTaskMapper extends BaseMapper<TeachingTask> {
         @Param("semesterId") Long semesterId,
         @Param("page") Page<TeachingTask> page
     );
+
+    /**
+     * 冲突检查详情：一次加载教学任务及硬约束所需的课程、教师、班级字段。
+     */
+    TeachingTask selectConflictCheckById(@Param("id") Long id);
 }

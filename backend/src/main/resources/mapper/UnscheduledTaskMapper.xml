@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.paike.scheduler.mapper.UnscheduledTaskMapper">
+
+    <select id="selectFilteredPage" resultType="com.paike.scheduler.entity.UnscheduledTask">
+        SELECT
+            ut.*,
+            c.course_name AS courseName,
+            t.name AS teacherName,
+            cl.class_name AS className,
+            b.batch_no AS batchNo
+        FROM unscheduled_task ut
+        LEFT JOIN teaching_task tt ON ut.task_id = tt.id AND tt.deleted = 0
+        LEFT JOIN course c ON tt.course_id = c.id AND c.deleted = 0
+        LEFT JOIN teacher t ON tt.teacher_id = t.id AND t.deleted = 0
+        LEFT JOIN class_info cl ON tt.class_id = cl.id AND cl.deleted = 0
+        LEFT JOIN auto_schedule_batch b ON ut.batch_id = b.id
+        WHERE 1 = 1
+        <if test="batchId != null">
+            AND ut.batch_id = #{batchId}
+        </if>
+        <if test="courseName != null">
+            AND c.course_name LIKE CONCAT('%', #{courseName}, '%')
+        </if>
+        <if test="teacherName != null">
+            AND t.name LIKE CONCAT('%', #{teacherName}, '%')
+        </if>
+        <if test="className != null">
+            AND cl.class_name LIKE CONCAT('%', #{className}, '%')
+        </if>
+        <if test="reasonType != null">
+            AND ut.reason_type = #{reasonType}
+        </if>
+        ORDER BY ut.create_time DESC
+    </select>
+
+</mapper>

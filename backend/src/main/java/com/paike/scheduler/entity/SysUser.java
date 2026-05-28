@@ -24,6 +24,8 @@ public class SysUser {
 
     private String realName;
 
+    private String role;
+
     private Integer status;
 
     @TableLogic

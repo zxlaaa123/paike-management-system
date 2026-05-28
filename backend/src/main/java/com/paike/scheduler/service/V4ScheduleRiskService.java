@@ -112,9 +112,10 @@ public class V4ScheduleRiskService {
         context.roomMap = loadByIds(classroomMapper, collectIds(items, SchedulePlanItem::getClassroomId), Classroom::getId);
         context.courseMap = loadByIds(courseMapper, collectIds(items, SchedulePlanItem::getCourseId), Course::getId);
         context.taskMap = loadByIds(teachingTaskMapper, collectIds(items, SchedulePlanItem::getTeachingTaskId), TeachingTask::getId);
-        context.slotMap = timeSlotMapper.selectList(new LambdaQueryWrapper<>()).stream()
+        List<TimeSlot> slots = timeSlotMapper.selectList(new LambdaQueryWrapper<>());
+        context.slotMap = slots.stream()
                 .collect(Collectors.toMap(slot -> slot.getDayOfWeek() + "_" + slot.getPeriodNo(), Function.identity(), (a, b) -> a));
-        context.totalTimeSlots = Math.max(timeSlotMapper.selectCount(new LambdaQueryWrapper<TimeSlot>()), 1L);
+        context.totalTimeSlots = Math.max(slots.size(), 1);
         return context;
     }
 

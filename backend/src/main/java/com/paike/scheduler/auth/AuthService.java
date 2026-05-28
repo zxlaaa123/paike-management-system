@@ -56,7 +56,7 @@ public class AuthService {
         }
 
         String token = jwtService.generateToken(user.getId(), user.getUsername());
-        UserInfoVo userInfo = new UserInfoVo(user.getId(), user.getUsername(), user.getRealName());
+        UserInfoVo userInfo = new UserInfoVo(user.getId(), user.getUsername(), user.getRealName(), user.getRole());
         return new LoginResponse(token, userInfo);
     }
 
@@ -65,6 +65,6 @@ public class AuthService {
         if (user == null) {
             throw new BusinessException(401, "未登录或登录已过期");
         }
-        return new UserInfoVo(user.getId(), user.getUsername(), user.getRealName());
+        return new UserInfoVo(user.getId(), user.getUsername(), user.getRealName(), user.getRole());
     }
 }

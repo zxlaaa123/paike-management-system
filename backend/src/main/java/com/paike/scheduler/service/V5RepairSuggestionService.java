@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -103,13 +104,14 @@ public class V5RepairSuggestionService {
                 .eq(ScheduleRepairSuggestion::getRepairTaskId, taskId)
                 .orderByDesc(ScheduleRepairSuggestion::getCreatedAt)
                 .orderByDesc(ScheduleRepairSuggestion::getId));
-        return list.stream().map(this::toVo).toList();
+        Map<Long, String> classroomNames = loadClassroomNames(list);
+        return list.stream().map(s -> toVo(s, classroomNames)).toList();
     }
 
     public V5RepairSuggestionVo detail(Long taskId, Long suggestionId) {
         requireTask(taskId);
         ScheduleRepairSuggestion s = requireSuggestion(taskId, suggestionId);
-        return toVo(s);
+        return toVo(s, loadClassroomNames(List.of(s)));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -125,7 +127,7 @@ public class V5RepairSuggestionService {
             task.setStatus("SUGGESTED");
             repairTaskMapper.updateById(task);
         }
-        return toVo(s);
+        return toVo(s, loadClassroomNames(List.of(s)));
     }
 
     private List<ScheduleRepairSuggestion> buildSuggestions(
@@ -302,7 +304,7 @@ public class V5RepairSuggestionService {
         return req;
     }
 
-    private V5RepairSuggestionVo toVo(ScheduleRepairSuggestion s) {
+    private V5RepairSuggestionVo toVo(ScheduleRepairSuggestion s, Map<Long, String> classroomNames) {
         SuggestionDetail d = readDetail(s.getDetailJson());
         V5RepairSuggestionVo vo = new V5RepairSuggestionVo();
         vo.setId(s.getId());
@@ -318,12 +320,12 @@ public class V5RepairSuggestionService {
         vo.setSourceStartPeriod(d.getSourceStartPeriod());
         vo.setSourceEndPeriod(d.getSourceEndPeriod());
         vo.setSourceClassroomId(d.getSourceClassroomId());
-        vo.setSourceClassroomName(classroomName(d.getSourceClassroomId()));
+        vo.setSourceClassroomName(classroomName(d.getSourceClassroomId(), classroomNames));
         vo.setTargetWeekday(d.getTargetWeekday());
         vo.setTargetStartPeriod(d.getTargetStartPeriod());
         vo.setTargetEndPeriod(d.getTargetEndPeriod());
         vo.setTargetClassroomId(d.getTargetClassroomId());
-        vo.setTargetClassroomName(classroomName(d.getTargetClassroomId()));
+        vo.setTargetClassroomName(classroomName(d.getTargetClassroomId(), classroomNames));
         vo.setResolvesOriginalRisk(d.getResolvesOriginalRisk());
         vo.setIntroducesNewRisk(d.getIntroducesNewRisk());
         vo.setAffectedItems(d.getAffectedItems() == null ? List.of() : d.getAffectedItems());
@@ -334,10 +336,24 @@ public class V5RepairSuggestionService {
         return vo;
     }
 
-    private String classroomName(Long classroomId) {
+    private Map<Long, String> loadClassroomNames(List<ScheduleRepairSuggestion> suggestions) {
+        Set<Long> ids = suggestions.stream()
+                .map(ScheduleRepairSuggestion::getDetailJson)
+                .map(this::readDetail)
+                .flatMap(detail -> java.util.stream.Stream.of(detail.getSourceClassroomId(), detail.getTargetClassroomId()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return classroomMapper.selectBatchIds(ids).stream()
+                .filter(classroom -> classroom.getId() != null)
+                .collect(Collectors.toMap(Classroom::getId, Classroom::getRoomName, (a, b) -> a));
+    }
+
+    private String classroomName(Long classroomId, Map<Long, String> classroomNames) {
         if (classroomId == null) return null;
-        Classroom c = classroomMapper.selectById(classroomId);
-        return c == null ? null : c.getRoomName();
+        return classroomNames.get(classroomId);
     }
 
     private ScheduleRepairTask requireTask(Long taskId) {

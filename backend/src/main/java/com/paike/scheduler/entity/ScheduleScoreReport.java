@@ -17,6 +17,8 @@ public class ScheduleScoreReport {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private Long semesterId;
+
     private Integer score;
 
     private String grade;

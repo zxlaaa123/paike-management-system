@@ -368,7 +368,10 @@ public class V4ScheduleAdjustmentService {
         adjustRequest.setWeekday(request.getNewWeekDay());
         adjustRequest.setStartPeriod(request.getNewPeriodStart());
         adjustRequest.setEndPeriod(request.getNewPeriodEnd());
-        adjustRequest.setAdjustReason(request.getAdjustReason().trim());
+        String adjustReason = request.getAdjustReason();
+        adjustRequest.setAdjustReason(adjustReason == null || adjustReason.trim().isEmpty()
+                ? "调整预检"
+                : adjustReason.trim());
         return adjustRequest;
     }
 

@@ -67,7 +67,7 @@ public class ScheduleController {
         }
         // 使用自定义 SQL 进行数据库层面过滤和分页
         Page<Schedule> pageResult = scheduleMapper.selectFilteredSchedulePage(
-            courseName, teacherName, className, roomName, dayOfWeek, resolvedSemesterId,
+            trimToNull(courseName), trimToNull(teacherName), trimToNull(className), trimToNull(roomName), dayOfWeek, resolvedSemesterId,
             new Page<>(page, size));
 
         if (pageResult.getRecords().isEmpty()) {
@@ -275,6 +275,12 @@ public class ScheduleController {
     private void fillRelation(Schedule s) {
         // 批量查询所有关联数据（单条记录也走批量接口，统一逻辑）
         fillRelations(List.of(s));
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     @Getter

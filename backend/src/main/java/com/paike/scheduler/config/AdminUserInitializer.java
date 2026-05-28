@@ -53,6 +53,7 @@ public class AdminUserInitializer implements CommandLineRunner {
         admin.setUsername("admin");
         admin.setPassword(passwordEncoder.encode(password));
         admin.setRealName("管理员");
+        admin.setRole("ADMIN");
         admin.setStatus(1);
         admin.setDeleted(0);
         admin.setCreateTime(LocalDateTime.now());
