@@ -316,6 +316,7 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
                 CREATE TABLE IF NOT EXISTS schedule_report (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '报告ID',
                     plan_id BIGINT NOT NULL COMMENT '排课方案ID',
+                    semester_id BIGINT NULL COMMENT '所属学期ID',
                     report_type VARCHAR(40) NOT NULL COMMENT '报告类型',
                     format VARCHAR(20) NOT NULL COMMENT '导出格式',
                     status VARCHAR(20) NOT NULL DEFAULT 'GENERATED' COMMENT '生成状态',
@@ -324,10 +325,38 @@ public class SemesterSchemaInitializer implements CommandLineRunner {
                     include_suggestions TINYINT NOT NULL DEFAULT 1 COMMENT '是否包含建议',
                     file_path VARCHAR(500) NOT NULL COMMENT '报告文件路径',
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除'
                 ) COMMENT='V4 排课分析报告表'
                 """);
+            Integer semesterIdCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS " +
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_report' AND COLUMN_NAME = 'semester_id'",
+                Integer.class);
+            if (semesterIdCount != null && semesterIdCount == 0) {
+                jdbcTemplate.execute(
+                    "ALTER TABLE schedule_report " +
+                        "ADD COLUMN semester_id BIGINT NULL COMMENT '所属学期ID' AFTER plan_id");
+            }
+            Integer deletedCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS " +
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_report' AND COLUMN_NAME = 'deleted'",
+                Integer.class);
+            if (deletedCount != null && deletedCount == 0) {
+                jdbcTemplate.execute(
+                    "ALTER TABLE schedule_report " +
+                        "ADD COLUMN deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除' AFTER updated_at");
+            }
+            jdbcTemplate.execute("""
+                UPDATE schedule_report r
+                JOIN schedule_plan p ON p.id = r.plan_id
+                SET r.semester_id = p.semester_id
+                WHERE r.semester_id IS NULL
+                  AND p.semester_id IS NOT NULL
+                """);
             ensureIndex("schedule_report", "idx_schedule_report_plan", "CREATE INDEX idx_schedule_report_plan ON schedule_report(plan_id)");
+            ensureIndex("schedule_report", "idx_schedule_report_plan_deleted", "CREATE INDEX idx_schedule_report_plan_deleted ON schedule_report(plan_id, deleted)");
+            ensureIndex("schedule_report", "idx_schedule_report_semester_deleted_created", "CREATE INDEX idx_schedule_report_semester_deleted_created ON schedule_report(semester_id, deleted, created_at)");
             ensureIndex("schedule_report", "idx_schedule_report_type", "CREATE INDEX idx_schedule_report_type ON schedule_report(report_type)");
             ensureIndex("schedule_report", "idx_schedule_report_created", "CREATE INDEX idx_schedule_report_created ON schedule_report(created_at)");
         } catch (Exception e) {

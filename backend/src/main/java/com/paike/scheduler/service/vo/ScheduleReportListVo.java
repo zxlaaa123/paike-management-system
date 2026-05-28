@@ -11,6 +11,7 @@ public class ScheduleReportListVo {
 
     private Long planId;
 
+    private Long semesterId;
+
     private List<ScheduleReportItemVo> items;
 }
-

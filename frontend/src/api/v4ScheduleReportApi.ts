@@ -15,6 +15,7 @@ export interface ScheduleReportGenerateRequest {
 export interface ScheduleReportItem {
   reportId: number
   planId: number
+  semesterId: number | null
   reportType: ScheduleReportType
   format: ScheduleReportFormat
   status: string
@@ -24,6 +25,7 @@ export interface ScheduleReportItem {
 
 export interface ScheduleReportList {
   planId: number
+  semesterId: number | null
   items: ScheduleReportItem[]
 }
 
