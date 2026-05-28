@@ -19,6 +19,8 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.paike.scheduler.common.util.StringSanitizer.trimToNull;
+
 @Service
 @RequiredArgsConstructor
 public class V4ScheduleLockService {
@@ -371,14 +373,6 @@ public class V4ScheduleLockService {
             throw new BusinessException("锁定目标类型不能为空");
         }
         return normalized.toUpperCase(Locale.ROOT);
-    }
-
-    private String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private static class ResolvedTarget {

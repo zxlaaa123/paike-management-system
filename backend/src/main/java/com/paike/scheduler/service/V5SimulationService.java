@@ -61,6 +61,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import static com.paike.scheduler.common.util.StringSanitizer.trimToNull;
+
 @Service
 @RequiredArgsConstructor
 public class V5SimulationService {
@@ -694,12 +696,6 @@ public class V5SimulationService {
         } catch (Exception e) {
             return List.of();
         }
-    }
-
-    private String trimToNull(String value) {
-        if (value == null) return null;
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private int nullSafe(Integer value) {

@@ -27,6 +27,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.paike.scheduler.common.util.StringSanitizer.trimToNull;
+
 @Service
 @RequiredArgsConstructor
 public class V4ScheduleReplanService {
@@ -258,11 +260,4 @@ public class V4ScheduleReplanService {
         return score == null ? null : score.stripTrailingZeros();
     }
 
-    private String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
 }

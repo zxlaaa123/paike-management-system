@@ -30,6 +30,8 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 
+import static com.paike.scheduler.common.util.StringSanitizer.trimToNull;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -279,9 +281,4 @@ public class V5RepairTaskFlowService {
         }
     }
 
-    private String trimToNull(String value) {
-        if (value == null) return null;
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
 }

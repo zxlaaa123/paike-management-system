@@ -25,6 +25,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 
+import static com.paike.scheduler.common.util.StringSanitizer.trimToNull;
+
 @Service
 @RequiredArgsConstructor
 public class V5Stage1DataService {
@@ -207,9 +209,4 @@ public class V5Stage1DataService {
         return normalized.toUpperCase(Locale.ROOT);
     }
 
-    private String trimToNull(String value) {
-        if (value == null) return null;
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
 }
