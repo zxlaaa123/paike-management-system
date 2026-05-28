@@ -13,22 +13,12 @@ let fetchCurrentUserInflight: Promise<UserInfo> | null = null
  * - XSRF-TOKEN Cookie 由前端读取后放入 X-CSRF-Token 请求头，防 CSRF
  */
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string>('')
   const userInfo = ref<UserInfo | null>(null)
 
   const isLoggedIn = computed(() => Boolean(userInfo.value))
 
-  function setToken(newToken: string) {
-    token.value = newToken
-  }
-
-  function clearToken() {
-    token.value = ''
-  }
-
   async function login(username: string, password: string) {
     const data = await loginApi({ username, password })
-    clearToken()
     userInfo.value = data.userInfo
   }
 
@@ -51,16 +41,12 @@ export const useAuthStore = defineStore('auth', () => {
       await logoutApi()
     } finally {
       userInfo.value = null
-      clearToken()
     }
   }
 
   return {
-    token,
     userInfo,
     isLoggedIn,
-    setToken,
-    clearToken,
     login,
     logout,
     fetchCurrentUser,

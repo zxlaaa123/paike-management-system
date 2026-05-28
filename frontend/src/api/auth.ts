@@ -14,7 +14,6 @@ export interface UserInfo {
 }
 
 export interface LoginResponse {
-  token?: string
   userInfo: UserInfo
 }
 
