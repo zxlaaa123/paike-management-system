@@ -17,6 +17,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -107,6 +108,45 @@ class SchedulePlanServiceTest {
         assertEquals(2, plan.getConflictCount());
         assertEquals("教师时间冲突：张老师；班级时间冲突：一班；教室时间冲突：A101", first.getConflictReason());
         assertEquals("教师时间冲突：张老师；班级时间冲突：一班；教室时间冲突：A101", second.getConflictReason());
+    }
+
+    @Test
+    void applyPlan_recordsFailureAuditWhenPlanRejected() {
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SystemAuditLogService auditLogService = mock(SystemAuditLogService.class);
+        SchedulePlanService service = new SchedulePlanService(
+                planMapper,
+                mock(SchedulePlanItemMapper.class),
+                mock(ScheduleMapper.class),
+                mock(ScheduleLockedItemMapper.class),
+                mock(ScheduleLockGuardService.class),
+                mock(CourseMapper.class),
+                mock(TeacherMapper.class),
+                mock(ClassInfoMapper.class),
+                mock(ClassroomMapper.class),
+                mock(TimeSlotMapper.class),
+                mock(TeachingTaskMapper.class),
+                mock(TeacherUnavailableTimeService.class),
+                mock(ScheduleScoreService.class),
+                mock(SchedulePlanExplainService.class),
+                auditLogService);
+        SchedulePlan plan = new SchedulePlan();
+        plan.setId(10L);
+        plan.setSemesterId(3L);
+        plan.setStatus("ABANDONED");
+        when(planMapper.selectById(10L)).thenReturn(plan);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.applyPlan(10L));
+
+        assertEquals("已废弃方案不能应用", error.getMessage());
+        verify(auditLogService).recordFailure(
+                eq(SystemAuditLogService.ACTION_APPLY_PLAN),
+                eq(SystemAuditLogService.TARGET_SCHEDULE_PLAN),
+                eq(10L),
+                eq(3L),
+                eq(10L),
+                eq("400"),
+                eq("已废弃方案不能应用"));
     }
 
     private SchedulePlanItem planItem(Long id, Long taskId, Long teacherId, Long classId, Long classroomId,
