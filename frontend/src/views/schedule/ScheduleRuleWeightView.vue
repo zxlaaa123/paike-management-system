@@ -9,6 +9,7 @@ import {
   type ScheduleRuleWeight,
 } from '../../api/scheduleRuleWeight'
 import { getAllSemesters, getCurrentSemester, type Semester } from '../../api/semester'
+import { extractMessage } from '../../utils/errors'
 
 function fallback<T>(promise: Promise<T>, defaultValue: T): Promise<T> {
   return promise.catch((err) => {
@@ -92,6 +93,8 @@ async function handleSave(row: ScheduleRuleWeight) {
       enabled: row.enabled,
     })
     ElMessage.success('保存成功')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '保存失败'))
   } finally {
     saving.value = false
   }
@@ -102,6 +105,8 @@ async function handleBatchSave() {
   try {
     await batchUpdateRuleWeights(tableData.value)
     ElMessage.success('批量保存成功')
+  } catch (error: unknown) {
+    ElMessage.error(extractMessage(error, '批量保存失败'))
   } finally {
     saving.value = false
   }
