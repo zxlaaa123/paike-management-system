@@ -282,31 +282,59 @@ public class SchedulePlanService {
     }
 
     private Map<String, Object> applyPlanWithAudit(Long id, String actionType) {
-        SchedulePlan plan = planMapper.selectById(id);
-        if (plan == null) {
-            throw new BusinessException("排课方案不存在");
+        SchedulePlan plan = null;
+        try {
+            plan = planMapper.selectById(id);
+            if (plan == null) {
+                throw new BusinessException("排课方案不存在");
+            }
+            if ("SIMULATION".equals(plan.getStatus()) || "CONFIRMED".equals(plan.getStatus())) {
+                throw new BusinessException("试算方案必须从试算详情页校验后应用");
+            }
+            if ("ABANDONED".equals(plan.getStatus())) {
+                throw new BusinessException("已废弃方案不能应用");
+            }
+            if ("DISCARDED".equals(plan.getStatus())) {
+                throw new BusinessException("已放弃试算方案不能应用");
+            }
+            if ("APPLIED".equals(plan.getStatus())) {
+                throw new BusinessException("该方案已应用，无需重复应用");
+            }
+            Map<String, Object> result = applyPlanInternal(plan);
+            auditLogService.recordSuccess(
+                    actionType,
+                    SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                    plan.getId(),
+                    plan.getSemesterId(),
+                    plan.getId(),
+                    "正式课表已应用，排课数=" + result.get("appliedCount"));
+            return result;
+        } catch (RuntimeException ex) {
+            recordApplyPlanFailure(actionType, id, plan, ex);
+            throw ex;
         }
-        if ("SIMULATION".equals(plan.getStatus()) || "CONFIRMED".equals(plan.getStatus())) {
-            throw new BusinessException("试算方案必须从试算详情页校验后应用");
+    }
+
+    private void recordApplyPlanFailure(String actionType, Long requestedPlanId, SchedulePlan plan, RuntimeException ex) {
+        try {
+            auditLogService.recordFailure(
+                    actionType,
+                    SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                    plan == null ? requestedPlanId : plan.getId(),
+                    plan == null ? null : plan.getSemesterId(),
+                    plan == null ? requestedPlanId : plan.getId(),
+                    auditErrorCode(ex),
+                    ex.getMessage());
+        } catch (Exception ignored) {
+            // 审计写入失败不能掩盖原始业务异常。
         }
-        if ("ABANDONED".equals(plan.getStatus())) {
-            throw new BusinessException("已废弃方案不能应用");
+    }
+
+    private String auditErrorCode(RuntimeException ex) {
+        if (ex instanceof BusinessException businessException) {
+            return String.valueOf(businessException.getCode());
         }
-        if ("DISCARDED".equals(plan.getStatus())) {
-            throw new BusinessException("已放弃试算方案不能应用");
-        }
-        if ("APPLIED".equals(plan.getStatus())) {
-            throw new BusinessException("该方案已应用，无需重复应用");
-        }
-        Map<String, Object> result = applyPlanInternal(plan);
-        auditLogService.recordSuccess(
-                actionType,
-                SystemAuditLogService.TARGET_SCHEDULE_PLAN,
-                plan.getId(),
-                plan.getSemesterId(),
-                plan.getId(),
-                "正式课表已应用，排课数=" + result.get("appliedCount"));
-        return result;
+        return ex.getClass().getSimpleName();
     }
 
     @Transactional(rollbackFor = Exception.class)

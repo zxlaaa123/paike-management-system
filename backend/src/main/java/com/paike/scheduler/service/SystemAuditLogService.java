@@ -8,6 +8,8 @@ import com.paike.scheduler.entity.SystemAuditLog;
 import com.paike.scheduler.mapper.SystemAuditLogMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -52,14 +54,7 @@ public class SystemAuditLogService {
 
     public void recordSuccess(String actionType, String targetType, Long targetId, Long semesterId,
                               Long planId, String afterSummary) {
-        SysUser operator = AuthUserContext.get();
-        SystemAuditLog log = new SystemAuditLog();
-        if (operator != null) {
-            log.setOperatorId(operator.getId());
-            log.setOperatorName(operator.getRealName() == null || operator.getRealName().isBlank()
-                    ? operator.getUsername()
-                    : operator.getRealName());
-        }
+        SystemAuditLog log = newLogWithOperator();
         log.setActionType(actionType);
         log.setTargetType(targetType);
         log.setTargetId(targetId);
@@ -69,5 +64,33 @@ public class SystemAuditLogService {
         log.setAfterSummary(afterSummary);
         log.setCreatedAt(LocalDateTime.now());
         auditLogMapper.insert(log);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordFailure(String actionType, String targetType, Long targetId, Long semesterId,
+                              Long planId, String errorCode, String errorMessage) {
+        SystemAuditLog log = newLogWithOperator();
+        log.setActionType(actionType);
+        log.setTargetType(targetType);
+        log.setTargetId(targetId);
+        log.setSemesterId(semesterId);
+        log.setPlanId(planId);
+        log.setSuccess(0);
+        log.setErrorCode(errorCode);
+        log.setErrorMessage(errorMessage);
+        log.setCreatedAt(LocalDateTime.now());
+        auditLogMapper.insert(log);
+    }
+
+    private SystemAuditLog newLogWithOperator() {
+        SysUser operator = AuthUserContext.get();
+        SystemAuditLog log = new SystemAuditLog();
+        if (operator != null) {
+            log.setOperatorId(operator.getId());
+            log.setOperatorName(operator.getRealName() == null || operator.getRealName().isBlank()
+                    ? operator.getUsername()
+                    : operator.getRealName());
+        }
+        return log;
     }
 }
