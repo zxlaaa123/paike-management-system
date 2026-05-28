@@ -78,6 +78,16 @@ class DatabaseSchemaScriptTest {
         assertTrue(application.contains("classpath:db/v15_sys_user_role.sql"));
     }
 
+    @Test
+    void scheduleSearchOrderIndexMigrationIsRegistered() throws IOException {
+        String migration = resource("db/v16_schedule_search_order_index.sql");
+        String application = resource("application.yml");
+
+        assertTrue(migration.contains("idx_schedule_semester_deleted_created"));
+        assertTrue(migration.contains("(semester_id, deleted, create_time, id)"));
+        assertTrue(application.contains("classpath:db/v16_schedule_search_order_index.sql"));
+    }
+
     private String resource(String path) throws IOException {
         try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(path)) {
             assertNotNull(inputStream, "Missing resource " + path);
