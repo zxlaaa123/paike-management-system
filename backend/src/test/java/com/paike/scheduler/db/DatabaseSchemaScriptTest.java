@@ -67,6 +67,24 @@ class DatabaseSchemaScriptTest {
     }
 
     @Test
+    void legacyColumnMigrationsAreIdempotent() throws IOException {
+        String semesterDataBind = resource("db/v3_semester_data_bind.sql");
+        String scoreReport = resource("db/v2_alter_score_report.sql");
+
+        assertTrue(semesterDataBind.contains("CREATE PROCEDURE add_semester_data_bind_columns_if_not_exists()"));
+        assertTrue(semesterDataBind.contains("TABLE_NAME = 'teaching_task'"));
+        assertTrue(semesterDataBind.contains("COLUMN_NAME = 'semester_id'"));
+        assertTrue(semesterDataBind.contains("TABLE_NAME = 'schedule'"));
+        assertTrue(semesterDataBind.contains("COLUMN_NAME = 'plan_id'"));
+        assertTrue(semesterDataBind.contains("CALL add_semester_data_bind_columns_if_not_exists();"));
+
+        assertTrue(scoreReport.contains("CREATE PROCEDURE add_score_report_grade_name_if_not_exists()"));
+        assertTrue(scoreReport.contains("TABLE_NAME = 'schedule_score_report'"));
+        assertTrue(scoreReport.contains("COLUMN_NAME = 'grade_name'"));
+        assertTrue(scoreReport.contains("CALL add_score_report_grade_name_if_not_exists();"));
+    }
+
+    @Test
     void sysUserRoleMigrationIsRegistered() throws IOException {
         String schema = resource("db/schema.sql");
         String migration = resource("db/v15_sys_user_role.sql");
