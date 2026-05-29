@@ -29,6 +29,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { applySimulation, confirmSimulation, discardSimulation, generateRepairExplanation, getLatestConsistencyReport, getSimulationDetail, runConsistencyCheck, type V5ConsistencyCheckReport, type V5RepairExplanation, type V5SimulationCompare, type V5SimulationPlanDetail } from '../../api/v5SimulationApi'
 import { extractMessage } from '../../utils/errors'
+import { copyText } from '../../utils/clipboard'
 import { buildExplanationCopyText, buildMetricRows } from './simulationPlanDetail/formatters'
 import OverviewCard from './simulationPlanDetail/OverviewCard.vue'
 import ConsistencyCard from './simulationPlanDetail/ConsistencyCard.vue'
@@ -111,17 +112,10 @@ async function handleCopyExplanation() {
     ElMessage.warning('暂无可复制内容')
     return
   }
-  try {
-    await navigator.clipboard.writeText(text)
+  if (await copyText(text)) {
     ElMessage.success('已复制 AI 修复解释')
-  } catch {
-    const textarea = document.createElement('textarea')
-    textarea.value = text
-    document.body.appendChild(textarea)
-    textarea.select()
-    document.execCommand('copy')
-    document.body.removeChild(textarea)
-    ElMessage.success('已复制 AI 修复解释')
+  } else {
+    ElMessage.error('复制失败，请手动复制')
   }
 }
 async function confirmPlan() {
