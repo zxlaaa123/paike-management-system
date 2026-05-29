@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance } from 'element-plus'
 import {
   getUnavailableTimeList,
   createUnavailableTime,
@@ -32,7 +33,7 @@ const timeSlots = ref<TimeSlot[]>([])
 
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
-const formRef = ref()
+const formRef = ref<FormInstance>()
 const editingId = ref<number | null>(null)
 
 const form = reactive<UnavailableTimeForm>({

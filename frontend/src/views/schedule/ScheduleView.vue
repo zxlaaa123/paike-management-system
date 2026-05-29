@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance } from 'element-plus'
 import { useRouter } from 'vue-router'
 import ScheduleAdjustDialog from '../../components/v4/ScheduleAdjustDialog.vue'
 import {
@@ -37,7 +38,7 @@ const searchForm = reactive({
 })
 
 const dialogVisible = ref(false)
-const formRef = ref()
+const formRef = ref<FormInstance>()
 const submitting = ref(false)
 
 const form = reactive<ScheduleForm>({
