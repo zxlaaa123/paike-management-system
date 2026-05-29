@@ -1,7 +1,6 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.enums.CourseType;
 import com.paike.scheduler.common.enums.RoomType;
@@ -367,12 +366,9 @@ public class SchedulePlanService {
                         .eq(SchedulePlan::getStatus, SchedulePlanStatus.APPLIED.getCode()));
         ensurePlansUnlocked(oldAppliedPlans, "存在已锁定课程，不能被新方案覆盖，请先解锁");
         for (SchedulePlan oldPlan : oldAppliedPlans) {
-            scheduleMapper.update(null,
-                    new LambdaUpdateWrapper<Schedule>()
-                            .eq(Schedule::getSemesterId, semesterId)
-                            .eq(Schedule::getPlanId, oldPlan.getId())
-                            .set(Schedule::getDeleted, 1)
-                            .set(Schedule::getUpdateTime, LocalDateTime.now()));
+            scheduleMapper.delete(new LambdaQueryWrapper<Schedule>()
+                    .eq(Schedule::getSemesterId, semesterId)
+                    .eq(Schedule::getPlanId, oldPlan.getId()));
             oldPlan.setStatus(SchedulePlanStatus.DRAFT.getCode());
             oldPlan.setUpdatedAt(LocalDateTime.now());
             planMapper.updateById(oldPlan);
