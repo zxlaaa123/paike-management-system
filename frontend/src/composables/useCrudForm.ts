@@ -22,6 +22,7 @@
 
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance } from 'element-plus'
 import type { PageResult } from '../api/types'
 import { extractMessage } from '../utils/errors'
 
@@ -57,7 +58,7 @@ export function useCrudForm<T extends { id: number }, F extends object>(options:
 
   const dialogVisible = ref(false)
   const dialogTitle = ref('')
-  const formRef = ref()
+  const formRef = ref<FormInstance>()
   const editingId = ref<number | null>(null)
 
   const form = reactive({ ...options.formDefaults }) as F

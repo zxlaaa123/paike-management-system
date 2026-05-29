@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance } from 'element-plus'
 import {
   getTeachingTaskList,
   createTeachingTask,
@@ -33,7 +34,7 @@ const searchForm = reactive({
 
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
-const formRef = ref()
+const formRef = ref<FormInstance>()
 const editingId = ref<number | null>(null)
 
 const form = reactive<TeachingTaskForm>({
