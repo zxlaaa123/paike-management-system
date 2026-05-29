@@ -76,7 +76,6 @@ public class AutoScheduleService {
     private void clearSchedulesIfNeeded(AutoScheduleRequest request, Long semesterId) {
         if (request.isClearAllSchedule()) {
             LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<Schedule>()
-                    .eq(Schedule::getDeleted, 0)
                     .eq(Schedule::getSemesterId, semesterId);
             ensureSchedulesUnlocked(wrapper);
             scheduleMapper.delete(wrapper);
@@ -84,7 +83,6 @@ public class AutoScheduleService {
         } else if (request.isClearOldAutoSchedule()) {
             LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<Schedule>()
                     .eq(Schedule::getSourceType, ScheduleSourceType.AUTO.getCode())
-                    .eq(Schedule::getDeleted, 0)
                     .eq(Schedule::getSemesterId, semesterId);
             ensureSchedulesUnlocked(wrapper);
             scheduleMapper.delete(wrapper);
@@ -95,7 +93,6 @@ public class AutoScheduleService {
     private List<TeachingTask> loadTargetTasks(Long semesterId, List<Long> requestedTaskIds) {
         List<TeachingTask> allTasks = teachingTaskMapper.selectList(
                 new LambdaQueryWrapper<TeachingTask>()
-                        .eq(TeachingTask::getDeleted, 0)
                         .eq(TeachingTask::getStatus, 1)
                         .eq(TeachingTask::getSemesterId, semesterId));
         if (requestedTaskIds == null || requestedTaskIds.isEmpty()) {
@@ -302,8 +299,7 @@ public class AutoScheduleService {
     private int countScheduledSlots(Long taskId) {
         return scheduleMapper.selectCount(
                 new LambdaQueryWrapper<Schedule>()
-                        .eq(Schedule::getTeachingTaskId, taskId)
-                        .eq(Schedule::getDeleted, 0)).intValue();
+                        .eq(Schedule::getTeachingTaskId, taskId)).intValue();
     }
 
     /**
@@ -320,7 +316,6 @@ public class AutoScheduleService {
         LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getTeacherId, teacherId)
                 .eq(Schedule::getSemesterId, semesterId)
-                .eq(Schedule::getDeleted, 0)
                 .in(Schedule::getTimeSlotId, slotIds);
         long count = scheduleMapper.selectCount(wrapper);
         return count < maxSlots;
@@ -333,7 +328,6 @@ public class AutoScheduleService {
         LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getClassId, classId)
                 .eq(Schedule::getSemesterId, semesterId)
-                .eq(Schedule::getDeleted, 0)
                 .in(Schedule::getTimeSlotId, slotIds);
         long count = scheduleMapper.selectCount(wrapper);
         return count < maxSlots;
@@ -348,7 +342,6 @@ public class AutoScheduleService {
                         .eq(Schedule::getClassId, classId)
                         .eq(Schedule::getCourseId, courseId)
                         .eq(Schedule::getSemesterId, semesterId)
-                        .eq(Schedule::getDeleted, 0)
                         .in(Schedule::getTimeSlotId, slotIds));
         return count > 0;
     }

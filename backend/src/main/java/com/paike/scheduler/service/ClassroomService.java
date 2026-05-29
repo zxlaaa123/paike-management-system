@@ -19,8 +19,7 @@ public class ClassroomService {
     private final ClassroomMapper classroomMapper;
 
     public Page<Classroom> list(String roomName, String building, String roomType, Integer status, int page, int size) {
-        LambdaQueryWrapper<Classroom> wrapper = new LambdaQueryWrapper<Classroom>()
-            .eq(Classroom::getDeleted, 0);
+        LambdaQueryWrapper<Classroom> wrapper = new LambdaQueryWrapper<Classroom>();
         if (roomName != null && !roomName.isBlank()) {
             wrapper.like(Classroom::getRoomName, roomName);
         }
@@ -48,8 +47,7 @@ public class ClassroomService {
     @Transactional(rollbackFor = Exception.class)
     public Classroom create(Classroom classroom) {
         long count = classroomMapper.selectCount(new LambdaQueryWrapper<Classroom>()
-            .eq(Classroom::getRoomName, classroom.getRoomName())
-            .eq(Classroom::getDeleted, 0));
+            .eq(Classroom::getRoomName, classroom.getRoomName()));
         if (count > 0) {
             throw new BusinessException(400, "教室名称已存在");
         }
@@ -65,7 +63,6 @@ public class ClassroomService {
         Classroom existing = getById(id);
         long count = classroomMapper.selectCount(new LambdaQueryWrapper<Classroom>()
             .eq(Classroom::getRoomName, classroom.getRoomName())
-            .eq(Classroom::getDeleted, 0)
             .ne(Classroom::getId, id));
         if (count > 0) {
             throw new BusinessException(400, "教室名称已存在");
@@ -97,7 +94,6 @@ public class ClassroomService {
 
     public List<Classroom> listAll() {
         return classroomMapper.selectList(new LambdaQueryWrapper<Classroom>()
-            .eq(Classroom::getDeleted, 0)
             .eq(Classroom::getStatus, 1)
             .orderByAsc(Classroom::getRoomName));
     }

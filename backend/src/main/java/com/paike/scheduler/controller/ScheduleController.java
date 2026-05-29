@@ -149,7 +149,6 @@ public class ScheduleController {
         List<TeachingTask> tasks = teachingTaskMapper.selectList(
             new LambdaQueryWrapper<TeachingTask>()
                 .eq(TeachingTask::getClassId, classId)
-                .eq(TeachingTask::getDeleted, 0)
         );
         if (tasks.isEmpty()) {
             return Result.success(List.of());
@@ -158,7 +157,6 @@ public class ScheduleController {
         List<Schedule> list = scheduleMapper.selectList(
             new LambdaQueryWrapper<Schedule>()
                 .in(Schedule::getTeachingTaskId, taskIds)
-                .eq(Schedule::getDeleted, 0)
         );
         fillRelations(list);
         return Result.success(list);
@@ -170,7 +168,6 @@ public class ScheduleController {
         List<TeachingTask> tasks = teachingTaskMapper.selectList(
             new LambdaQueryWrapper<TeachingTask>()
                 .eq(TeachingTask::getTeacherId, teacherId)
-                .eq(TeachingTask::getDeleted, 0)
         );
         if (tasks.isEmpty()) {
             return Result.success(List.of());
@@ -179,7 +176,6 @@ public class ScheduleController {
         List<Schedule> list = scheduleMapper.selectList(
             new LambdaQueryWrapper<Schedule>()
                 .in(Schedule::getTeachingTaskId, taskIds)
-                .eq(Schedule::getDeleted, 0)
         );
         fillRelations(list);
         return Result.success(list);
@@ -191,7 +187,6 @@ public class ScheduleController {
         List<Schedule> list = scheduleMapper.selectList(
             new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getClassroomId, classroomId)
-                .eq(Schedule::getDeleted, 0)
         );
         fillRelations(list);
         return Result.success(list);

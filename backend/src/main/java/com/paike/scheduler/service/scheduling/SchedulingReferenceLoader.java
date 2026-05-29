@@ -62,21 +62,19 @@ public class SchedulingReferenceLoader {
 
         List<Classroom> classrooms = classroomMapper.selectList(
                 new LambdaQueryWrapper<Classroom>()
-                        .eq(Classroom::getStatus, 1)
-                        .eq(Classroom::getDeleted, 0));
+                        .eq(Classroom::getStatus, 1));
 
         List<TeacherUnavailableTime> unavailables = unavailableTimeMapper.selectList(
                 new LambdaQueryWrapper<TeacherUnavailableTime>()
-                        .eq(TeacherUnavailableTime::getStatus, 1)
-                        .eq(TeacherUnavailableTime::getDeleted, 0));
+                        .eq(TeacherUnavailableTime::getStatus, 1));
 
         Map<Long, Course> courseMap = courseMapper.selectList(
-                        new LambdaQueryWrapper<Course>().eq(Course::getDeleted, 0))
+                        new LambdaQueryWrapper<Course>())
                 .stream()
                 .collect(Collectors.toMap(Course::getId, c -> c, (a, b) -> a));
 
         Map<Long, ClassInfo> classMap = classInfoMapper.selectList(
-                        new LambdaQueryWrapper<ClassInfo>().eq(ClassInfo::getDeleted, 0))
+                        new LambdaQueryWrapper<ClassInfo>())
                 .stream()
                 .collect(Collectors.toMap(ClassInfo::getId, c -> c, (a, b) -> a));
 

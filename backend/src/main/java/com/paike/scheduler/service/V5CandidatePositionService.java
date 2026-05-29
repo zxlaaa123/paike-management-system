@@ -59,7 +59,6 @@ public class V5CandidatePositionService {
                 .orderByAsc(TimeSlot::getDayOfWeek)
                 .orderByAsc(TimeSlot::getPeriodNo));
         List<Classroom> classrooms = classroomMapper.selectList(new LambdaQueryWrapper<Classroom>()
-                .eq(Classroom::getDeleted, 0)
                 .eq(Classroom::getStatus, 1)
                 .orderByAsc(Classroom::getRoomName));
         if (timeSlots.isEmpty() || classrooms.isEmpty()) {

@@ -663,8 +663,7 @@ public class SchedulePlanService {
         List<Schedule> schedules = scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getPlanId, plan.getId())
                 .eq(Schedule::getTeachingTaskId, before.getTeachingTaskId())
-                .eq(Schedule::getTimeSlotId, oldSlot.getId())
-                .eq(Schedule::getDeleted, 0));
+                .eq(Schedule::getTimeSlotId, oldSlot.getId()));
         if (schedules.isEmpty()) {
             throw new BusinessException("已应用方案缺少对应正式课表记录，无法同步");
         }

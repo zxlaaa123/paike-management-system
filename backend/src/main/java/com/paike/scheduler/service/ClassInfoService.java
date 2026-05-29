@@ -19,8 +19,7 @@ public class ClassInfoService {
     private final ClassInfoMapper classInfoMapper;
 
     public Page<ClassInfo> list(String className, String major, String grade, Integer status, int page, int size) {
-        LambdaQueryWrapper<ClassInfo> wrapper = new LambdaQueryWrapper<ClassInfo>()
-            .eq(ClassInfo::getDeleted, 0);
+        LambdaQueryWrapper<ClassInfo> wrapper = new LambdaQueryWrapper<ClassInfo>();
         if (className != null && !className.isBlank()) {
             wrapper.like(ClassInfo::getClassName, className);
         }
@@ -48,8 +47,7 @@ public class ClassInfoService {
     @Transactional(rollbackFor = Exception.class)
     public ClassInfo create(ClassInfo classInfo) {
         long count = classInfoMapper.selectCount(new LambdaQueryWrapper<ClassInfo>()
-            .eq(ClassInfo::getClassName, classInfo.getClassName())
-            .eq(ClassInfo::getDeleted, 0));
+            .eq(ClassInfo::getClassName, classInfo.getClassName()));
         if (count > 0) {
             throw new BusinessException(400, "班级名称已存在");
         }
@@ -65,7 +63,6 @@ public class ClassInfoService {
         ClassInfo existing = getById(id);
         long count = classInfoMapper.selectCount(new LambdaQueryWrapper<ClassInfo>()
             .eq(ClassInfo::getClassName, classInfo.getClassName())
-            .eq(ClassInfo::getDeleted, 0)
             .ne(ClassInfo::getId, id));
         if (count > 0) {
             throw new BusinessException(400, "班级名称已存在");
@@ -98,7 +95,6 @@ public class ClassInfoService {
 
     public List<ClassInfo> listAll() {
         return classInfoMapper.selectList(new LambdaQueryWrapper<ClassInfo>()
-            .eq(ClassInfo::getDeleted, 0)
             .eq(ClassInfo::getStatus, 1)
             .orderByAsc(ClassInfo::getClassName));
     }

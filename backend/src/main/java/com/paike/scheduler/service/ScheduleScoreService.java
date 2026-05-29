@@ -251,8 +251,7 @@ public class ScheduleScoreService {
     private Map<Long, Long> activeClassroomUseCounts() {
         List<Classroom> classrooms = classroomMapper.selectList(
                 new LambdaQueryWrapper<Classroom>()
-                        .eq(Classroom::getStatus, 1)
-                        .eq(Classroom::getDeleted, 0));
+                        .eq(Classroom::getStatus, 1));
         if (classrooms == null || classrooms.isEmpty()) {
             return new HashMap<>();
         }

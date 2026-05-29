@@ -88,7 +88,6 @@ public class ScheduleScoreReportService {
     public ScoreResult generate(Long semesterId) {
         Long effectiveSemesterId = resolveSemesterId(semesterId);
         List<Schedule> schedules = scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
-                .eq(Schedule::getDeleted, 0)
                 .eq(Schedule::getSemesterId, effectiveSemesterId));
 
         Context context = buildContext(effectiveSemesterId, schedules);
@@ -158,7 +157,6 @@ public class ScheduleScoreReportService {
         List<Long> timeSlotIds = schedules.stream().map(Schedule::getTimeSlotId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
 
         List<TeachingTask> allTasks = teachingTaskMapper.selectList(new LambdaQueryWrapper<TeachingTask>()
-                .eq(TeachingTask::getDeleted, 0)
                 .eq(TeachingTask::getStatus, 1)
                 .eq(TeachingTask::getSemesterId, semesterId));
         context.taskMap = allTasks.stream().collect(Collectors.toMap(TeachingTask::getId, Function.identity(), (a, b) -> a));
@@ -180,7 +178,6 @@ public class ScheduleScoreReportService {
                 .stream().collect(Collectors.toMap(TimeSlot::getId, Function.identity(), (a, b) -> a));
 
         context.unavailableMap = unavailableTimeMapper.selectList(new LambdaQueryWrapper<TeacherUnavailableTime>()
-                        .eq(TeacherUnavailableTime::getDeleted, 0)
                         .eq(TeacherUnavailableTime::getStatus, 1))
                 .stream()
                 .collect(Collectors.toMap(item -> buildPairKey(item.getTeacherId(), item.getTimeSlotId()), Function.identity(), (a, b) -> a));

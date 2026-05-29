@@ -175,8 +175,7 @@ public class TeachingTaskController {
         task.setClassName(classInfo.getClassName());
         Long count = scheduleMapper.selectCount(
             new LambdaQueryWrapper<Schedule>()
-                .eq(Schedule::getTeachingTaskId, task.getId())
-                .eq(Schedule::getDeleted, 0));
+                .eq(Schedule::getTeachingTaskId, task.getId()));
         task.setScheduledSlots(count != null ? count.intValue() : 0);
         return Result.success(task);
     }
@@ -195,7 +194,6 @@ public class TeachingTaskController {
     public Result<List<TeachingTask>> listAll() {
         List<TeachingTask> list = teachingTaskMapper.selectList(
             new LambdaQueryWrapper<TeachingTask>()
-                .eq(TeachingTask::getDeleted, 0)
                 .eq(TeachingTask::getStatus, 1)
                 .orderByDesc(TeachingTask::getCreateTime)
         );
@@ -223,8 +221,7 @@ public class TeachingTaskController {
                 .collect(Collectors.toMap(ClassInfo::getId, ClassInfo::getClassName));
         Map<Long, Long> scheduledCountMap = taskIds.isEmpty() ? Map.of() :
             scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
-                    .in(Schedule::getTeachingTaskId, taskIds)
-                    .eq(Schedule::getDeleted, 0))
+                    .in(Schedule::getTeachingTaskId, taskIds))
                 .stream()
                 .collect(Collectors.groupingBy(Schedule::getTeachingTaskId, Collectors.counting()));
 
