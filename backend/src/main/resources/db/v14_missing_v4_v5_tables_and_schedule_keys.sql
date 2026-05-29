@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS schedule_generate_log (
     KEY idx_generate_log_semester (semester_id),
     KEY idx_generate_log_task (teaching_task_id),
     KEY idx_generate_log_type (log_type)
-) COMMENT='排课生成日志表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课生成日志表';
 
 CREATE TABLE IF NOT EXISTS schedule_unassigned_task (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '未排任务ID',
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS schedule_unassigned_task (
     KEY idx_unassigned_semester (semester_id, deleted),
     KEY idx_unassigned_task (teaching_task_id, deleted),
     KEY idx_unassigned_reason (reason_code, deleted)
-) COMMENT='未排任务原因表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='未排任务原因表';
 
 CREATE TABLE IF NOT EXISTS schedule_adjust_log (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '调整日志ID',
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS schedule_adjust_log (
     KEY idx_adjust_schedule (schedule_id, deleted),
     KEY idx_adjust_semester (semester_id, deleted),
     KEY idx_adjust_task (teaching_task_id, deleted)
-) COMMENT='手动调整日志表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='手动调整日志表';
 
 CREATE TABLE IF NOT EXISTS schedule_locked_item (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '锁定记录ID',
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS schedule_locked_item (
     KEY idx_locked_plan_item (plan_item_id),
     KEY idx_locked_schedule (schedule_id),
     KEY idx_locked_active (active_flag)
-) COMMENT='课程锁定记录表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程锁定记录表';
 
 CREATE TABLE IF NOT EXISTS schedule_report (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '报告ID',
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS schedule_report (
     KEY idx_schedule_report_semester_deleted_created (semester_id, deleted, created_at),
     KEY idx_schedule_report_type (report_type),
     KEY idx_schedule_report_created (created_at)
-) COMMENT='V4 排课分析报告表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='V4 排课分析报告表';
 
 SET @ddl = (
     SELECT IF(

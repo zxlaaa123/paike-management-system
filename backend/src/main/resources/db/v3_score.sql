@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS schedule_rule_weight (
     INDEX idx_rule_weight_semester (semester_id),
     INDEX idx_rule_weight_strategy (strategy_type),
     INDEX idx_rule_weight_rule_code (rule_code)
-) COMMENT='排课规则权重表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课规则权重表';
 
 -- -----------------------------------
 -- 2. schedule_score_detail 排课评分明细表
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS schedule_score_detail (
     INDEX idx_score_detail_semester (semester_id),
     INDEX idx_score_detail_semester_deleted (semester_id, deleted),
     INDEX idx_score_detail_rule (rule_code)
-) COMMENT='排课评分明细表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课评分明细表';
 
 -- -----------------------------------
 -- 3. 初始化默认规则权重（综合最优策略）

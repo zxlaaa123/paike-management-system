@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS schedule_repair_task (
     INDEX idx_repair_task_source_schedule (source_schedule_id),
     INDEX idx_repair_task_status (status),
     INDEX idx_repair_task_created (created_at)
-) COMMENT='V5 修复任务记录';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='V5 修复任务记录';
 
 -- 2) 修复建议记录
 CREATE TABLE IF NOT EXISTS schedule_repair_suggestion (
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS schedule_repair_suggestion (
     INDEX idx_repair_suggestion_task (repair_task_id),
     INDEX idx_repair_suggestion_status (status),
     INDEX idx_repair_suggestion_created (created_at)
-) COMMENT='V5 修复建议记录';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='V5 修复建议记录';
 
 -- 3) 候选位置记录
 CREATE TABLE IF NOT EXISTS schedule_candidate_position (
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS schedule_candidate_position (
     INDEX idx_candidate_repair_task (repair_task_id),
     INDEX idx_candidate_suggestion (suggestion_id),
     INDEX idx_candidate_created (created_at)
-) COMMENT='V5 候选位置记录';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='V5 候选位置记录';
 
 -- 4) 优化前后对比记录
 CREATE TABLE IF NOT EXISTS schedule_optimization_compare (
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS schedule_optimization_compare (
     INDEX idx_opt_compare_baseline_plan (baseline_plan_id),
     INDEX idx_opt_compare_optimized_plan (optimized_plan_id),
     INDEX idx_opt_compare_created (created_at)
-) COMMENT='V5 优化前后对比记录';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='V5 优化前后对比记录';
 
 -- 5) 数据一致性检查记录
 CREATE TABLE IF NOT EXISTS schedule_consistency_check (
@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS schedule_consistency_check (
     INDEX idx_consistency_plan (plan_id),
     INDEX idx_consistency_status (status),
     INDEX idx_consistency_created (created_at)
-) COMMENT='V5 数据一致性检查记录';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='V5 数据一致性检查记录';
 
 -- 6) 回归测试记录
 CREATE TABLE IF NOT EXISTS schedule_regression_test (
@@ -177,5 +177,5 @@ CREATE TABLE IF NOT EXISTS schedule_regression_test (
     INDEX idx_regression_status (status),
     INDEX idx_regression_stage (test_stage),
     INDEX idx_regression_created (created_at)
-) COMMENT='V5 回归测试记录';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='V5 回归测试记录';
 

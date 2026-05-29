@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS sys_user (
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY uk_sys_user_username (username)
-) COMMENT='系统用户表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表';
 
 CREATE TABLE IF NOT EXISTS teacher (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS teacher (
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY uk_teacher_no (teacher_no)
-) COMMENT='教师表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='教师表';
 
 CREATE TABLE IF NOT EXISTS class_info (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS class_info (
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY uk_class_name (class_name)
-) COMMENT='班级表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='班级表';
 
 CREATE TABLE IF NOT EXISTS classroom (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS classroom (
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY uk_room_name (room_name)
-) COMMENT='教室表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='教室表';
 
 CREATE TABLE IF NOT EXISTS course (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS course (
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY uk_course_no (course_no)
-) COMMENT='课程表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程表';
 
 CREATE TABLE IF NOT EXISTS teaching_task (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS teaching_task (
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删 1已删',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
-) COMMENT='教学任务表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='教学任务表';
 
 CREATE TABLE IF NOT EXISTS time_slot (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS time_slot (
     time_label VARCHAR(50) NOT NULL COMMENT '时间段标签，如：周一 第1-2节',
     sort_order TINYINT NOT NULL COMMENT '排序序号：1~20',
     UNIQUE KEY uk_day_period (day_of_week, period_no)
-) COMMENT='时间段表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='时间段表';
 
 INSERT IGNORE INTO time_slot (day_of_week, period_no, time_label, sort_order) VALUES
 (1, 1, '周一 第1-2节', 1),
@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS schedule (
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删 1已删',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
-) COMMENT='排课表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课表';
 
 -- === From: v2_schema.sql ===
 -- =============================================
@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS teacher_unavailable_time (
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删 1已删',
     active_key BIGINT GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN 0 ELSE id END) STORED,
     UNIQUE KEY uk_teacher_timeslot (teacher_id, time_slot_id, active_key)
-) COMMENT='教师禁排时间表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='教师禁排时间表';
 
 -- -----------------------------------
 -- 2. schedule_rule_config 排课规则配置表
@@ -168,7 +168,7 @@ CREATE TABLE IF NOT EXISTS schedule_rule_config (
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY uk_rule_key (rule_key)
-) COMMENT='排课规则配置表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课规则配置表';
 
 -- -----------------------------------
 -- 3. auto_schedule_batch 自动排课批次表
@@ -188,7 +188,7 @@ CREATE TABLE IF NOT EXISTS auto_schedule_batch (
     end_time DATETIME DEFAULT NULL COMMENT '结束时间',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     UNIQUE KEY uk_batch_no (batch_no)
-) COMMENT='自动排课批次表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='自动排课批次表';
 
 -- -----------------------------------
 -- 4. unscheduled_task 未排任务表
@@ -206,7 +206,7 @@ CREATE TABLE IF NOT EXISTS unscheduled_task (
     reason_type VARCHAR(50) DEFAULT NULL COMMENT '未排原因类型',
     reason_message VARCHAR(500) DEFAULT NULL COMMENT '未排原因说明',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
-) COMMENT='未排任务表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='未排任务表';
 
 -- -----------------------------------
 -- 5. schedule_conflict_report 排课冲突报告表
@@ -225,7 +225,7 @@ CREATE TABLE IF NOT EXISTS schedule_conflict_report (
     suggestion VARCHAR(500) DEFAULT NULL COMMENT '处理建议',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     UNIQUE KEY uk_report_no (report_no)
-) COMMENT='排课冲突报告表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课冲突报告表';
 
 -- -----------------------------------
 -- 6. schedule_score_report 课表评分报告表
@@ -242,7 +242,7 @@ CREATE TABLE IF NOT EXISTS schedule_score_report (
     deduction_detail TEXT DEFAULT NULL COMMENT '扣分详情',
     suggestion TEXT DEFAULT NULL COMMENT '优化建议',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
-) COMMENT='课表评分报告表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课表评分报告表';
 
 -- -----------------------------------
 -- 7. 初始化默认排课规则
@@ -329,7 +329,7 @@ CREATE TABLE IF NOT EXISTS semester (
     remark VARCHAR(255) NULL COMMENT '备注',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
-) COMMENT='学期表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学期表';
 
 -- -----------------------------------
 -- 2. 初始化默认学期（如果没有任何学期数据）
@@ -365,7 +365,7 @@ CREATE TABLE IF NOT EXISTS schedule_plan (
     INDEX idx_plan_semester (semester_id),
     INDEX idx_plan_status (status),
     INDEX idx_plan_strategy (strategy_type)
-) COMMENT='排课方案表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课方案表';
 
 -- -----------------------------------
 -- 2. schedule_plan_item 排课方案明细表
@@ -395,7 +395,7 @@ CREATE TABLE IF NOT EXISTS schedule_plan_item (
     INDEX idx_plan_item_teacher_time (teacher_id, weekday, start_period, end_period),
     INDEX idx_plan_item_class_time (class_id, weekday, start_period, end_period),
     INDEX idx_plan_item_room_time (classroom_id, weekday, start_period, end_period)
-) COMMENT='排课方案明细表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课方案明细表';
 
 -- === From: v3_score.sql ===
 -- =============================================
@@ -421,7 +421,7 @@ CREATE TABLE IF NOT EXISTS schedule_rule_weight (
     INDEX idx_rule_weight_semester (semester_id),
     INDEX idx_rule_weight_strategy (strategy_type),
     INDEX idx_rule_weight_rule_code (rule_code)
-) COMMENT='排课规则权重表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课规则权重表';
 
 -- -----------------------------------
 -- 2. schedule_score_detail 排课评分明细表
@@ -444,7 +444,7 @@ CREATE TABLE IF NOT EXISTS schedule_score_detail (
     INDEX idx_score_detail_semester (semester_id),
     INDEX idx_score_detail_semester_deleted (semester_id, deleted),
     INDEX idx_score_detail_rule (rule_code)
-) COMMENT='排课评分明细表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课评分明细表';
 
 -- -----------------------------------
 -- 3. 初始化默认规则权重（综合最优策略）

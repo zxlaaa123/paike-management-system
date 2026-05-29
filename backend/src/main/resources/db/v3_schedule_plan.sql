@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS schedule_plan (
     INDEX idx_plan_semester (semester_id),
     INDEX idx_plan_status (status),
     INDEX idx_plan_strategy (strategy_type)
-) COMMENT='排课方案表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课方案表';
 
 -- -----------------------------------
 -- 2. schedule_plan_item 排课方案明细表
@@ -56,4 +56,4 @@ CREATE TABLE IF NOT EXISTS schedule_plan_item (
     INDEX idx_plan_item_teacher_time (teacher_id, weekday, start_period, end_period),
     INDEX idx_plan_item_class_time (class_id, weekday, start_period, end_period),
     INDEX idx_plan_item_room_time (classroom_id, weekday, start_period, end_period)
-) COMMENT='排课方案明细表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课方案明细表';
