@@ -16,10 +16,9 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
-  flyway:
-    enabled: false  # 自用项目，初始化由 spring.sql.init + SemesterSchemaInitializer 兜底，不引入迁移框架。详见 db/README.md
   sql:
     init:
+      # 本项目不引入 Flyway/Liquibase；初始化由 spring.sql.init + SemesterSchemaInitializer 兜底。详见 db/README.md。
       # 三套初始化入口的执行顺序与职责边界见 backend/src/main/resources/db/README.md。
       # 新增 schema 改动请追加新的 v*.sql 到 schema-locations 末尾，并保持幂等。
       mode: always
