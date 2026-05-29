@@ -27,3 +27,28 @@ CREATE TABLE IF NOT EXISTS semester (
 INSERT INTO semester (name, school_year, term, start_date, end_date, is_current, status, remark)
 SELECT '2025-2026学年第二学期', '2025-2026', '第二学期', '2026-02-23', '2026-07-10', 1, '进行中', 'V3默认学期'
 WHERE NOT EXISTS (SELECT 1 FROM semester LIMIT 1);
+
+-- 兼容旧库：如果已存在学期但没有任何当前学期，则选择最新学期作为当前学期。
+-- 后续 v3_score.sql 的默认规则权重初始化依赖当前学期。
+UPDATE semester
+SET is_current = 1,
+    status = CASE WHEN status = '未开始' THEN '进行中' ELSE status END,
+    updated_at = NOW()
+WHERE id = (
+    SELECT id FROM (
+        SELECT id
+        FROM semester
+        WHERE deleted = 0
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 1
+    ) AS latest_semester
+)
+  AND NOT EXISTS (
+    SELECT 1 FROM (
+        SELECT id
+        FROM semester
+        WHERE deleted = 0
+          AND is_current = 1
+        LIMIT 1
+    ) AS current_semester
+);
