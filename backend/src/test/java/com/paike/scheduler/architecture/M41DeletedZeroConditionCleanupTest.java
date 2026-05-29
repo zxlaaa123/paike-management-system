@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class M41DeletedZeroConditionCleanupTest {
 
     private static final Pattern JAVA_DELETED_ZERO_CONDITION =
-            Pattern.compile("\\.eq\\s*\\([^\\n]*::getDeleted\\s*,\\s*0\\s*\\)");
+            Pattern.compile("\\.eq\\s*\\((?s:.*?)::getDeleted\\s*,\\s*0\\s*\\)");
 
     @Test
     void javaLambdaWrappersNoLongerRepeatDeletedZeroConditions() throws IOException {
@@ -46,6 +46,18 @@ class M41DeletedZeroConditionCleanupTest {
         assertTrue(source("src/main/java/com/paike/scheduler/entity/TeachingTask.java").contains("@TableLogic"));
         assertTrue(source("src/main/java/com/paike/scheduler/entity/Classroom.java").contains("@TableLogic"));
         assertTrue(source("src/main/java/com/paike/scheduler/entity/TeacherUnavailableTime.java").contains("@TableLogic"));
+        assertTrue(source("src/main/java/com/paike/scheduler/entity/ClassInfo.java").contains("@TableLogic"));
+        assertTrue(source("src/main/java/com/paike/scheduler/entity/Course.java").contains("@TableLogic"));
+        assertTrue(source("src/main/java/com/paike/scheduler/entity/Teacher.java").contains("@TableLogic"));
+    }
+
+    @Test
+    void mybatisPlusLogicDeleteConfigurationRemainsExplicit() throws IOException {
+        String application = source("src/main/resources/application.yml");
+
+        assertTrue(application.contains("logic-delete-field: deleted"));
+        assertTrue(application.contains("logic-delete-value: 1"));
+        assertTrue(application.contains("logic-not-delete-value: 0"));
     }
 
     private List<SourceFile> sourceFiles(Path root, String extension) throws IOException {
@@ -87,4 +99,3 @@ class M41DeletedZeroConditionCleanupTest {
     private record SourceFile(String path, String content) {
     }
 }
-
