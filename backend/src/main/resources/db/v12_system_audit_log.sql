@@ -22,4 +22,4 @@ CREATE TABLE IF NOT EXISTS system_audit_log (
     INDEX idx_audit_plan (plan_id),
     INDEX idx_audit_success (success),
     INDEX idx_audit_created (created_at)
-) COMMENT='V6 系统关键操作审计日志表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='V6 系统关键操作审计日志表';

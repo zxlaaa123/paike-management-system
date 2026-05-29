@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS teacher_unavailable_time (
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删 1已删',
     active_key BIGINT GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN 0 ELSE NULL END) STORED,
     UNIQUE KEY uk_teacher_timeslot (teacher_id, time_slot_id, active_key)
-) COMMENT='教师禁排时间表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='教师禁排时间表';
 
 -- -----------------------------------
 -- 2. schedule_rule_config 排课规则配置表
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS schedule_rule_config (
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY uk_rule_key (rule_key)
-) COMMENT='排课规则配置表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课规则配置表';
 
 -- -----------------------------------
 -- 3. auto_schedule_batch 自动排课批次表
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS auto_schedule_batch (
     end_time DATETIME DEFAULT NULL COMMENT '结束时间',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     UNIQUE KEY uk_batch_no (batch_no)
-) COMMENT='自动排课批次表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='自动排课批次表';
 
 -- -----------------------------------
 -- 4. unscheduled_task 未排任务表
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS unscheduled_task (
     reason_type VARCHAR(50) DEFAULT NULL COMMENT '未排原因类型',
     reason_message VARCHAR(500) DEFAULT NULL COMMENT '未排原因说明',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
-) COMMENT='未排任务表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='未排任务表';
 
 -- -----------------------------------
 -- 5. schedule_conflict_report 排课冲突报告表
@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS schedule_conflict_report (
     suggestion VARCHAR(500) DEFAULT NULL COMMENT '处理建议',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     UNIQUE KEY uk_report_no (report_no)
-) COMMENT='排课冲突报告表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课冲突报告表';
 
 -- -----------------------------------
 -- 6. schedule_score_report 课表评分报告表
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS schedule_score_report (
     deduction_detail TEXT DEFAULT NULL COMMENT '扣分详情',
     suggestion TEXT DEFAULT NULL COMMENT '优化建议',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
-) COMMENT='课表评分报告表';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课表评分报告表';
 
 -- -----------------------------------
 -- 7. 初始化默认排课规则
