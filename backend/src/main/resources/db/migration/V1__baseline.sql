@@ -221,7 +221,7 @@ CREATE TABLE IF NOT EXISTS schedule_conflict_report (
     object_id BIGINT DEFAULT NULL COMMENT '冲突对象ID',
     object_name VARCHAR(100) DEFAULT NULL COMMENT '冲突对象名称',
     time_slot_id BIGINT DEFAULT NULL COMMENT '时间段ID',
-    related_schedule_ids VARCHAR(255) DEFAULT NULL COMMENT '相关排课记录ID',
+    related_schedule_ids TEXT NULL COMMENT '相关排课记录ID',
     description VARCHAR(500) DEFAULT NULL COMMENT '冲突说明',
     suggestion VARCHAR(500) DEFAULT NULL COMMENT '处理建议',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
