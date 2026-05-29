@@ -77,6 +77,7 @@ class V4ScheduleReportServiceTest {
         assertFalse(html.contains("<img"));
         assertTrue(html.contains("&lt;script&gt;alert(&#x27;x&#x27;)&lt;&#x2F;script&gt;"));
         assertTrue(html.contains("&lt;img src=x onerror=alert(1)&gt;"));
+        assertTrue(html.contains("&lt;script&gt;alert(2)&lt;&#x2F;script&gt;"));
     }
 
     @Test
