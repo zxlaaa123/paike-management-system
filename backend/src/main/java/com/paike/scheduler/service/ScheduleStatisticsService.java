@@ -111,8 +111,7 @@ public class ScheduleStatisticsService {
 
         List<Classroom> allRooms = classroomMapper.selectList(
                 new LambdaQueryWrapper<Classroom>()
-                        .eq(Classroom::getStatus, 1)
-                        .eq(Classroom::getDeleted, 0));
+                        .eq(Classroom::getStatus, 1));
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (Classroom room : allRooms) {
@@ -261,8 +260,7 @@ public class ScheduleStatisticsService {
         // 正式课表课程数量
         Long formalCount = scheduleMapper.selectCount(
                 new LambdaQueryWrapper<Schedule>()
-                        .eq(Schedule::getSemesterId, semesterId)
-                        .eq(Schedule::getDeleted, 0));
+                        .eq(Schedule::getSemesterId, semesterId));
         overview.put("formalScheduleCount", formalCount);
 
         // 未排任务数量（所有方案合计）
@@ -284,9 +282,9 @@ public class ScheduleStatisticsService {
         Map<String, Object> stats = new LinkedHashMap<>();
 
         // 基础数据量
-        Long teacherCount = teacherMapper.selectCount(new LambdaQueryWrapper<Teacher>().eq(Teacher::getDeleted, 0));
-        Long classCount = classInfoMapper.selectCount(new LambdaQueryWrapper<ClassInfo>().eq(ClassInfo::getDeleted, 0));
-        Long classroomCount = classroomMapper.selectCount(new LambdaQueryWrapper<Classroom>().eq(Classroom::getDeleted, 0));
+        Long teacherCount = teacherMapper.selectCount(new LambdaQueryWrapper<Teacher>());
+        Long classCount = classInfoMapper.selectCount(new LambdaQueryWrapper<ClassInfo>());
+        Long classroomCount = classroomMapper.selectCount(new LambdaQueryWrapper<Classroom>());
 
         stats.put("teacherCount", teacherCount);
         stats.put("classCount", classCount);
@@ -315,8 +313,7 @@ public class ScheduleStatisticsService {
             // 统计正式课表
             return scheduleMapper.selectList(
                     new LambdaQueryWrapper<Schedule>()
-                            .eq(Schedule::getSemesterId, semesterId)
-                            .eq(Schedule::getDeleted, 0));
+                            .eq(Schedule::getSemesterId, semesterId));
         }
     }
 

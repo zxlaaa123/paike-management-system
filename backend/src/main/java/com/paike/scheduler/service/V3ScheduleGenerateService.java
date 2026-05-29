@@ -194,8 +194,7 @@ public class V3ScheduleGenerateService {
         return teachingTaskMapper.selectList(
                 new LambdaQueryWrapper<TeachingTask>()
                         .eq(TeachingTask::getSemesterId, semesterId)
-                        .eq(TeachingTask::getStatus, 1)
-                        .eq(TeachingTask::getDeleted, 0));
+                        .eq(TeachingTask::getStatus, 1));
     }
 
     private RuleConfig loadRuleConfig() {

@@ -106,7 +106,6 @@ public class ScheduleConflictService {
 
         // 只查询同一时间段的排课记录,避免全表扫描
         LambdaQueryWrapper<Schedule> baseWrapper = new LambdaQueryWrapper<Schedule>()
-                .eq(Schedule::getDeleted, 0)
                 .eq(Schedule::getTimeSlotId, timeSlotId)
                 .eq(task.getSemesterId() != null, Schedule::getSemesterId, task.getSemesterId());
         if (excludeScheduleId != null) {
@@ -154,7 +153,6 @@ public class ScheduleConflictService {
         // 统计该任务已排的大节数
         LambdaQueryWrapper<Schedule> taskWrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getTeachingTaskId, taskId)
-                .eq(Schedule::getDeleted, 0)
                 .eq(task.getSemesterId() != null, Schedule::getSemesterId, task.getSemesterId());
         if (excludeScheduleId != null) {
             taskWrapper.ne(Schedule::getId, excludeScheduleId);

@@ -483,8 +483,7 @@ public class V5ConsistencyCheckService {
 
     private void checkNoFormalOverwrite(SchedulePlan plan, List<V5ConsistencyIssueVo> issues) {
         long formalCount = scheduleMapper.selectCount(new LambdaQueryWrapper<Schedule>()
-                .eq(Schedule::getPlanId, plan.getId())
-                .eq(Schedule::getDeleted, 0));
+                .eq(Schedule::getPlanId, plan.getId()));
         if (formalCount > 0) {
             issues.add(issue("FORMAL_SCHEDULE_OVERWRITE", SEVERITY_BLOCKING, "PROCESS", "试算方案已直接写入正式课表",
                     "planId=" + plan.getId() + " 已存在 " + formalCount + " 条正式课表记录",

@@ -19,8 +19,7 @@ public class TeacherService {
     private final TeacherMapper teacherMapper;
 
     public Page<Teacher> list(String name, String teacherNo, String department, Integer status, int page, int size) {
-        LambdaQueryWrapper<Teacher> wrapper = new LambdaQueryWrapper<Teacher>()
-            .eq(Teacher::getDeleted, 0);
+        LambdaQueryWrapper<Teacher> wrapper = new LambdaQueryWrapper<Teacher>();
         if (name != null && !name.isBlank()) {
             wrapper.like(Teacher::getName, name);
         }
@@ -48,8 +47,7 @@ public class TeacherService {
     @Transactional(rollbackFor = Exception.class)
     public Teacher create(Teacher teacher) {
         long count = teacherMapper.selectCount(new LambdaQueryWrapper<Teacher>()
-            .eq(Teacher::getTeacherNo, teacher.getTeacherNo())
-            .eq(Teacher::getDeleted, 0));
+            .eq(Teacher::getTeacherNo, teacher.getTeacherNo()));
         if (count > 0) {
             throw new BusinessException(400, "教师编号已存在");
         }
@@ -65,7 +63,6 @@ public class TeacherService {
         Teacher existing = getById(id);
         long count = teacherMapper.selectCount(new LambdaQueryWrapper<Teacher>()
             .eq(Teacher::getTeacherNo, teacher.getTeacherNo())
-            .eq(Teacher::getDeleted, 0)
             .ne(Teacher::getId, id));
         if (count > 0) {
             throw new BusinessException(400, "教师编号已存在");
@@ -97,7 +94,6 @@ public class TeacherService {
 
     public List<Teacher> listAll() {
         return teacherMapper.selectList(new LambdaQueryWrapper<Teacher>()
-            .eq(Teacher::getDeleted, 0)
             .eq(Teacher::getStatus, 1)
             .orderByAsc(Teacher::getTeacherNo));
     }

@@ -241,7 +241,6 @@ public class V4ScheduleAdjustmentService {
         List<Schedule> schedules = scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getSemesterId, context.schedule.getSemesterId())
                 .eq(Schedule::getTimeSlotId, newSlot.getId())
-                .eq(Schedule::getDeleted, 0)
                 .ne(Schedule::getId, context.schedule.getId()));
 
         for (Schedule other : schedules) {

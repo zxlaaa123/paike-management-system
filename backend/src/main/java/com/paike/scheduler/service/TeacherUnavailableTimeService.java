@@ -36,15 +36,13 @@ public class TeacherUnavailableTimeService {
      * 列表查询支持按教师、时间段和状态筛选，返回前补齐页面展示所需的关联字段。
      */
     public Page<TeacherUnavailableTime> list(Long teacherId, String teacherName, Long timeSlotId, Integer status, int page, int size) {
-        LambdaQueryWrapper<TeacherUnavailableTime> wrapper = new LambdaQueryWrapper<TeacherUnavailableTime>()
-                .eq(TeacherUnavailableTime::getDeleted, 0);
+        LambdaQueryWrapper<TeacherUnavailableTime> wrapper = new LambdaQueryWrapper<TeacherUnavailableTime>();
 
         if (teacherId != null) {
             wrapper.eq(TeacherUnavailableTime::getTeacherId, teacherId);
         }
         if (teacherName != null && !teacherName.isBlank()) {
             List<Teacher> teachers = teacherMapper.selectList(new LambdaQueryWrapper<Teacher>()
-                    .eq(Teacher::getDeleted, 0)
                     .like(Teacher::getName, teacherName));
             if (teachers.isEmpty()) {
                 return new Page<>(page, size, 0);
@@ -165,7 +163,6 @@ public class TeacherUnavailableTimeService {
         long count = unavailableTimeMapper.selectCount(new LambdaQueryWrapper<TeacherUnavailableTime>()
                 .eq(TeacherUnavailableTime::getTeacherId, form.getTeacherId())
                 .eq(TeacherUnavailableTime::getTimeSlotId, form.getTimeSlotId())
-                .eq(TeacherUnavailableTime::getDeleted, 0)
                 .ne(excludedId != null, TeacherUnavailableTime::getId, excludedId));
         if (count > 0) {
             throw new BusinessException(duplicateMessage(new UnavailableReference(teacher, timeSlot)));
@@ -214,8 +211,7 @@ public class TeacherUnavailableTimeService {
         long count = unavailableTimeMapper.selectCount(new LambdaQueryWrapper<TeacherUnavailableTime>()
                 .eq(TeacherUnavailableTime::getTeacherId, teacherId)
                 .eq(TeacherUnavailableTime::getTimeSlotId, timeSlotId)
-                .eq(TeacherUnavailableTime::getStatus, 1)
-                .eq(TeacherUnavailableTime::getDeleted, 0));
+                .eq(TeacherUnavailableTime::getStatus, 1));
         return count > 0;
     }
 }

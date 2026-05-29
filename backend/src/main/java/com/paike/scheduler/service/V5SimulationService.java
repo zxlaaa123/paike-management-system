@@ -522,7 +522,6 @@ public class V5SimulationService {
                 .orderByAsc(TimeSlot::getDayOfWeek)
                 .orderByAsc(TimeSlot::getPeriodNo));
         List<Classroom> classrooms = classroomMapper.selectList(new LambdaQueryWrapper<Classroom>()
-                .eq(Classroom::getDeleted, 0)
                 .eq(Classroom::getStatus, 1)
                 .orderByAsc(Classroom::getRoomName));
         // P1-13: 把 plan / item / teacher / classInfo / course / allItems / weights / isLocked / classrooms / timeSlots 提到循环外。
@@ -728,8 +727,7 @@ public class V5SimulationService {
                     .orderByAsc(SchedulePlanItem::getStartPeriod));
         }
         List<Schedule> schedules = scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
-                .eq(Schedule::getSemesterId, task.getSemesterId())
-                .eq(Schedule::getDeleted, 0));
+                .eq(Schedule::getSemesterId, task.getSemesterId()));
         Map<Long, TimeSlot> slotMap = timeSlotMapper.selectBatchIds(schedules.stream()
                         .map(Schedule::getTimeSlotId)
                         .filter(Objects::nonNull)

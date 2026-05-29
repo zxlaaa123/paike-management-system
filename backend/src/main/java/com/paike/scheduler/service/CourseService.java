@@ -19,8 +19,7 @@ public class CourseService {
     private final CourseMapper courseMapper;
 
     public Page<Course> list(String courseName, String courseNo, String courseType, int page, int size) {
-        LambdaQueryWrapper<Course> wrapper = new LambdaQueryWrapper<Course>()
-            .eq(Course::getDeleted, 0);
+        LambdaQueryWrapper<Course> wrapper = new LambdaQueryWrapper<Course>();
         if (courseName != null && !courseName.isBlank()) {
             wrapper.like(Course::getCourseName, courseName);
         }
@@ -45,8 +44,7 @@ public class CourseService {
     @Transactional(rollbackFor = Exception.class)
     public Course create(Course course) {
         long count = courseMapper.selectCount(new LambdaQueryWrapper<Course>()
-            .eq(Course::getCourseNo, course.getCourseNo())
-            .eq(Course::getDeleted, 0));
+            .eq(Course::getCourseNo, course.getCourseNo()));
         if (count > 0) {
             throw new BusinessException(400, "课程编号已存在");
         }
@@ -62,7 +60,6 @@ public class CourseService {
         Course existing = getById(id);
         long count = courseMapper.selectCount(new LambdaQueryWrapper<Course>()
             .eq(Course::getCourseNo, course.getCourseNo())
-            .eq(Course::getDeleted, 0)
             .ne(Course::getId, id));
         if (count > 0) {
             throw new BusinessException(400, "课程编号已存在");
@@ -87,7 +84,6 @@ public class CourseService {
 
     public List<Course> listAll() {
         return courseMapper.selectList(new LambdaQueryWrapper<Course>()
-            .eq(Course::getDeleted, 0)
             .orderByAsc(Course::getCourseNo));
     }
 }

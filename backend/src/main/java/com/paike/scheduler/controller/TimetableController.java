@@ -130,8 +130,7 @@ public class TimetableController {
             String taskField, Long fieldValue,
             java.util.function.Function<LambdaQueryWrapper<Schedule>, LambdaQueryWrapper<Schedule>> scheduleFilter) {
         // 通过 teaching_task 关联查询
-        LambdaQueryWrapper<TeachingTask> taskWrapper = new LambdaQueryWrapper<TeachingTask>()
-            .eq(TeachingTask::getDeleted, 0);
+        LambdaQueryWrapper<TeachingTask> taskWrapper = new LambdaQueryWrapper<TeachingTask>();
         switch (taskField) {
             case "classId" -> taskWrapper.eq(TeachingTask::getClassId, fieldValue);
             case "teacherId" -> taskWrapper.eq(TeachingTask::getTeacherId, fieldValue);
@@ -140,8 +139,7 @@ public class TimetableController {
         List<Long> taskIds = tasks.stream().map(TeachingTask::getId).collect(Collectors.toList());
 
         // 直接按 schedule 表字段查
-        LambdaQueryWrapper<Schedule> scheduleWrapper = new LambdaQueryWrapper<Schedule>()
-            .eq(Schedule::getDeleted, 0);
+        LambdaQueryWrapper<Schedule> scheduleWrapper = new LambdaQueryWrapper<Schedule>();
         scheduleFilter.apply(scheduleWrapper);
         List<Schedule> schedules = scheduleMapper.selectList(scheduleWrapper);
 
@@ -150,7 +148,6 @@ public class TimetableController {
             List<Schedule> taskSchedules = scheduleMapper.selectList(
                 new LambdaQueryWrapper<Schedule>()
                     .in(Schedule::getTeachingTaskId, taskIds)
-                    .eq(Schedule::getDeleted, 0)
             );
             Set<Long> existingIds = schedules.stream().map(Schedule::getId).collect(Collectors.toSet());
             for (Schedule s : taskSchedules) {
@@ -176,7 +173,6 @@ public class TimetableController {
         return scheduleMapper.selectList(
             new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getClassroomId, classroomId)
-                .eq(Schedule::getDeleted, 0)
         );
     }
 

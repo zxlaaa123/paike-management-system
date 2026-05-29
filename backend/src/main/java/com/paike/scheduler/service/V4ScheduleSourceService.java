@@ -35,8 +35,7 @@ public class V4ScheduleSourceService {
 
         List<Schedule> schedules = scheduleMapper.selectList(
                 new LambdaQueryWrapper<Schedule>()
-                        .eq(Schedule::getSemesterId, semester.getId())
-                        .eq(Schedule::getDeleted, 0));
+                        .eq(Schedule::getSemesterId, semester.getId()));
 
         Long sourcePlanId = schedules.stream()
                 .map(Schedule::getPlanId)
