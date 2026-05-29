@@ -10,6 +10,7 @@ import {
 } from '../../api/v4ScheduleAiApi'
 import { strategyText } from '../../utils/status'
 import { extractMessage } from '../../utils/errors'
+import { copyText } from '../../utils/clipboard'
 
 const route = useRoute()
 const router = useRouter()
@@ -86,17 +87,10 @@ async function handleCopy() {
     ElMessage.warning('暂无可复制内容')
     return
   }
-  try {
-    await navigator.clipboard.writeText(text)
+  if (await copyText(text)) {
     ElMessage.success('已复制分析结果')
-  } catch (_error) {
-    const textarea = document.createElement('textarea')
-    textarea.value = text
-    document.body.appendChild(textarea)
-    textarea.select()
-    document.execCommand('copy')
-    document.body.removeChild(textarea)
-    ElMessage.success('已复制分析结果')
+  } else {
+    ElMessage.error('复制失败，请手动复制')
   }
 }
 
