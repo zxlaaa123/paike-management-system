@@ -92,6 +92,10 @@ function jumpToRepairFlow() {
   ).toString()}`)
 }
 
+function handleCurrentChange(row: V5CandidatePosition | null) {
+  selected.value = row
+}
+
 onMounted(loadData)
 </script>
 
@@ -124,7 +128,7 @@ onMounted(loadData)
         <el-input v-model="filters.classroomKeyword" clearable placeholder="教室关键字" style="width: 200px" />
       </div>
 
-      <el-table :data="displayedRows" border stripe @current-change="(row:any) => (selected = row)" highlight-current-row>
+      <el-table :data="displayedRows" border stripe @current-change="handleCurrentChange" highlight-current-row>
         <el-table-column type="index" width="60" label="#" />
         <el-table-column label="星期" width="90">
           <template #default="{ row }">{{ weekdayText(row.weekday) }}</template>

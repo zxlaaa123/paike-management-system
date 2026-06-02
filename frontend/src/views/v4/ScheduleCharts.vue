@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { EChartsOption } from 'echarts'
+import type { ECElementEvent } from 'echarts/core'
 import EChartPanel from '../../components/v4/EChartPanel.vue'
 import { getSchedulePlanById, type SchedulePlan } from '../../api/schedulePlan'
 import {
@@ -139,7 +140,10 @@ const densityOption = computed<EChartsOption>(() => {
   const maxCount = Math.max(...items.map((item) => item.courseCount), 0)
   return {
     tooltip: {
-      formatter: (params: any) => `周${params.value[0]} 第${params.value[1]}节：${params.value[2]} 门课`,
+      formatter: (params: unknown) => {
+        const value = readDensityValue(params)
+        return `周${value[0]} 第${value[1]}节：${value[2]} 门课`
+      },
     },
     grid: { left: 48, right: 72, top: 24, bottom: 36 },
     xAxis: { type: 'category', data: [1, 2, 3, 4, 5].map((day) => `周${day}`) },
@@ -195,13 +199,25 @@ const scoreOption = computed<EChartsOption>(() => {
   }
 })
 
-function handleTeacherClick(params: any) {
+type ChartClickParams = Pick<ECElementEvent, 'dataIndex' | 'value'>
+type DensityCellValue = [number, number, number]
+
+function readDensityValue(params: unknown): DensityCellValue {
+  const value = typeof params === 'object' && params !== null && 'value' in params
+    ? (params as { value?: unknown }).value
+    : undefined
+  return Array.isArray(value) && value.length >= 3
+    ? [Number(value[0]), Number(value[1]), Number(value[2])]
+    : [0, 0, 0]
+}
+
+function handleTeacherClick(params: ChartClickParams) {
   const item = teacherChart.value?.items?.[params.dataIndex]
   if (!item) return
   openDetail(item.teacherName, [`总课时：${item.totalHours} 节`, `涉及课程数：${item.courseCount}`])
 }
 
-function handleRoomClick(params: any) {
+function handleRoomClick(params: ChartClickParams) {
   const item = roomChart.value?.items?.[params.dataIndex]
   if (!item) return
   openDetail(item.roomName, [
@@ -213,12 +229,12 @@ function handleRoomClick(params: any) {
   ])
 }
 
-function handleDensityClick(params: any) {
-  const value = params.value as [number, number, number]
+function handleDensityClick(params: ChartClickParams) {
+  const value = readDensityValue(params)
   openDetail(`周${value[0] + 1} 第${value[1] + 1}节`, [`课程密度：${value[2]} 门课`])
 }
 
-function handleRadarClick(params: any) {
+function handleRadarClick(params: ChartClickParams) {
   const item = scoreChart.value?.items?.[params.dataIndex ?? 0]
   if (!item) return
   openDetail(item.name, [`得分：${item.value}`, `说明：${item.description}`])

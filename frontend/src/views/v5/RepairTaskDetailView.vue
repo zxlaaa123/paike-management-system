@@ -92,6 +92,10 @@ async function chooseForSimulation(row: V5RepairSuggestion) {
   }
 }
 
+function handleSuggestionSelectionChange(rows: V5RepairSuggestion[]) {
+  selectedSuggestions.value = rows
+}
+
 function openLocalReplan() {
   if (!task.value) return
   localReplanForm.value = {
@@ -268,7 +272,7 @@ onMounted(fetchData)
           <div class="sub">支持多选对比与生成试算方案</div>
         </div>
       </template>
-      <el-table :data="suggestions" stripe border @selection-change="(rows:any)=>selectedSuggestions=rows">
+      <el-table :data="suggestions" stripe border @selection-change="handleSuggestionSelectionChange">
         <el-table-column type="selection" width="48" />
         <el-table-column prop="suggestionCode" label="建议编码" width="150" />
         <el-table-column label="建议类型" width="170">
