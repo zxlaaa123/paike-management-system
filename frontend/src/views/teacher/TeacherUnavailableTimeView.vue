@@ -83,6 +83,7 @@ async function loadOptions() {
     timeSlots.value = await getAllTimeSlots()
   } catch (_e) {
     console.error(_e)
+    ElMessage.error('加载教师和时间段失败')
   }
 }
 
@@ -124,6 +125,7 @@ async function handleSubmit() {
     fetchData()
   } catch (_e) {
     console.error(_e)
+    ElMessage.error('保存禁排时间失败')
   }
 }
 

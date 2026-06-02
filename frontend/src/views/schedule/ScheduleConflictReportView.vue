@@ -143,6 +143,7 @@ async function handleClear() {
     await fetchReports()
   } catch (_e) {
     console.error(_e)
+    ElMessage.error('加载冲突报告失败')
   }
 }
 

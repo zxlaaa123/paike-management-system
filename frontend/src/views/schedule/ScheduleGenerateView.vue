@@ -71,6 +71,7 @@ async function handleGenerateSingle() {
     router.push(`/v3/schedule-plans/${result.planId}`)
   } catch (error) {
     console.error(error)
+    ElMessage.error('单方案生成失败')
   } finally {
     generating.value = false
   }
@@ -93,6 +94,7 @@ async function handleGenerateMultiple() {
     router.push('/v3/schedule-plans')
   } catch (error) {
     console.error(error)
+    ElMessage.error('多方案生成失败')
   } finally {
     generating.value = false
   }
