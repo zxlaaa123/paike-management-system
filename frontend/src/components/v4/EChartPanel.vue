@@ -10,7 +10,7 @@ import {
   VisualMapComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
-import { use, init, type ECharts, type EChartsCoreOption } from 'echarts/core'
+import { use, init, type ECElementEvent, type ECharts, type EChartsCoreOption } from 'echarts/core'
 
 use([
   BarChart,
@@ -38,7 +38,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  chartClick: [params: unknown]
+  chartClick: [params: ECElementEvent]
 }>()
 
 const elRef = ref<HTMLDivElement | null>(null)
@@ -51,7 +51,7 @@ function renderChart() {
   }
   if (!chart) {
     chart = init(elRef.value)
-    chart.on('click', (params) => emit('chartClick', params))
+    chart.on('click', (params: ECElementEvent) => emit('chartClick', params))
   }
   chart.setOption(props.option, true)
   if (props.loading) {
