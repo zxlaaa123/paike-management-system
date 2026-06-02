@@ -66,6 +66,7 @@ async function handleSave() {
     fetchRules()
   } catch (_e) {
     console.error(_e)
+    ElMessage.error('保存规则失败')
   } finally {
     saving.value = false
   }
@@ -79,6 +80,7 @@ async function handleReset() {
     fetchRules()
   } catch (_e) {
     console.error(_e)
+    ElMessage.error('恢复默认规则失败')
   }
 }
 

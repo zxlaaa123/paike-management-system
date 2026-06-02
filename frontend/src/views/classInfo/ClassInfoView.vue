@@ -116,6 +116,7 @@ async function handleSubmit() {
     fetchData()
   } catch (_e) {
     console.error(_e)
+    ElMessage.error('保存班级失败')
   }
 }
 

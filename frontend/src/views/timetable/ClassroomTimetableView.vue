@@ -48,6 +48,7 @@ async function handleExport() {
     await exportClassroomTimetable(selectedRoomId.value)
   } catch (_e) {
     console.error(_e)
+    ElMessage.error('导出教室占用表失败')
   } finally {
     exportLoading.value = false
   }

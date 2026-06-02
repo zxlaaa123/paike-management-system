@@ -48,6 +48,7 @@ async function handleExport() {
     await exportTeacherTimetable(selectedTeacherId.value)
   } catch (_e) {
     console.error(_e)
+    ElMessage.error('导出教师课表失败')
   } finally {
     exportLoading.value = false
   }

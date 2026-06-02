@@ -161,6 +161,7 @@ async function handleSubmit() {
     await fetchData()
   } catch (_e) {
     console.error(_e)
+    ElMessage.error('排课失败')
   } finally {
     submitting.value = false
   }

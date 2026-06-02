@@ -42,6 +42,7 @@ async function handleSemesterChange(semesterId: number) {
     ElMessage.success('已切换当前学期')
   } catch (_e) {
     console.error(_e)
+    ElMessage.error('切换当前学期失败')
   }
 }
 

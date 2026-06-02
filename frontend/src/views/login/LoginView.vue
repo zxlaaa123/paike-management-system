@@ -35,6 +35,7 @@ async function handleLogin() {
     router.push(redirect)
   } catch (_e) {
     console.error(_e)
+    ElMessage.error('登录失败，请检查账号或密码')
   } finally {
     loading.value = false
   }

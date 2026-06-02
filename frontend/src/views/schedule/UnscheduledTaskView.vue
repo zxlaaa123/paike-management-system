@@ -92,6 +92,7 @@ async function fetchBatches() {
     batchList.value = res.records
   } catch (_e) {
     console.error(_e)
+    ElMessage.error('加载批次列表失败')
   }
 }
 
@@ -122,6 +123,7 @@ async function handleClearAll() {
     fetchTasks()
   } catch (_e) {
     console.error(_e)
+    ElMessage.error('清空未排任务失败')
   }
 }
 
@@ -138,6 +140,7 @@ async function handleClearBatch(batchId: number) {
     fetchTasks()
   } catch (_e) {
     console.error(_e)
+    ElMessage.error('清空未排任务失败')
   }
 }
 
