@@ -12,6 +12,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class M13ControllerMapperInjectionInvestigationTest {
 
@@ -27,12 +28,12 @@ class M13ControllerMapperInjectionInvestigationTest {
         countMapperFields("TimeSlotController.java", mapperFieldCounts);
         countMapperFields("TimetableController.java", mapperFieldCounts);
 
-        assertEquals(4, mapperFieldCounts.size());
+        assertEquals(3, mapperFieldCounts.size());
         assertEquals(8, mapperFieldCounts.get("ScheduleController.java"));
         assertEquals(5, mapperFieldCounts.get("TeachingTaskController.java"));
         assertEquals(1, mapperFieldCounts.get("TimeSlotController.java"));
-        assertEquals(7, mapperFieldCounts.get("TimetableController.java"));
-        assertEquals(21, mapperFieldCounts.values().stream().mapToInt(Integer::intValue).sum());
+        assertFalse(mapperFieldCounts.containsKey("TimetableController.java"));
+        assertEquals(14, mapperFieldCounts.values().stream().mapToInt(Integer::intValue).sum());
     }
 
     private void countMapperFields(String fileName, Map<String, Integer> mapperFieldCounts) throws IOException {
