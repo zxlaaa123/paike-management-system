@@ -6,13 +6,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class M13ControllerMapperInjectionInvestigationTest {
 
@@ -20,34 +18,31 @@ class M13ControllerMapperInjectionInvestigationTest {
             Pattern.compile("private\\s+final\\s+(\\w*Mapper)\\s+(\\w+);");
 
     @Test
-    void controllerMapperInjectionScopeIsLimitedButReal() throws IOException {
-        Map<String, Integer> mapperFieldCounts = new LinkedHashMap<>();
+    void controllersDoNotInjectMappersDirectly() throws IOException {
+        Path controllerDir = Path.of("src", "main", "java", "com", "paike", "scheduler", "controller");
 
-        countMapperFields("ScheduleController.java", mapperFieldCounts);
-        countMapperFields("TeachingTaskController.java", mapperFieldCounts);
-        countMapperFields("TimeSlotController.java", mapperFieldCounts);
-        countMapperFields("TimetableController.java", mapperFieldCounts);
-
-        assertEquals(3, mapperFieldCounts.size());
-        assertEquals(8, mapperFieldCounts.get("ScheduleController.java"));
-        assertEquals(5, mapperFieldCounts.get("TeachingTaskController.java"));
-        assertEquals(1, mapperFieldCounts.get("TimeSlotController.java"));
-        assertFalse(mapperFieldCounts.containsKey("TimetableController.java"));
-        assertEquals(14, mapperFieldCounts.values().stream().mapToInt(Integer::intValue).sum());
+        try (Stream<Path> paths = Files.list(controllerDir)) {
+            int mapperFieldCount = paths
+                    .filter(path -> path.getFileName().toString().endsWith("Controller.java"))
+                    .mapToInt(this::countMapperFields)
+                    .sum();
+            assertEquals(0, mapperFieldCount);
+        }
     }
 
-    private void countMapperFields(String fileName, Map<String, Integer> mapperFieldCounts) throws IOException {
-        String source = Files.readString(
-                Path.of("src", "main", "java", "com", "paike", "scheduler", "controller", fileName),
-                StandardCharsets.UTF_8);
+    private int countMapperFields(Path path) {
+        String source;
+        try {
+            source = Files.readString(path, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to read " + path, e);
+        }
 
         Matcher matcher = MAPPER_FIELD_PATTERN.matcher(source);
         int count = 0;
         while (matcher.find()) {
             count++;
         }
-        if (count > 0) {
-            mapperFieldCounts.put(fileName, count);
-        }
+        return count;
     }
 }

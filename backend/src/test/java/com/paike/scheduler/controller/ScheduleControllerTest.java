@@ -13,6 +13,7 @@ import com.paike.scheduler.mapper.TeachingTaskMapper;
 import com.paike.scheduler.mapper.TimeSlotMapper;
 import com.paike.scheduler.service.ScheduleConflictService;
 import com.paike.scheduler.service.ScheduleLockGuardService;
+import com.paike.scheduler.service.ScheduleService;
 import com.paike.scheduler.service.SemesterService;
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +29,7 @@ class ScheduleControllerTest {
     void list_trimsBlankKeywordFiltersBeforeMapperQuery() {
         ScheduleMapper scheduleMapper = mock(ScheduleMapper.class);
         SemesterService semesterService = mock(SemesterService.class);
-        ScheduleController controller = new ScheduleController(
+        ScheduleService scheduleService = new ScheduleService(
                 scheduleMapper,
                 mock(TeachingTaskMapper.class),
                 mock(TimeSlotMapper.class),
@@ -46,7 +47,7 @@ class ScheduleControllerTest {
         when(scheduleMapper.selectFilteredSchedulePage(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(new Page<Schedule>(1, 10));
 
-        controller.list("  数学  ", "   ", "\t一班\t", "", null, null, 1, 10);
+        scheduleService.list("  数学  ", "   ", "\t一班\t", "", null, null, 1, 10);
 
         verify(scheduleMapper).selectFilteredSchedulePage(
                 eq("数学"),
