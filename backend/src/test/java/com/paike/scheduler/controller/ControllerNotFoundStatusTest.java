@@ -3,9 +3,9 @@ package com.paike.scheduler.controller;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.common.exception.GlobalExceptionHandler;
 import com.paike.scheduler.common.response.Result;
-import com.paike.scheduler.mapper.TimeSlotMapper;
 import com.paike.scheduler.service.AutoScheduleBatchService;
 import com.paike.scheduler.service.AutoScheduleService;
+import com.paike.scheduler.service.TimeSlotService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,9 +19,9 @@ class ControllerNotFoundStatusTest {
 
     @Test
     void timeSlotMissingThrowsBusinessNotFound() {
-        TimeSlotMapper timeSlotMapper = mock(TimeSlotMapper.class);
-        when(timeSlotMapper.selectById(999L)).thenReturn(null);
-        TimeSlotController controller = new TimeSlotController(timeSlotMapper);
+        TimeSlotService timeSlotService = mock(TimeSlotService.class);
+        when(timeSlotService.getById(999L)).thenThrow(new BusinessException(404, "时间段不存在"));
+        TimeSlotController controller = new TimeSlotController(timeSlotService);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> controller.getById(999L));
 

@@ -1,10 +1,8 @@
 package com.paike.scheduler.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.TimeSlot;
-import com.paike.scheduler.mapper.TimeSlotMapper;
+import com.paike.scheduler.service.TimeSlotService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,29 +16,20 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TimeSlotController {
 
-    private final TimeSlotMapper timeSlotMapper;
+    private final TimeSlotService timeSlotService;
 
     @GetMapping
     public Result<List<TimeSlot>> listAll() {
-        List<TimeSlot> list = timeSlotMapper.selectList(new LambdaQueryWrapper<TimeSlot>()
-            .orderByAsc(TimeSlot::getSortOrder));
-        return Result.success(list);
+        return Result.success(timeSlotService.listAll());
     }
 
     @GetMapping("/{id}")
     public Result<TimeSlot> getById(@PathVariable Long id) {
-        TimeSlot slot = timeSlotMapper.selectById(id);
-        if (slot == null) {
-            throw new BusinessException(404, "时间段不存在");
-        }
-        return Result.success(slot);
+        return Result.success(timeSlotService.getById(id));
     }
 
     @GetMapping("/day/{dayOfWeek}")
     public Result<List<TimeSlot>> listByDay(@PathVariable Integer dayOfWeek) {
-        List<TimeSlot> list = timeSlotMapper.selectList(new LambdaQueryWrapper<TimeSlot>()
-            .eq(TimeSlot::getDayOfWeek, dayOfWeek)
-            .orderByAsc(TimeSlot::getPeriodNo));
-        return Result.success(list);
+        return Result.success(timeSlotService.listByDay(dayOfWeek));
     }
 }
