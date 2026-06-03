@@ -22,13 +22,16 @@ class M14MapStringObjectUsageInvestigationTest {
 
     @Test
     void mapStringObjectUsageIsBroadAndContractFacing() throws IOException {
+        // 基线随 M-14 分阶段收敛逐步下调（棘轮）。
+        // 阶段1（2026-06-03）：低风险端点改 VO，移除 9 行 / 5 个文件清零（Health/Auth/ScheduleScore/Schedule[checkConflict]/SchedulePlanExplain）。
+        //   66→57 处、16→11 文件、controller 21→14、service 45→43。Statistics/Plan/Compare（阶段2/3 目标）23/10/7 不变。
         List<Hit> hits = collectHits();
         Map<String, Long> byFile = countByFile(hits);
 
-        assertEquals(66, hits.size());
-        assertEquals(16, byFile.size());
-        assertEquals(21, hits.stream().filter(hit -> hit.path().contains("/controller/")).count());
-        assertEquals(45, hits.stream().filter(hit -> hit.path().contains("/service/")).count());
+        assertEquals(57, hits.size());
+        assertEquals(11, byFile.size());
+        assertEquals(14, hits.stream().filter(hit -> hit.path().contains("/controller/")).count());
+        assertEquals(43, hits.stream().filter(hit -> hit.path().contains("/service/")).count());
 
         assertEquals(23, byFile.get("backend/src/main/java/com/paike/scheduler/service/ScheduleStatisticsService.java"));
         assertEquals(10, byFile.get("backend/src/main/java/com/paike/scheduler/service/SchedulePlanService.java"));
@@ -42,7 +45,8 @@ class M14MapStringObjectUsageInvestigationTest {
                 .filter(hit -> hit.line().contains("public Result<"))
                 .toList();
 
-        assertEquals(18, controllerContracts.size());
+        // 阶段1 移除 6 个公开端点契约（health/logout/checkConflict/getScoreSummary/rescore/getUnassignedSummary）：18→12。
+        assertEquals(12, controllerContracts.size());
         assertTrue(controllerContracts.stream().anyMatch(hit -> hit.path().endsWith("ScheduleStatisticsController.java")));
         assertTrue(controllerContracts.stream().anyMatch(hit -> hit.path().endsWith("SchedulePlanController.java")));
     }

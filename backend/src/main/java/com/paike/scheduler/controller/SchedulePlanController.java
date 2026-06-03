@@ -11,6 +11,7 @@ import com.paike.scheduler.service.ScheduleCompareService;
 import com.paike.scheduler.service.SchedulePlanExplainService;
 import com.paike.scheduler.service.SchedulePlanService;
 import com.paike.scheduler.service.SemesterService;
+import com.paike.scheduler.service.vo.UnassignedSummaryVo;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
@@ -127,7 +128,7 @@ public class SchedulePlanController {
     }
 
     @GetMapping("/{planId}/unassigned-summary")
-    public Result<List<Map<String, Object>>> getUnassignedSummary(@PathVariable Long planId) {
+    public Result<List<UnassignedSummaryVo>> getUnassignedSummary(@PathVariable Long planId) {
         return Result.success(explainService.summarizeUnassignedTasks(planId));
     }
 

@@ -1,6 +1,8 @@
 package com.paike.scheduler.controller;
 
 import com.paike.scheduler.common.response.Result;
+import com.paike.scheduler.controller.vo.RescoreResultVo;
+import com.paike.scheduler.controller.vo.ScoreSummaryVo;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.ScheduleScoreDetail;
 import com.paike.scheduler.service.SchedulePlanService;
@@ -10,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v3/schedule-plans")
@@ -26,7 +27,7 @@ public class ScheduleScoreController {
     }
 
     @GetMapping("/{planId}/score-summary")
-    public Result<Map<String, Object>> getScoreSummary(@PathVariable Long planId) {
+    public Result<ScoreSummaryVo> getScoreSummary(@PathVariable Long planId) {
         BigDecimal totalScore = scoreService.getScoreSummary(planId);
         List<ScheduleScoreDetail> details = scoreService.getScoreDetails(planId);
         int hardViolation = 0;
@@ -40,28 +41,19 @@ public class ScheduleScoreController {
                 }
             }
         }
-        return Result.success(Map.of(
-                "planId", planId,
-                "totalScore", totalScore,
-                "hardViolationCount", hardViolation,
-                "softViolationCount", softViolation,
-                "scoreLevel", getScoreLevel(totalScore)
-        ));
+        return Result.success(new ScoreSummaryVo(
+                planId, totalScore, hardViolation, softViolation, getScoreLevel(totalScore)));
     }
 
     @PostMapping("/{planId}/rescore")
-    public Result<Map<String, Object>> rescore(@PathVariable Long planId) {
+    public Result<RescoreResultVo> rescore(@PathVariable Long planId) {
         SchedulePlan plan = planService.getById(planId);
         planService.refreshPlanConflictState(planId);
         scoreService.rescore(plan);
         SchedulePlan refreshed = planService.getById(planId);
         BigDecimal totalScore = refreshed.getTotalScore();
-        return Result.success(Map.of(
-                "planId", planId,
-                "totalScore", totalScore,
-                "conflictCount", refreshed.getConflictCount(),
-                "scoreLevel", getScoreLevel(totalScore)
-        ));
+        return Result.success(new RescoreResultVo(
+                planId, totalScore, refreshed.getConflictCount(), getScoreLevel(totalScore)));
     }
 
     private String getScoreLevel(BigDecimal score) {

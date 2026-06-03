@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
+import com.paike.scheduler.service.vo.UnassignedSummaryVo;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.PessimisticLockingFailureException;
@@ -123,7 +124,7 @@ public class SchedulePlanExplainService {
         return records;
     }
 
-    public List<Map<String, Object>> summarizeUnassignedTasks(Long planId) {
+    public List<UnassignedSummaryVo> summarizeUnassignedTasks(Long planId) {
         List<ScheduleUnassignedTask> records = unassignedTaskMapper.selectList(
                 new LambdaQueryWrapper<ScheduleUnassignedTask>().eq(ScheduleUnassignedTask::getPlanId, planId));
         return records.stream()
@@ -131,13 +132,8 @@ public class SchedulePlanExplainService {
                 .entrySet()
                 .stream()
                 .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
-                .map(entry -> {
-                    Map<String, Object> item = new LinkedHashMap<>();
-                    item.put("reasonCode", entry.getKey());
-                    item.put("reasonName", reasonName(entry.getKey()));
-                    item.put("count", entry.getValue());
-                    return item;
-                })
+                .map(entry -> new UnassignedSummaryVo(
+                        entry.getKey(), reasonName(entry.getKey()), entry.getValue()))
                 .toList();
     }
 
