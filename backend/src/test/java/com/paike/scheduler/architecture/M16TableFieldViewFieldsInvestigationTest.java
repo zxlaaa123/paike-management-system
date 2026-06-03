@@ -21,11 +21,10 @@ class M16TableFieldViewFieldsInvestigationTest {
         List<FieldHit> hits = collectHits();
         Map<String, Long> byEntity = countByEntity(hits);
 
-        assertEquals(20, hits.size());
-        assertEquals(3, byEntity.size());
+        assertEquals(18, hits.size());
+        assertEquals(2, byEntity.size());
         assertEquals(10, byEntity.get("Schedule"));
         assertEquals(8, byEntity.get("TeachingTask"));
-        assertEquals(2, byEntity.get("SchedulePlan"));
     }
 
     @Test

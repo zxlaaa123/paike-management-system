@@ -5,6 +5,7 @@ import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.service.vo.SchedulePlanItemVo;
+import com.paike.scheduler.service.vo.SchedulePlanVo;
 import com.paike.scheduler.entity.ScheduleGenerateLog;
 import com.paike.scheduler.service.vo.ScheduleUnassignedTaskVo;
 import com.paike.scheduler.service.ScheduleCompareService;
@@ -59,8 +60,8 @@ public class SchedulePlanController {
     }
 
     @GetMapping("/{id}")
-    public Result<SchedulePlan> getById(@PathVariable Long id) {
-        return Result.success(planService.getById(id));
+    public Result<SchedulePlanVo> getById(@PathVariable Long id) {
+        return Result.success(SchedulePlanVo.fromEntity(planService.getById(id)));
     }
 
     @GetMapping("/{planId}/items")

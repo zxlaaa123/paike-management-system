@@ -12,6 +12,7 @@ import com.paike.scheduler.service.dto.SchedulePlanItemAdjustRequest;
 import com.paike.scheduler.service.vo.AdjustPlanResultVo;
 import com.paike.scheduler.service.vo.ApplyPlanResultVo;
 import com.paike.scheduler.service.vo.SchedulePlanItemVo;
+import com.paike.scheduler.service.vo.SchedulePlanVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
