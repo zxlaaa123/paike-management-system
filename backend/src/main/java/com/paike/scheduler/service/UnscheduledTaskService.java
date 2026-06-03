@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
+import com.paike.scheduler.service.vo.UnscheduledTaskVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,7 +19,7 @@ public class UnscheduledTaskService {
     private final UnscheduledTaskMapper unscheduledTaskMapper;
     private final TeachingTaskMapper teachingTaskMapper;
 
-    public Page<UnscheduledTask> list(Long batchId, String courseName, String teacherName,
+    public Page<UnscheduledTaskVo> list(Long batchId, String courseName, String teacherName,
                                        String className, String reasonType, int page, int size) {
         return unscheduledTaskMapper.selectFilteredPage(
                 batchId,
