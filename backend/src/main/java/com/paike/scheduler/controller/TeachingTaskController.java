@@ -2,8 +2,8 @@ package com.paike.scheduler.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.response.Result;
-import com.paike.scheduler.entity.TeachingTask;
 import com.paike.scheduler.service.TeachingTaskService;
+import com.paike.scheduler.service.vo.TeachingTaskVo;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -31,7 +31,7 @@ public class TeachingTaskController {
     private final TeachingTaskService teachingTaskService;
 
     @GetMapping
-    public Result<Page<TeachingTask>> list(
+    public Result<Page<TeachingTaskVo>> list(
         @RequestParam(required = false) String courseName,
         @RequestParam(required = false) String teacherName,
         @RequestParam(required = false) String className,
@@ -47,12 +47,12 @@ public class TeachingTaskController {
     }
 
     @GetMapping("/{id}")
-    public Result<TeachingTask> getById(@PathVariable Long id) {
+    public Result<TeachingTaskVo> getById(@PathVariable Long id) {
         return Result.success(teachingTaskService.getById(id));
     }
 
     @PostMapping
-    public Result<TeachingTask> create(@Valid @RequestBody TaskForm form) {
+    public Result<TeachingTaskVo> create(@Valid @RequestBody TaskForm form) {
         return Result.success(teachingTaskService.create(
             form.getCourseId(),
             form.getTeacherId(),
@@ -64,7 +64,7 @@ public class TeachingTaskController {
     }
 
     @PutMapping("/{id}")
-    public Result<TeachingTask> update(@PathVariable Long id, @Valid @RequestBody TaskForm form) {
+    public Result<TeachingTaskVo> update(@PathVariable Long id, @Valid @RequestBody TaskForm form) {
         return Result.success(teachingTaskService.update(
             id,
             form.getCourseId(),
@@ -83,7 +83,7 @@ public class TeachingTaskController {
     }
 
     @GetMapping("/all")
-    public Result<List<TeachingTask>> listAll() {
+    public Result<List<TeachingTaskVo>> listAll() {
         return Result.success(teachingTaskService.listAll());
     }
 

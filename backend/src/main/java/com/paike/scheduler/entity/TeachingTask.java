@@ -42,29 +42,4 @@ public class TeachingTask {
 
     @TableField("update_time")
     private LocalDateTime updateTime;
-
-    /** 关联字段，不映射到数据库 */
-    @TableField(exist = false)
-    private String courseName;
-
-    @TableField(exist = false)
-    private String teacherName;
-
-    @TableField(exist = false)
-    private String className;
-
-    @TableField(exist = false)
-    private Integer scheduledSlots;
-
-    @TableField(exist = false)
-    private String courseType;
-
-    @TableField(exist = false)
-    private Integer teacherStatus;
-
-    @TableField(exist = false)
-    private Integer classStatus;
-
-    @TableField(exist = false)
-    private Integer studentCount;
 }

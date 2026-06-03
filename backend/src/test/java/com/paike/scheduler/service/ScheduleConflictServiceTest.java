@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
+import com.paike.scheduler.service.vo.TeachingTaskVo;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -96,7 +97,7 @@ class ScheduleConflictServiceTest {
     }
 
     private void seedActiveResources() {
-        TeachingTask task = new TeachingTask();
+        TeachingTaskVo task = new TeachingTaskVo();
         task.setId(1L);
         task.setDeleted(0);
         task.setTeacherId(10L);

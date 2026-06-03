@@ -14,6 +14,7 @@ import com.paike.scheduler.mapper.CourseMapper;
 import com.paike.scheduler.mapper.ScheduleMapper;
 import com.paike.scheduler.mapper.TeacherMapper;
 import com.paike.scheduler.mapper.TeachingTaskMapper;
+import com.paike.scheduler.service.vo.TeachingTaskVo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,7 +37,7 @@ public class TeachingTaskService {
     private final ScheduleMapper scheduleMapper;
     private final SemesterService semesterService;
 
-    public Page<TeachingTask> list(String courseName, String teacherName, String className, Integer status,
+    public Page<TeachingTaskVo> list(String courseName, String teacherName, String className, Integer status,
             Long semesterId, int pageNum, int pageSize) {
         Long resolvedSemesterId = semesterId;
         if (resolvedSemesterId == null) {
@@ -52,25 +53,28 @@ public class TeachingTaskService {
         Page<TeachingTask> pageResult = new Page<>(pageNum, pageSize);
         List<TeachingTask> records = teachingTaskMapper.selectFilteredTasks(
             courseName, teacherName, className, status, resolvedSemesterId, pageResult);
-        pageResult.setRecords(records);
+        List<TeachingTaskVo> vos = records.stream().map(TeachingTaskVo::fromEntity).collect(Collectors.toList());
 
-        if (!records.isEmpty()) {
-            fillTaskRelations(records);
+        if (!vos.isEmpty()) {
+            fillTaskRelations(vos);
         }
-        return pageResult;
+        Page<TeachingTaskVo> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
+        voPage.setRecords(vos);
+        return voPage;
     }
 
-    public TeachingTask getById(Long id) {
+    public TeachingTaskVo getById(Long id) {
         TeachingTask task = teachingTaskMapper.selectById(id);
         if (task == null || Integer.valueOf(1).equals(task.getDeleted())) {
             throw new BusinessException(404, "教学任务不存在");
         }
-        fillTaskRelations(List.of(task));
-        return task;
+        TeachingTaskVo vo = TeachingTaskVo.fromEntity(task);
+        fillTaskRelations(List.of(vo));
+        return vo;
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public TeachingTask create(Long courseId, Long teacherId, Long classId, Integer weeklyHours, Integer needContinuous,
+    public TeachingTaskVo create(Long courseId, Long teacherId, Long classId, Integer weeklyHours, Integer needContinuous,
             Integer status, String remark) {
         Course course = requireActiveCourse(courseId);
         Teacher teacher = requireActiveTeacher(teacherId);
@@ -90,15 +94,16 @@ public class TeachingTaskService {
         task.setUpdateTime(LocalDateTime.now());
         teachingTaskMapper.insert(task);
 
-        task.setCourseName(course.getCourseName());
-        task.setTeacherName(teacher.getName());
-        task.setClassName(classInfo.getClassName());
-        task.setScheduledSlots(0);
-        return task;
+        TeachingTaskVo vo = TeachingTaskVo.fromEntity(task);
+        vo.setCourseName(course.getCourseName());
+        vo.setTeacherName(teacher.getName());
+        vo.setClassName(classInfo.getClassName());
+        vo.setScheduledSlots(0);
+        return vo;
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public TeachingTask update(Long id, Long courseId, Long teacherId, Long classId, Integer weeklyHours,
+    public TeachingTaskVo update(Long id, Long courseId, Long teacherId, Long classId, Integer weeklyHours,
             Integer needContinuous, Integer status, String remark) {
         TeachingTask task = teachingTaskMapper.selectById(id);
         if (task == null || Integer.valueOf(1).equals(task.getDeleted())) {
@@ -121,14 +126,15 @@ public class TeachingTaskService {
         task.setUpdateTime(LocalDateTime.now());
         teachingTaskMapper.updateById(task);
 
-        task.setCourseName(course.getCourseName());
-        task.setTeacherName(teacher.getName());
-        task.setClassName(classInfo.getClassName());
+        TeachingTaskVo vo = TeachingTaskVo.fromEntity(task);
+        vo.setCourseName(course.getCourseName());
+        vo.setTeacherName(teacher.getName());
+        vo.setClassName(classInfo.getClassName());
         Long count = scheduleMapper.selectCount(
             new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getTeachingTaskId, task.getId()));
-        task.setScheduledSlots(count != null ? count.intValue() : 0);
-        return task;
+        vo.setScheduledSlots(count != null ? count.intValue() : 0);
+        return vo;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -140,26 +146,27 @@ public class TeachingTaskService {
         teachingTaskMapper.deleteById(id);
     }
 
-    public List<TeachingTask> listAll() {
+    public List<TeachingTaskVo> listAll() {
         List<TeachingTask> list = teachingTaskMapper.selectList(
             new LambdaQueryWrapper<TeachingTask>()
                 .eq(TeachingTask::getStatus, 1)
                 .orderByDesc(TeachingTask::getCreateTime)
         );
-        fillTaskRelations(list);
-        return list;
+        List<TeachingTaskVo> vos = list.stream().map(TeachingTaskVo::fromEntity).collect(Collectors.toList());
+        fillTaskRelations(vos);
+        return vos;
     }
 
     /** 批量填充教学任务关联数据（避免 N+1 查询） */
-    private void fillTaskRelations(List<TeachingTask> tasks) {
+    private void fillTaskRelations(List<TeachingTaskVo> tasks) {
         if (tasks.isEmpty()) {
             return;
         }
 
-        List<Long> courseIds = tasks.stream().map(TeachingTask::getCourseId).distinct().collect(Collectors.toList());
-        List<Long> teacherIds = tasks.stream().map(TeachingTask::getTeacherId).distinct().collect(Collectors.toList());
-        List<Long> classIds = tasks.stream().map(TeachingTask::getClassId).distinct().collect(Collectors.toList());
-        List<Long> taskIds = tasks.stream().map(TeachingTask::getId).distinct().collect(Collectors.toList());
+        List<Long> courseIds = tasks.stream().map(TeachingTaskVo::getCourseId).distinct().collect(Collectors.toList());
+        List<Long> teacherIds = tasks.stream().map(TeachingTaskVo::getTeacherId).distinct().collect(Collectors.toList());
+        List<Long> classIds = tasks.stream().map(TeachingTaskVo::getClassId).distinct().collect(Collectors.toList());
+        List<Long> taskIds = tasks.stream().map(TeachingTaskVo::getId).distinct().collect(Collectors.toList());
 
         Map<Long, String> courseNameMap = courseIds.isEmpty() ? Map.of() :
             courseMapper.selectBatchIds(courseIds).stream()
@@ -176,7 +183,7 @@ public class TeachingTaskService {
                 .stream()
                 .collect(Collectors.groupingBy(Schedule::getTeachingTaskId, Collectors.counting()));
 
-        for (TeachingTask task : tasks) {
+        for (TeachingTaskVo task : tasks) {
             task.setCourseName(courseNameMap.get(task.getCourseId()));
             task.setTeacherName(teacherNameMap.get(task.getTeacherId()));
             task.setClassName(classNameMap.get(task.getClassId()));

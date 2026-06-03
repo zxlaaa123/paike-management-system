@@ -5,6 +5,7 @@ import com.paike.scheduler.common.enums.CourseType;
 import com.paike.scheduler.common.enums.RoomType;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
+import com.paike.scheduler.service.vo.TeachingTaskVo;
 import com.paike.scheduler.service.dto.ScheduleDailyConflictCounts;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -51,7 +52,7 @@ public class ScheduleConflictService {
      * @return null 表示无冲突,否则返回冲突描述信息
      */
     public String checkConflict(Long taskId, Long timeSlotId, Long classroomId, Long excludeScheduleId) {
-        TeachingTask task = teachingTaskMapper.selectConflictCheckById(taskId);
+        TeachingTaskVo task = teachingTaskMapper.selectConflictCheckById(taskId);
         if (task == null) {
             return tagReason("TASK_NOT_FOUND", "所选教学任务不存在");
         }
