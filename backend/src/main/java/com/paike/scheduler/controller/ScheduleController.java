@@ -3,8 +3,8 @@ package com.paike.scheduler.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.controller.vo.ConflictCheckResultVo;
-import com.paike.scheduler.entity.Schedule;
 import com.paike.scheduler.service.ScheduleService;
+import com.paike.scheduler.service.vo.ScheduleVo;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -29,7 +29,7 @@ public class ScheduleController {
     private final ScheduleService scheduleService;
 
     @GetMapping
-    public Result<Page<Schedule>> list(
+    public Result<Page<ScheduleVo>> list(
         @RequestParam(required = false) String courseName,
         @RequestParam(required = false) String teacherName,
         @RequestParam(required = false) String className,
@@ -46,12 +46,12 @@ public class ScheduleController {
     }
 
     @GetMapping("/{id}")
-    public Result<Schedule> getById(@PathVariable Long id) {
+    public Result<ScheduleVo> getById(@PathVariable Long id) {
         return Result.success(scheduleService.getById(id));
     }
 
     @PostMapping
-    public Result<Schedule> create(@Valid @RequestBody ScheduleForm form) {
+    public Result<ScheduleVo> create(@Valid @RequestBody ScheduleForm form) {
         return Result.success(scheduleService.create(
             form.getTeachingTaskId(),
             form.getTimeSlotId(),
@@ -66,19 +66,19 @@ public class ScheduleController {
 
     /** 按班级查询排课列表 */
     @GetMapping("/class/{classId}")
-    public Result<List<Schedule>> listByClass(@PathVariable Long classId) {
+    public Result<List<ScheduleVo>> listByClass(@PathVariable Long classId) {
         return Result.success(scheduleService.listByClass(classId));
     }
 
     /** 按教师查询排课列表 */
     @GetMapping("/teacher/{teacherId}")
-    public Result<List<Schedule>> listByTeacher(@PathVariable Long teacherId) {
+    public Result<List<ScheduleVo>> listByTeacher(@PathVariable Long teacherId) {
         return Result.success(scheduleService.listByTeacher(teacherId));
     }
 
     /** 按教室查询排课列表 */
     @GetMapping("/classroom/{classroomId}")
-    public Result<List<Schedule>> listByClassroom(@PathVariable Long classroomId) {
+    public Result<List<ScheduleVo>> listByClassroom(@PathVariable Long classroomId) {
         return Result.success(scheduleService.listByClassroom(classroomId));
     }
 

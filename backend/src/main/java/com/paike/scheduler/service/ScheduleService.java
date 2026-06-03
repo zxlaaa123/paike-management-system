@@ -10,6 +10,7 @@ import com.paike.scheduler.entity.Classroom;
 import com.paike.scheduler.entity.Course;
 import com.paike.scheduler.entity.Schedule;
 import com.paike.scheduler.entity.Semester;
+import com.paike.scheduler.service.vo.ScheduleVo;
 import com.paike.scheduler.entity.Teacher;
 import com.paike.scheduler.entity.TeachingTask;
 import com.paike.scheduler.entity.TimeSlot;
@@ -54,7 +55,7 @@ public class ScheduleService {
     private final AutoScheduleBatchMapper autoScheduleBatchMapper;
     private final SemesterService semesterService;
 
-    public Page<Schedule> list(String courseName, String teacherName, String className, String roomName,
+    public Page<ScheduleVo> list(String courseName, String teacherName, String className, String roomName,
             Integer dayOfWeek, Long semesterId, int page, int size) {
         Long resolvedSemesterId = semesterId;
         if (resolvedSemesterId == null) {
@@ -72,22 +73,29 @@ public class ScheduleService {
             resolvedSemesterId, new Page<>(page, size));
 
         if (!pageResult.getRecords().isEmpty()) {
-            fillRelations(pageResult.getRecords());
+            List<ScheduleVo> vos = pageResult.getRecords().stream()
+                .map(ScheduleVo::fromEntity).collect(Collectors.toList());
+            fillRelations(vos);
+            pageResult.setRecords(null);
+            Page<ScheduleVo> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
+            voPage.setRecords(vos);
+            return voPage;
         }
-        return pageResult;
+        return new Page<>(page, size);
     }
 
-    public Schedule getById(Long id) {
+    public ScheduleVo getById(Long id) {
         Schedule schedule = scheduleMapper.selectById(id);
         if (schedule == null || Integer.valueOf(1).equals(schedule.getDeleted())) {
             throw new BusinessException(404, "排课记录不存在");
         }
-        fillRelation(schedule);
-        return schedule;
+        ScheduleVo vo = ScheduleVo.fromEntity(schedule);
+        fillRelation(vo);
+        return vo;
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Schedule create(Long teachingTaskId, Long timeSlotId, Long classroomId) {
+    public ScheduleVo create(Long teachingTaskId, Long timeSlotId, Long classroomId) {
         String conflict = conflictService.checkConflict(teachingTaskId, timeSlotId, classroomId, null);
         if (conflict != null) {
             throw new BusinessException(400, ScheduleConflictService.stripReasonTag(conflict));
@@ -116,8 +124,9 @@ public class ScheduleService {
             throw new BusinessException(409, "排课冲突：该时间段已有其他课程占用，请刷新后重试");
         }
 
-        fillRelation(schedule);
-        return schedule;
+        ScheduleVo vo = ScheduleVo.fromEntity(schedule);
+        fillRelation(vo);
+        return vo;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -131,7 +140,7 @@ public class ScheduleService {
     }
 
     /** 按班级查询排课列表 */
-    public List<Schedule> listByClass(Long classId) {
+    public List<ScheduleVo> listByClass(Long classId) {
         List<TeachingTask> tasks = teachingTaskMapper.selectList(
             new LambdaQueryWrapper<TeachingTask>()
                 .eq(TeachingTask::getClassId, classId)
@@ -144,12 +153,13 @@ public class ScheduleService {
             new LambdaQueryWrapper<Schedule>()
                 .in(Schedule::getTeachingTaskId, taskIds)
         );
-        fillRelations(list);
-        return list;
+        List<ScheduleVo> vos = list.stream().map(ScheduleVo::fromEntity).collect(Collectors.toList());
+        fillRelations(vos);
+        return vos;
     }
 
     /** 按教师查询排课列表 */
-    public List<Schedule> listByTeacher(Long teacherId) {
+    public List<ScheduleVo> listByTeacher(Long teacherId) {
         List<TeachingTask> tasks = teachingTaskMapper.selectList(
             new LambdaQueryWrapper<TeachingTask>()
                 .eq(TeachingTask::getTeacherId, teacherId)
@@ -162,18 +172,20 @@ public class ScheduleService {
             new LambdaQueryWrapper<Schedule>()
                 .in(Schedule::getTeachingTaskId, taskIds)
         );
-        fillRelations(list);
-        return list;
+        List<ScheduleVo> vos = list.stream().map(ScheduleVo::fromEntity).collect(Collectors.toList());
+        fillRelations(vos);
+        return vos;
     }
 
     /** 按教室查询排课列表 */
-    public List<Schedule> listByClassroom(Long classroomId) {
+    public List<ScheduleVo> listByClassroom(Long classroomId) {
         List<Schedule> list = scheduleMapper.selectList(
             new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getClassroomId, classroomId)
         );
-        fillRelations(list);
-        return list;
+        List<ScheduleVo> vos = list.stream().map(ScheduleVo::fromEntity).collect(Collectors.toList());
+        fillRelations(vos);
+        return vos;
     }
 
     public String checkConflict(Long teachingTaskId, Long timeSlotId, Long classroomId) {
@@ -184,15 +196,15 @@ public class ScheduleService {
         return null;
     }
 
-    private void fillRelations(List<Schedule> list) {
+    private void fillRelations(List<ScheduleVo> list) {
         if (list.isEmpty()) {
             return;
         }
 
-        List<Long> timeSlotIds = list.stream().map(Schedule::getTimeSlotId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
-        List<Long> classroomIds = list.stream().map(Schedule::getClassroomId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
-        List<Long> taskIds = list.stream().map(Schedule::getTeachingTaskId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
-        List<Long> batchIds = list.stream().map(Schedule::getBatchId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        List<Long> timeSlotIds = list.stream().map(ScheduleVo::getTimeSlotId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        List<Long> classroomIds = list.stream().map(ScheduleVo::getClassroomId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        List<Long> taskIds = list.stream().map(ScheduleVo::getTeachingTaskId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        List<Long> batchIds = list.stream().map(ScheduleVo::getBatchId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
 
         Map<Long, TimeSlot> timeSlotMap = timeSlotIds.isEmpty() ? Map.of() :
             timeSlotMapper.selectBatchIds(timeSlotIds).stream().collect(Collectors.toMap(TimeSlot::getId, Function.identity(), (a, b) -> a));
@@ -225,48 +237,48 @@ public class ScheduleService {
         Map<Long, ClassInfo> classMap = classIds.isEmpty() ? Map.of() :
             classInfoMapper.selectBatchIds(classIds).stream().collect(Collectors.toMap(ClassInfo::getId, Function.identity(), (a, b) -> a));
 
-        for (Schedule schedule : list) {
-            TimeSlot timeSlot = timeSlotMap.get(schedule.getTimeSlotId());
+        for (ScheduleVo vo : list) {
+            TimeSlot timeSlot = timeSlotMap.get(vo.getTimeSlotId());
             if (timeSlot != null) {
-                schedule.setTimeLabel(timeSlot.getTimeLabel());
-                schedule.setDayOfWeek(timeSlot.getDayOfWeek());
-                schedule.setPeriodNo(timeSlot.getPeriodNo());
+                vo.setTimeLabel(timeSlot.getTimeLabel());
+                vo.setDayOfWeek(timeSlot.getDayOfWeek());
+                vo.setPeriodNo(timeSlot.getPeriodNo());
             }
-            Classroom classroom = classroomMap.get(schedule.getClassroomId());
+            Classroom classroom = classroomMap.get(vo.getClassroomId());
             if (classroom != null) {
-                schedule.setRoomName(classroom.getRoomName());
-                schedule.setBuilding(classroom.getBuilding());
+                vo.setRoomName(classroom.getRoomName());
+                vo.setBuilding(classroom.getBuilding());
             }
-            TeachingTask task = taskMap.get(schedule.getTeachingTaskId());
+            TeachingTask task = taskMap.get(vo.getTeachingTaskId());
             if (task != null) {
                 Course course = courseMap.get(task.getCourseId());
                 if (course != null) {
-                    schedule.setCourseName(course.getCourseName());
+                    vo.setCourseName(course.getCourseName());
                 }
                 Teacher teacher = teacherMap.get(task.getTeacherId());
                 if (teacher != null) {
-                    schedule.setTeacherName(teacher.getName());
+                    vo.setTeacherName(teacher.getName());
                 }
                 ClassInfo classInfo = classMap.get(task.getClassId());
                 if (classInfo != null) {
-                    schedule.setClassName(classInfo.getClassName());
+                    vo.setClassName(classInfo.getClassName());
                 }
             }
-            if (schedule.getSourceType() != null) {
-                schedule.setSourceTypeName(ScheduleSourceType.AUTO.getCode().equals(schedule.getSourceType()) ? "自动排课" : "手动排课");
+            if (vo.getSourceType() != null) {
+                vo.setSourceTypeName(ScheduleSourceType.AUTO.getCode().equals(vo.getSourceType()) ? "自动排课" : "手动排课");
             } else {
-                schedule.setSourceTypeName("手动排课");
+                vo.setSourceTypeName("手动排课");
             }
-            if (schedule.getBatchId() != null) {
-                AutoScheduleBatch batch = batchMap.get(schedule.getBatchId());
+            if (vo.getBatchId() != null) {
+                AutoScheduleBatch batch = batchMap.get(vo.getBatchId());
                 if (batch != null) {
-                    schedule.setBatchNo(batch.getBatchNo());
+                    vo.setBatchNo(batch.getBatchNo());
                 }
             }
         }
     }
 
-    private void fillRelation(Schedule schedule) {
-        fillRelations(List.of(schedule));
+    private void fillRelation(ScheduleVo vo) {
+        fillRelations(List.of(vo));
     }
 }

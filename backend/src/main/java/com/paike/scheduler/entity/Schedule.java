@@ -51,38 +51,4 @@ public class Schedule {
 
     @TableField("update_time")
     private LocalDateTime updateTime;
-
-    // ========== VO 展示字段（@TableField(exist = false)，不映射列，仅用于 API 响应组装）==========
-    // 这些字段在 fillRelations() 中从关联表批量查询填充，属于展示职责而非持久化职责。
-    // 理想情况下应拆分独立的 ScheduleVO，当前为减少 DTO 转换开销暂放在 Entity 中。
-
-    @TableField(exist = false)
-    private String courseName;
-
-    @TableField(exist = false)
-    private String teacherName;
-
-    @TableField(exist = false)
-    private String className;
-
-    @TableField(exist = false)
-    private String timeLabel;
-
-    @TableField(exist = false)
-    private Integer dayOfWeek;
-
-    @TableField(exist = false)
-    private Integer periodNo;
-
-    @TableField(exist = false)
-    private String roomName;
-
-    @TableField(exist = false)
-    private String building;
-
-    @TableField(exist = false)
-    private String sourceTypeName;
-
-    @TableField(exist = false)
-    private String batchNo;
 }
