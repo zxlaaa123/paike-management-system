@@ -6,6 +6,11 @@ import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.config.ScheduleThresholdProperties;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
+import com.paike.scheduler.service.vo.ClassBalanceVo;
+import com.paike.scheduler.service.vo.ClassroomUtilizationVo;
+import com.paike.scheduler.service.vo.DashboardStatsVo;
+import com.paike.scheduler.service.vo.PlanOverviewVo;
+import com.paike.scheduler.service.vo.TeacherWorkloadVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -30,13 +35,13 @@ public class ScheduleStatisticsService {
 
     // ==================== 教师工作量统计 ====================
 
-    public List<Map<String, Object>> teacherWorkload(Long semesterId, Long planId) {
+    public List<TeacherWorkloadVo> teacherWorkload(Long semesterId, Long planId) {
         List<?> rawItems = loadItems(semesterId, planId);
         if (rawItems.isEmpty()) {
             return List.of();
         }
 
-        Map<Long, Map<String, Object>> teacherMap = new LinkedHashMap<>();
+        Map<Long, TeacherWorkloadAcc> teacherMap = new LinkedHashMap<>();
         Map<Long, Teacher> teacherCache = new HashMap<>();
         Map<Long, TimeSlot> timeSlotCache = loadTimeSlotMap(rawItems);
 
@@ -48,57 +53,43 @@ public class ScheduleStatisticsService {
             int weekday = getWeekday(obj, timeSlotCache);
             if (weekday <= 0 || weekday > 7) continue;
 
-            teacherMap.computeIfAbsent(teacherId, k -> {
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("teacherId", k);
-                row.put("totalPeriods", 0);
-                row.put("dailyPeriods", new LinkedHashMap<Integer, Long>());
-                row.put("maxDailyPeriods", 0);
-                row.put("maxContinuousPeriods", 0);
-                row.put("courseCount", new HashSet<Long>());
-                row.put("classCount", new HashSet<Long>());
-                return row;
-            });
-
-            Map<String, Object> row = teacherMap.get(teacherId);
-            row.put("totalPeriods", (int) row.get("totalPeriods") + periods);
-            row.computeIfAbsent("courseCount", k -> new HashSet<Long>());
-            longSet(row, "courseCount").add(courseId);
-            longSet(row, "classCount").add(classId);
-
-            Map<Integer, Long> dailyPeriods = integerLongMap(row, "dailyPeriods");
-            dailyPeriods.merge(weekday, (long) periods, ScheduleStatisticsService::sumLongs);
+            TeacherWorkloadAcc acc = teacherMap.computeIfAbsent(teacherId, k -> new TeacherWorkloadAcc());
+            acc.totalPeriods += periods;
+            acc.courseIds.add(courseId);
+            acc.classIds.add(classId);
+            acc.dailyPeriods.merge(weekday, (long) periods, ScheduleStatisticsService::sumLongs);
         }
 
         // 填充关联信息 + 计算衍生指标
-        for (Map.Entry<Long, Map<String, Object>> entry : teacherMap.entrySet()) {
+        List<TeacherWorkloadVo> result = new ArrayList<>();
+        for (Map.Entry<Long, TeacherWorkloadAcc> entry : teacherMap.entrySet()) {
             Long teacherId = entry.getKey();
-            Map<String, Object> row = entry.getValue();
+            TeacherWorkloadAcc acc = entry.getValue();
 
             Teacher teacher = teacherCache.computeIfAbsent(teacherId, id -> teacherMapper.selectById(id));
-            row.put("teacherName", teacher != null ? teacher.getName() : "未知");
-            row.put("department", teacher != null ? teacher.getDepartment() : null);
+            int maxDaily = acc.dailyPeriods.values().stream().mapToInt(Long::intValue).max().orElse(0);
+            String evaluation = evaluateWorkload(acc.totalPeriods, maxDaily);
 
-            Set<Long> courseIds = longSet(row, "courseCount");
-            Set<Long> classIds = longSet(row, "classCount");
-            row.put("courseCount", courseIds.size());
-            row.put("classCount", classIds.size());
-
-            Map<Integer, Long> dailyPeriods = integerLongMap(row, "dailyPeriods");
-            int maxDaily = dailyPeriods.values().stream().mapToInt(Long::intValue).max().orElse(0);
-            row.put("maxDailyPeriods", maxDaily);
-
-            int totalPeriods = (int) row.get("totalPeriods");
-            String evaluation = evaluateWorkload(totalPeriods, maxDaily);
-            row.put("evaluation", evaluation);
+            TeacherWorkloadVo vo = new TeacherWorkloadVo();
+            vo.setTeacherId(teacherId);
+            vo.setTotalPeriods(acc.totalPeriods);
+            vo.setDailyPeriods(acc.dailyPeriods);
+            vo.setMaxDailyPeriods(maxDaily);
+            vo.setMaxContinuousPeriods(0); // 历史恒为 0（占位字段），保留以维持 JSON 不变
+            vo.setCourseCount(acc.courseIds.size());
+            vo.setClassCount(acc.classIds.size());
+            vo.setTeacherName(teacher != null ? teacher.getName() : "未知");
+            vo.setDepartment(teacher != null ? teacher.getDepartment() : null);
+            vo.setEvaluation(evaluation);
+            result.add(vo);
         }
 
-        return new ArrayList<>(teacherMap.values());
+        return result;
     }
 
     // ==================== 教室利用率统计 ====================
 
-    public List<Map<String, Object>> classroomUtilization(Long semesterId, Long planId) {
+    public List<ClassroomUtilizationVo> classroomUtilization(Long semesterId, Long planId) {
         List<?> rawItems = loadItems(semesterId, planId);
 
         // 统计每个教室的使用节次
@@ -113,47 +104,42 @@ public class ScheduleStatisticsService {
                 new LambdaQueryWrapper<Classroom>()
                         .eq(Classroom::getStatus, 1));
 
-        List<Map<String, Object>> result = new ArrayList<>();
+        List<ClassroomUtilizationVo> result = new ArrayList<>();
         for (Classroom room : allRooms) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("roomId", room.getId());
-            row.put("roomName", room.getRoomName());
-            row.put("building", room.getBuilding());
-            row.put("capacity", room.getCapacity());
-            row.put("roomType", room.getRoomType());
-
             long usedPeriods = roomUsage.getOrDefault(room.getId(), 0L);
-            row.put("usedPeriods", usedPeriods);
-            row.put("totalPeriods", thresholds.getTotalAvailablePeriods());
-
             BigDecimal rate = thresholds.getTotalAvailablePeriods() > 0
                     ? BigDecimal.valueOf(usedPeriods).multiply(BigDecimal.valueOf(100))
                             .divide(BigDecimal.valueOf(thresholds.getTotalAvailablePeriods()), 1, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
-            row.put("utilizationRate", rate);
-            row.put("evaluation", evaluateUtilization(rate.doubleValue()));
-            result.add(row);
+
+            ClassroomUtilizationVo vo = new ClassroomUtilizationVo();
+            vo.setRoomId(room.getId());
+            vo.setRoomName(room.getRoomName());
+            vo.setBuilding(room.getBuilding());
+            vo.setCapacity(room.getCapacity());
+            vo.setRoomType(room.getRoomType());
+            vo.setUsedPeriods(usedPeriods);
+            vo.setTotalPeriods(thresholds.getTotalAvailablePeriods());
+            vo.setUtilizationRate(rate);
+            vo.setEvaluation(evaluateUtilization(rate.doubleValue()));
+            result.add(vo);
         }
 
         // 按利用率降序排序
-        result.sort((a, b) -> {
-            BigDecimal rateA = (BigDecimal) a.get("utilizationRate");
-            BigDecimal rateB = (BigDecimal) b.get("utilizationRate");
-            return rateB.compareTo(rateA);
-        });
+        result.sort(Comparator.comparing(ClassroomUtilizationVo::getUtilizationRate).reversed());
 
         return result;
     }
 
     // ==================== 班级均衡度统计 ====================
 
-    public List<Map<String, Object>> classBalance(Long semesterId, Long planId) {
+    public List<ClassBalanceVo> classBalance(Long semesterId, Long planId) {
         List<?> rawItems = loadItems(semesterId, planId);
         if (rawItems.isEmpty()) {
             return List.of();
         }
 
-        Map<Long, Map<String, Object>> classMap = new LinkedHashMap<>();
+        Map<Long, ClassBalanceAcc> classMap = new LinkedHashMap<>();
         Map<Long, ClassInfo> classCache = new HashMap<>();
         Map<Long, TimeSlot> timeSlotCache = loadTimeSlotMap(rawItems);
 
@@ -163,74 +149,63 @@ public class ScheduleStatisticsService {
             int periods = getPeriodCount(obj);
             if (weekday <= 0 || weekday > 7) continue;
 
-            classMap.computeIfAbsent(classId, k -> {
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("classId", k);
-                row.put("dailyPeriods", new LinkedHashMap<Integer, Long>());
-                row.put("totalPeriods", 0);
-                return row;
-            });
-
-            Map<String, Object> row = classMap.get(classId);
-            row.put("totalPeriods", (int) row.get("totalPeriods") + periods);
-            Map<Integer, Long> dailyPeriods = integerLongMap(row, "dailyPeriods");
-            dailyPeriods.merge(weekday, (long) periods, ScheduleStatisticsService::sumLongs);
+            ClassBalanceAcc acc = classMap.computeIfAbsent(classId, k -> new ClassBalanceAcc());
+            acc.totalPeriods += periods;
+            acc.dailyPeriods.merge(weekday, (long) periods, ScheduleStatisticsService::sumLongs);
         }
 
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Map.Entry<Long, Map<String, Object>> entry : classMap.entrySet()) {
+        List<ClassBalanceVo> result = new ArrayList<>();
+        for (Map.Entry<Long, ClassBalanceAcc> entry : classMap.entrySet()) {
             Long classId = entry.getKey();
-            Map<String, Object> row = entry.getValue();
+            ClassBalanceAcc acc = entry.getValue();
 
             ClassInfo classInfo = classCache.computeIfAbsent(classId, id -> classInfoMapper.selectById(id));
-            row.put("className", classInfo != null ? classInfo.getClassName() : "未知");
-            row.put("studentCount", classInfo != null ? classInfo.getStudentCount() : 0);
-
-            @SuppressWarnings("unchecked")
-            Map<Integer, Long> dailyPeriods = (Map<Integer, Long>) row.get("dailyPeriods");
-            int total = (int) row.get("totalPeriods");
+            int total = acc.totalPeriods;
 
             // 均衡分 = 1 - (标准差 / 平均)，越接近 1 越均衡
-            double balanceScore = calculateBalanceScore(dailyPeriods, total);
-            row.put("balanceScore", BigDecimal.valueOf(balanceScore).setScale(2, RoundingMode.HALF_UP));
-            row.put("evaluation", evaluateBalance(balanceScore));
-            row.put("totalPeriods", total);
+            double balanceScore = calculateBalanceScore(acc.dailyPeriods, total);
 
+            ClassBalanceVo vo = new ClassBalanceVo();
+            vo.setClassId(classId);
+            vo.setDailyPeriods(acc.dailyPeriods);
+            vo.setTotalPeriods(total);
+            vo.setClassName(classInfo != null ? classInfo.getClassName() : "未知");
+            vo.setStudentCount(classInfo != null ? classInfo.getStudentCount() : 0);
+            vo.setBalanceScore(BigDecimal.valueOf(balanceScore).setScale(2, RoundingMode.HALF_UP));
+            vo.setEvaluation(evaluateBalance(balanceScore));
             // 每日课时详情
-            for (int day = 1; day <= 5; day++) {
-                row.put("day" + day + "Periods", dailyPeriods.getOrDefault(day, 0L));
-            }
+            vo.setDay1Periods(acc.dailyPeriods.getOrDefault(1, 0L));
+            vo.setDay2Periods(acc.dailyPeriods.getOrDefault(2, 0L));
+            vo.setDay3Periods(acc.dailyPeriods.getOrDefault(3, 0L));
+            vo.setDay4Periods(acc.dailyPeriods.getOrDefault(4, 0L));
+            vo.setDay5Periods(acc.dailyPeriods.getOrDefault(5, 0L));
 
-            result.add(row);
+            result.add(vo);
         }
 
         // 按均衡分升序排序（最不均衡的排前面）
-        result.sort((a, b) -> {
-            BigDecimal scoreA = (BigDecimal) a.get("balanceScore");
-            BigDecimal scoreB = (BigDecimal) b.get("balanceScore");
-            return scoreA.compareTo(scoreB);
-        });
+        result.sort(Comparator.comparing(ClassBalanceVo::getBalanceScore));
 
         return result;
     }
 
     // ==================== 方案统计总览 ====================
 
-    public Map<String, Object> planOverview(Long semesterId) {
-        Map<String, Object> overview = new LinkedHashMap<>();
+    public PlanOverviewVo planOverview(Long semesterId) {
+        PlanOverviewVo overview = new PlanOverviewVo();
 
         // 当前学期信息
-        overview.put("semesterId", semesterId);
+        overview.setSemesterId(semesterId);
 
         // 方案数量统计
         List<SchedulePlan> plans = planMapper.selectList(
                 new LambdaQueryWrapper<SchedulePlan>()
                         .eq(SchedulePlan::getSemesterId, semesterId));
 
-        overview.put("totalPlans", plans.size());
-        overview.put("draftPlans", plans.stream().filter(p -> SchedulePlanStatus.DRAFT.is(p.getStatus())).count());
-        overview.put("appliedPlans", plans.stream().filter(p -> SchedulePlanStatus.APPLIED.is(p.getStatus())).count());
-        overview.put("abandonedPlans", plans.stream().filter(p -> SchedulePlanStatus.ABANDONED.is(p.getStatus())).count());
+        overview.setTotalPlans(plans.size());
+        overview.setDraftPlans(plans.stream().filter(p -> SchedulePlanStatus.DRAFT.is(p.getStatus())).count());
+        overview.setAppliedPlans(plans.stream().filter(p -> SchedulePlanStatus.APPLIED.is(p.getStatus())).count());
+        overview.setAbandonedPlans(plans.stream().filter(p -> SchedulePlanStatus.ABANDONED.is(p.getStatus())).count());
 
         // 最高评分方案
         SchedulePlan bestPlan = plans.stream()
@@ -238,10 +213,10 @@ public class ScheduleStatisticsService {
                 .max(Comparator.comparing(SchedulePlan::getTotalScore))
                 .orElse(null);
         if (bestPlan != null) {
-            overview.put("bestPlanId", bestPlan.getId());
-            overview.put("bestPlanName", bestPlan.getName());
-            overview.put("bestPlanScore", bestPlan.getTotalScore());
-            overview.put("bestPlanStrategy", bestPlan.getStrategyType());
+            overview.setBestPlanId(bestPlan.getId());
+            overview.setBestPlanName(bestPlan.getName());
+            overview.setBestPlanScore(bestPlan.getTotalScore());
+            overview.setBestPlanStrategy(bestPlan.getStrategyType());
         }
 
         // 当前已应用的方案
@@ -249,19 +224,19 @@ public class ScheduleStatisticsService {
                 .filter(p -> SchedulePlanStatus.APPLIED.is(p.getStatus()))
                 .findFirst()
                 .orElse(null);
-        overview.put("hasAppliedPlan", appliedPlan != null);
+        overview.setHasAppliedPlan(appliedPlan != null);
         if (appliedPlan != null) {
-            overview.put("appliedPlanId", appliedPlan.getId());
-            overview.put("appliedPlanName", appliedPlan.getName());
-            overview.put("appliedPlanScore", appliedPlan.getTotalScore());
-            overview.put("appliedPlanAppliedAt", appliedPlan.getAppliedAt());
+            overview.setAppliedPlanId(appliedPlan.getId());
+            overview.setAppliedPlanName(appliedPlan.getName());
+            overview.setAppliedPlanScore(appliedPlan.getTotalScore());
+            overview.setAppliedPlanAppliedAt(appliedPlan.getAppliedAt());
         }
 
         // 正式课表课程数量
         Long formalCount = scheduleMapper.selectCount(
                 new LambdaQueryWrapper<Schedule>()
                         .eq(Schedule::getSemesterId, semesterId));
-        overview.put("formalScheduleCount", formalCount);
+        overview.setFormalScheduleCount(formalCount);
 
         // 未排任务数量（所有方案合计）
         int totalUnassigned = 0;
@@ -270,29 +245,26 @@ public class ScheduleStatisticsService {
             if (plan.getUnscheduledCount() != null) totalUnassigned += plan.getUnscheduledCount();
             if (plan.getConflictCount() != null) totalConflicts += plan.getConflictCount();
         }
-        overview.put("totalUnassignedTasks", totalUnassigned);
-        overview.put("totalConflicts", totalConflicts);
+        overview.setTotalUnassignedTasks(totalUnassigned);
+        overview.setTotalConflicts(totalConflicts);
 
         return overview;
     }
 
     // ==================== 首页统计 ====================
 
-    public Map<String, Object> dashboardStats(Long semesterId) {
-        Map<String, Object> stats = new LinkedHashMap<>();
-
+    public DashboardStatsVo dashboardStats(Long semesterId) {
         // 基础数据量
         Long teacherCount = teacherMapper.selectCount(new LambdaQueryWrapper<Teacher>());
         Long classCount = classInfoMapper.selectCount(new LambdaQueryWrapper<ClassInfo>());
         Long classroomCount = classroomMapper.selectCount(new LambdaQueryWrapper<Classroom>());
 
-        stats.put("teacherCount", teacherCount);
-        stats.put("classCount", classCount);
-        stats.put("classroomCount", classroomCount);
-
+        DashboardStatsVo stats = new DashboardStatsVo();
+        stats.setTeacherCount(teacherCount);
+        stats.setClassCount(classCount);
+        stats.setClassroomCount(classroomCount);
         // V3 方案概览
-        Map<String, Object> planOverview = planOverview(semesterId);
-        stats.put("v3Overview", planOverview);
+        stats.setV3Overview(planOverview(semesterId));
 
         return stats;
     }
@@ -415,16 +387,6 @@ public class ScheduleStatisticsService {
         return Math.max(0, Math.min(1, 1 - cv)); // 归一化到 0-1
     }
 
-    @SuppressWarnings("unchecked")
-    private Set<Long> longSet(Map<String, Object> row, String key) {
-        return (Set<Long>) row.get(key);
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<Integer, Long> integerLongMap(Map<String, Object> row, String key) {
-        return (Map<Integer, Long>) row.get(key);
-    }
-
     private static Long sumLongs(Long left, Long right) {
         long safeLeft = left == null ? 0L : left;
         long safeRight = right == null ? 0L : right;
@@ -437,5 +399,19 @@ public class ScheduleStatisticsService {
         if (score >= 0.4) return "一般";
         if (score >= 0.2) return "较差";
         return "不均衡";
+    }
+
+    /** 教师工作量聚合累加器：替代原 Map&lt;String,Object&gt; 行累加（courseCount/classCount 先以 Set 去重，最后落 size）。 */
+    private static final class TeacherWorkloadAcc {
+        private int totalPeriods;
+        private final Map<Integer, Long> dailyPeriods = new LinkedHashMap<>();
+        private final Set<Long> courseIds = new HashSet<>();
+        private final Set<Long> classIds = new HashSet<>();
+    }
+
+    /** 班级均衡度聚合累加器：替代原 Map&lt;String,Object&gt; 行累加。 */
+    private static final class ClassBalanceAcc {
+        private int totalPeriods;
+        private final Map<Integer, Long> dailyPeriods = new LinkedHashMap<>();
     }
 }

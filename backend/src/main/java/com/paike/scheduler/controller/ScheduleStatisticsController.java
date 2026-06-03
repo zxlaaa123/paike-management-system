@@ -5,11 +5,15 @@ import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.Semester;
 import com.paike.scheduler.service.ScheduleStatisticsService;
 import com.paike.scheduler.service.SemesterService;
+import com.paike.scheduler.service.vo.ClassBalanceVo;
+import com.paike.scheduler.service.vo.ClassroomUtilizationVo;
+import com.paike.scheduler.service.vo.DashboardStatsVo;
+import com.paike.scheduler.service.vo.PlanOverviewVo;
+import com.paike.scheduler.service.vo.TeacherWorkloadVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v3/statistics")
@@ -25,7 +29,7 @@ public class ScheduleStatisticsController {
      * 不传 planId 则统计正式课表
      */
     @GetMapping("/teacher-workload")
-    public Result<List<Map<String, Object>>> teacherWorkload(
+    public Result<List<TeacherWorkloadVo>> teacherWorkload(
             @RequestParam(required = false) Long semesterId,
             @RequestParam(required = false) Long planId
     ) {
@@ -39,7 +43,7 @@ public class ScheduleStatisticsController {
      * 不传 planId 则统计正式课表
      */
     @GetMapping("/classroom-utilization")
-    public Result<List<Map<String, Object>>> classroomUtilization(
+    public Result<List<ClassroomUtilizationVo>> classroomUtilization(
             @RequestParam(required = false) Long semesterId,
             @RequestParam(required = false) Long planId
     ) {
@@ -53,7 +57,7 @@ public class ScheduleStatisticsController {
      * 不传 planId 则统计正式课表
      */
     @GetMapping("/class-balance")
-    public Result<List<Map<String, Object>>> classBalance(
+    public Result<List<ClassBalanceVo>> classBalance(
             @RequestParam(required = false) Long semesterId,
             @RequestParam(required = false) Long planId
     ) {
@@ -66,7 +70,7 @@ public class ScheduleStatisticsController {
      * GET /api/v3/statistics/plan-overview?semesterId=2
      */
     @GetMapping("/plan-overview")
-    public Result<Map<String, Object>> planOverview(
+    public Result<PlanOverviewVo> planOverview(
             @RequestParam(required = false) Long semesterId
     ) {
         Long resolvedSemesterId = resolveSemesterId(semesterId);
@@ -78,7 +82,7 @@ public class ScheduleStatisticsController {
      * GET /api/v3/statistics/dashboard?semesterId=2
      */
     @GetMapping("/dashboard")
-    public Result<Map<String, Object>> dashboard(
+    public Result<DashboardStatsVo> dashboard(
             @RequestParam(required = false) Long semesterId
     ) {
         Long resolvedSemesterId = resolveSemesterId(semesterId);
