@@ -56,19 +56,4 @@ public class ScheduleAdjustLog {
 
     @TableLogic
     private Integer deleted;
-
-    @TableField(exist = false)
-    private String courseName;
-
-    @TableField(exist = false)
-    private String teacherName;
-
-    @TableField(exist = false)
-    private String className;
-
-    @TableField(exist = false)
-    private String oldClassroomName;
-
-    @TableField(exist = false)
-    private String newClassroomName;
 }

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
+import com.paike.scheduler.service.vo.ScheduleAdjustLogVo;
 import com.paike.scheduler.service.vo.ScheduleUnassignedTaskVo;
 import com.paike.scheduler.service.vo.UnassignedSummaryVo;
 import lombok.extern.slf4j.Slf4j;
@@ -160,7 +161,7 @@ public class SchedulePlanExplainService {
         adjustLogMapper.insert(log);
     }
 
-    public Page<ScheduleAdjustLog> listAdjustLogs(Long semesterId, Long planId, Long teachingTaskId, int pageNum, int pageSize) {
+    public Page<ScheduleAdjustLogVo> listAdjustLogs(Long semesterId, Long planId, Long teachingTaskId, int pageNum, int pageSize) {
         LambdaQueryWrapper<ScheduleAdjustLog> wrapper = new LambdaQueryWrapper<ScheduleAdjustLog>()
                 .orderByDesc(ScheduleAdjustLog::getCreatedAt);
         if (semesterId != null) {
@@ -173,8 +174,10 @@ public class SchedulePlanExplainService {
             wrapper.eq(ScheduleAdjustLog::getTeachingTaskId, teachingTaskId);
         }
         Page<ScheduleAdjustLog> page = adjustLogMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
-        fillAdjustRelations(page.getRecords());
-        return page;
+        Page<ScheduleAdjustLogVo> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+        voPage.setRecords(page.getRecords().stream().map(this::adjustLogToVo).collect(Collectors.toList()));
+        fillAdjustRelations(voPage.getRecords());
+        return voPage;
     }
 
     public String reasonName(String reasonCode) {
@@ -229,12 +232,12 @@ public class SchedulePlanExplainService {
         }
     }
 
-    private void fillAdjustRelations(List<ScheduleAdjustLog> records) {
+    private void fillAdjustRelations(List<ScheduleAdjustLogVo> records) {
         if (records == null || records.isEmpty()) {
             return;
         }
         Map<Long, TeachingTask> taskMap = teachingTaskMapper.selectBatchIds(records.stream()
-                        .map(ScheduleAdjustLog::getTeachingTaskId)
+                        .map(ScheduleAdjustLogVo::getTeachingTaskId)
                         .filter(Objects::nonNull)
                         .distinct()
                         .toList())
@@ -262,7 +265,7 @@ public class SchedulePlanExplainService {
                 .stream()
                 .collect(Collectors.toMap(ClassInfo::getId, Function.identity(), (a, b) -> a));
         Set<Long> roomIds = new HashSet<>();
-        for (ScheduleAdjustLog record : records) {
+        for (ScheduleAdjustLogVo record : records) {
             if (record.getOldClassroomId() != null) {
                 roomIds.add(record.getOldClassroomId());
             }
@@ -275,7 +278,7 @@ public class SchedulePlanExplainService {
                 : classroomMapper.selectBatchIds(roomIds).stream()
                 .collect(Collectors.toMap(Classroom::getId, Function.identity(), (a, b) -> a));
 
-        for (ScheduleAdjustLog record : records) {
+        for (ScheduleAdjustLogVo record : records) {
             TeachingTask task = taskMap.get(record.getTeachingTaskId());
             if (task != null) {
                 Course course = courseMap.get(task.getCourseId());
@@ -290,6 +293,31 @@ public class SchedulePlanExplainService {
             record.setOldClassroomName(oldRoom != null ? oldRoom.getRoomName() : null);
             record.setNewClassroomName(newRoom != null ? newRoom.getRoomName() : null);
         }
+    }
+
+    /** 逐字段拷贝 ScheduleAdjustLog 的 19 个持久化列到 VO（view 字段由 fillAdjustRelations 填充）。 */
+    private ScheduleAdjustLogVo adjustLogToVo(ScheduleAdjustLog entity) {
+        ScheduleAdjustLogVo vo = new ScheduleAdjustLogVo();
+        vo.setId(entity.getId());
+        vo.setPlanId(entity.getPlanId());
+        vo.setScheduleId(entity.getScheduleId());
+        vo.setSemesterId(entity.getSemesterId());
+        vo.setTeachingTaskId(entity.getTeachingTaskId());
+        vo.setOldClassroomId(entity.getOldClassroomId());
+        vo.setOldWeekday(entity.getOldWeekday());
+        vo.setOldStartPeriod(entity.getOldStartPeriod());
+        vo.setOldEndPeriod(entity.getOldEndPeriod());
+        vo.setNewClassroomId(entity.getNewClassroomId());
+        vo.setNewWeekday(entity.getNewWeekday());
+        vo.setNewStartPeriod(entity.getNewStartPeriod());
+        vo.setNewEndPeriod(entity.getNewEndPeriod());
+        vo.setBeforeScore(entity.getBeforeScore());
+        vo.setAfterScore(entity.getAfterScore());
+        vo.setConflictFlag(entity.getConflictFlag());
+        vo.setAdjustReason(entity.getAdjustReason());
+        vo.setCreatedAt(entity.getCreatedAt());
+        vo.setDeleted(entity.getDeleted());
+        return vo;
     }
 
     private void sleepQuietly(long millis) {

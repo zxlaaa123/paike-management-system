@@ -2,8 +2,8 @@ package com.paike.scheduler.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.response.Result;
-import com.paike.scheduler.entity.ScheduleAdjustLog;
 import com.paike.scheduler.service.SchedulePlanExplainService;
+import com.paike.scheduler.service.vo.ScheduleAdjustLogVo;
 import com.paike.scheduler.service.SemesterService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,7 +21,7 @@ public class ScheduleAdjustLogController {
     private final SemesterService semesterService;
 
     @GetMapping
-    public Result<Page<ScheduleAdjustLog>> list(
+    public Result<Page<ScheduleAdjustLogVo>> list(
             @RequestParam(required = false) Long semesterId,
             @RequestParam(required = false) Long planId,
             @RequestParam(required = false) Long teachingTaskId,

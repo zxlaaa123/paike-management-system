@@ -9,6 +9,7 @@ import com.paike.scheduler.entity.Semester;
 import com.paike.scheduler.mapper.ScheduleAdjustLogMapper;
 import com.paike.scheduler.mapper.ScheduleMapper;
 import com.paike.scheduler.mapper.SchedulePlanMapper;
+import com.paike.scheduler.service.vo.ScheduleAdjustLogVo;
 import com.paike.scheduler.service.vo.ScheduleAdjustmentLogListVo;
 import com.paike.scheduler.service.vo.ScheduleCurrentSourceVo;
 import lombok.RequiredArgsConstructor;
@@ -72,9 +73,9 @@ public class V4ScheduleSourceService {
             throw new BusinessException("排课方案不存在");
         }
 
-        List<ScheduleAdjustLog> logs = schedulePlanExplainService.listAdjustLogs(plan.getSemesterId(), planId, null, 1, 200).getRecords();
+        List<ScheduleAdjustLogVo> logs = schedulePlanExplainService.listAdjustLogs(plan.getSemesterId(), planId, null, 1, 200).getRecords();
         List<ScheduleAdjustmentLogListVo.Item> items = logs.stream()
-                .sorted(Comparator.comparing(ScheduleAdjustLog::getCreatedAt).reversed())
+                .sorted(Comparator.comparing(ScheduleAdjustLogVo::getCreatedAt).reversed())
                 .map(log -> {
                     ScheduleAdjustmentLogListVo.Item item = new ScheduleAdjustmentLogListVo.Item();
                     item.setId(log.getId());

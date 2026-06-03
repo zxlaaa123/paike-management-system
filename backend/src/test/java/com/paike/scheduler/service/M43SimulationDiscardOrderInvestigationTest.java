@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.enums.V5RepairTaskStatus;
-import com.paike.scheduler.entity.ScheduleAdjustLog;
+import com.paike.scheduler.service.vo.ScheduleAdjustLogVo;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.ScheduleRepairTask;
 import com.paike.scheduler.mapper.ClassroomMapper;
@@ -96,7 +96,7 @@ class M43SimulationDiscardOrderInvestigationTest {
         when(riskService.getPlanRisks(eq(planId), isNull(), isNull(), isNull())).thenReturn(emptyRisks(planId));
         when(schedulePlanService.getPlanItems(planId)).thenReturn(List.of());
         when(scoreDetailMapper.selectList(any())).thenReturn(List.of());
-        Page<ScheduleAdjustLog> adjustLogPage = new Page<>();
+        Page<ScheduleAdjustLogVo> adjustLogPage = new Page<>();
         adjustLogPage.setRecords(List.of());
         when(explainService.listAdjustLogs(eq(semesterId), eq(planId), isNull(), eq(1), eq(500))).thenReturn(adjustLogPage);
         when(suggestionMapper.selectOne(any())).thenReturn(null);
