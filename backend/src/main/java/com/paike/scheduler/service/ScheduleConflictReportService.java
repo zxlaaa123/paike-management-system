@@ -7,6 +7,7 @@ import com.paike.scheduler.common.enums.RoomType;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
+import com.paike.scheduler.service.vo.ScheduleConflictReportVo;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -45,8 +46,8 @@ public class ScheduleConflictReportService {
     private final ScheduleRuleService ruleService;
     private final SemesterService semesterService;
 
-    public Page<ScheduleConflictReport> list(Long semesterId, String reportNo, String conflictType,
-                                             String objectType, String objectName, int page, int size) {
+    public Page<ScheduleConflictReportVo> list(Long semesterId, String reportNo, String conflictType,
+                                               String objectType, String objectName, int page, int size) {
         Long resolvedSemesterId = resolveSemesterId(semesterId);
         LambdaQueryWrapper<ScheduleConflictReport> wrapper = new LambdaQueryWrapper<ScheduleConflictReport>()
                 .eq(ScheduleConflictReport::getSemesterId, resolvedSemesterId)
@@ -66,8 +67,10 @@ public class ScheduleConflictReportService {
         }
 
         Page<ScheduleConflictReport> result = conflictReportMapper.selectPage(new Page<>(page, size), wrapper);
-        fillRelationFields(result.getRecords());
-        return result;
+        Page<ScheduleConflictReportVo> voPage = new Page<>(result.getCurrent(), result.getSize(), result.getTotal());
+        voPage.setRecords(result.getRecords().stream().map(this::toVo).collect(Collectors.toList()));
+        fillRelationFields(voPage.getRecords());
+        return voPage;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -434,13 +437,13 @@ public class ScheduleConflictReportService {
         }
     }
 
-    private void fillRelationFields(List<ScheduleConflictReport> records) {
+    private void fillRelationFields(List<ScheduleConflictReportVo> records) {
         if (records.isEmpty()) {
             return;
         }
 
         List<Long> timeSlotIds = records.stream()
-                .map(ScheduleConflictReport::getTimeSlotId)
+                .map(ScheduleConflictReportVo::getTimeSlotId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
@@ -450,7 +453,7 @@ public class ScheduleConflictReportService {
                 .collect(Collectors.toMap(TimeSlot::getId, Function.identity(), (a, b) -> a));
 
         Set<Long> relatedScheduleIds = new LinkedHashSet<>();
-        for (ScheduleConflictReport record : records) {
+        for (ScheduleConflictReportVo record : records) {
             parseScheduleIds(record.getRelatedScheduleIds()).forEach(relatedScheduleIds::add);
         }
         Map<Long, Schedule> scheduleMap = relatedScheduleIds.isEmpty()
@@ -458,7 +461,7 @@ public class ScheduleConflictReportService {
                 : scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>().in(Schedule::getId, relatedScheduleIds))
                 .stream().collect(Collectors.toMap(Schedule::getId, Function.identity(), (a, b) -> a));
 
-        for (ScheduleConflictReport record : records) {
+        for (ScheduleConflictReportVo record : records) {
             record.setReportNo(normalizeReportNo(record.getReportNo()));
             if (record.getTimeSlotId() != null) {
                 TimeSlot slot = timeSlotMap.get(record.getTimeSlotId());
@@ -470,6 +473,23 @@ public class ScheduleConflictReportService {
                 record.setTimeSlotName(dayOfWeek != null ? weekdayText(dayOfWeek) : "-");
             }
         }
+    }
+
+    private ScheduleConflictReportVo toVo(ScheduleConflictReport entity) {
+        ScheduleConflictReportVo vo = new ScheduleConflictReportVo();
+        vo.setId(entity.getId());
+        vo.setSemesterId(entity.getSemesterId());
+        vo.setReportNo(entity.getReportNo());
+        vo.setConflictType(entity.getConflictType());
+        vo.setObjectType(entity.getObjectType());
+        vo.setObjectId(entity.getObjectId());
+        vo.setObjectName(entity.getObjectName());
+        vo.setTimeSlotId(entity.getTimeSlotId());
+        vo.setRelatedScheduleIds(entity.getRelatedScheduleIds());
+        vo.setDescription(entity.getDescription());
+        vo.setSuggestion(entity.getSuggestion());
+        vo.setCreateTime(entity.getCreateTime());
+        return vo;
     }
 
     private ScheduleConflictReport buildReport(
@@ -637,7 +657,7 @@ public class ScheduleConflictReportService {
     }
 
     private Integer extractDayOfWeekFromRelatedSchedules(
-            ScheduleConflictReport record,
+            ScheduleConflictReportVo record,
             Map<Long, Schedule> scheduleMap,
             Map<Long, TimeSlot> timeSlotMap
     ) {
