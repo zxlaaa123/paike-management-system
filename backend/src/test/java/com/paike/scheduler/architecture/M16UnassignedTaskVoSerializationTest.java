@@ -29,17 +29,17 @@ class M16UnassignedTaskVoSerializationTest {
 
     private static final Set<String> EXPECTED_FIELDS = Set.of(
             "id", "planId", "semesterId", "teachingTaskId", "reasonCode", "reasonMessage",
-            "suggestion", "createdAt", "courseName", "teacherName", "className");
+            "suggestion", "createdAt", "deleted", "courseName", "teacherName", "className");
 
     @Test
-    void unassignedTaskVoKeepsAllElevenFieldsWithRelations() throws Exception {
+    void unassignedTaskVoKeepsAllTwelveFieldsWithRelations() throws Exception {
         JsonNode json = toJson(new ScheduleUnassignedTaskVo(
                 1L, 34L, 2L, 88L, "NO_AVAILABLE_CLASSROOM", "无可用教室",
-                "建议优先处理未排任务", LocalDateTime.of(2026, 6, 3, 10, 0, 0),
+                "建议优先处理未排任务", LocalDateTime.of(2026, 6, 3, 10, 0, 0), 0,
                 "数据结构", "张老师", "计科2101"));
 
         assertEquals(EXPECTED_FIELDS, fieldNames(json));
-        assertEquals(11, fieldNames(json).size());
+        assertEquals(12, fieldNames(json).size());
         assertEquals(1L, json.get("id").asLong());
         assertEquals(34L, json.get("planId").asLong());
         assertEquals(2L, json.get("semesterId").asLong());
@@ -47,6 +47,7 @@ class M16UnassignedTaskVoSerializationTest {
         assertEquals("NO_AVAILABLE_CLASSROOM", json.get("reasonCode").asText());
         assertEquals("无可用教室", json.get("reasonMessage").asText());
         assertEquals("建议优先处理未排任务", json.get("suggestion").asText());
+        assertEquals(0, json.get("deleted").asInt());
         assertEquals("数据结构", json.get("courseName").asText());
         assertEquals("张老师", json.get("teacherName").asText());
         assertEquals("计科2101", json.get("className").asText());

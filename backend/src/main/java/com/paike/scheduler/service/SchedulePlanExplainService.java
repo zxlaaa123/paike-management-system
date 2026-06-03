@@ -136,6 +136,7 @@ public class SchedulePlanExplainService {
         vo.setReasonMessage(entity.getReasonMessage());
         vo.setSuggestion(entity.getSuggestion());
         vo.setCreatedAt(entity.getCreatedAt());
+        vo.setDeleted(entity.getDeleted());
         return vo;
     }
 
