@@ -9,6 +9,8 @@ import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.dto.SchedulePlanItemAdjustRequest;
+import com.paike.scheduler.service.vo.AdjustPlanResultVo;
+import com.paike.scheduler.service.vo.ApplyPlanResultVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -106,7 +108,7 @@ public class SchedulePlanService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> adjustPlanItem(Long itemId, SchedulePlanItemAdjustRequest request) {
+    public AdjustPlanResultVo adjustPlanItem(Long itemId, SchedulePlanItemAdjustRequest request) {
         if (request.getAdjustReason() == null || request.getAdjustReason().trim().isEmpty()) {
             throw new BusinessException("调整原因不能为空");
         }
@@ -186,17 +188,16 @@ public class SchedulePlanService {
         log.setAdjustReason(adjustReason);
         explainService.appendAdjustLog(log);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("itemId", refreshedItem.getId());
-        result.put("planId", refreshedPlan.getId());
-        result.put("beforeScore", log.getBeforeScore());
-        result.put("afterScore", log.getAfterScore());
-        result.put("conflictFlag", refreshedItem.getConflictFlag() == null ? 0 : refreshedItem.getConflictFlag());
-        result.put("conflictReason", refreshedItem.getConflictReason());
-        result.put("syncFormalSchedule", syncFormalSchedule);
-        result.put("scheduleId", scheduleId);
-        result.put("message", syncFormalSchedule ? "已同步正式课表" : "仅更新方案草稿");
-        return result;
+        return new AdjustPlanResultVo(
+                refreshedItem.getId(),
+                refreshedPlan.getId(),
+                log.getBeforeScore(),
+                log.getAfterScore(),
+                refreshedItem.getConflictFlag() == null ? 0 : refreshedItem.getConflictFlag(),
+                refreshedItem.getConflictReason(),
+                syncFormalSchedule,
+                scheduleId,
+                syncFormalSchedule ? "已同步正式课表" : "仅更新方案草稿");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -277,11 +278,11 @@ public class SchedulePlanService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> applyPlan(Long id) {
+    public ApplyPlanResultVo applyPlan(Long id) {
         return applyPlanWithAudit(id, SystemAuditLogService.ACTION_APPLY_PLAN);
     }
 
-    private Map<String, Object> applyPlanWithAudit(Long id, String actionType) {
+    private ApplyPlanResultVo applyPlanWithAudit(Long id, String actionType) {
         SchedulePlan plan = null;
         try {
             plan = planMapper.selectById(id);
@@ -300,14 +301,14 @@ public class SchedulePlanService {
             if (SchedulePlanStatus.APPLIED.is(plan.getStatus())) {
                 throw new BusinessException("该方案已应用，无需重复应用");
             }
-            Map<String, Object> result = applyPlanInternal(plan);
+            ApplyPlanResultVo result = applyPlanInternal(plan);
             auditLogService.recordSuccess(
                     actionType,
                     SystemAuditLogService.TARGET_SCHEDULE_PLAN,
                     plan.getId(),
                     plan.getSemesterId(),
                     plan.getId(),
-                    "正式课表已应用，排课数=" + result.get("appliedCount"));
+                    "正式课表已应用，排课数=" + result.getAppliedCount());
             return result;
         } catch (RuntimeException ex) {
             recordApplyPlanFailure(actionType, id, plan, ex);
@@ -338,7 +339,7 @@ public class SchedulePlanService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> applySimulationPlan(Long id) {
+    public ApplyPlanResultVo applySimulationPlan(Long id) {
         SchedulePlan plan = planMapper.selectById(id);
         if (plan == null) {
             throw new BusinessException("试算方案不存在");
@@ -352,7 +353,7 @@ public class SchedulePlanService {
         return applyPlanInternal(plan);
     }
 
-    private Map<String, Object> applyPlanInternal(SchedulePlan plan) {
+    private ApplyPlanResultVo applyPlanInternal(SchedulePlan plan) {
         if (plan.getScheduledCount() == null || plan.getScheduledCount() == 0) {
             throw new BusinessException("该方案没有排课明细，无法应用");
         }
@@ -416,16 +417,11 @@ public class SchedulePlanService {
         plan.setUpdatedAt(LocalDateTime.now());
         planMapper.updateById(plan);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("planId", plan.getId());
-        result.put("semesterId", semesterId);
-        result.put("appliedCount", insertedCount);
-        result.put("appliedAt", plan.getAppliedAt());
-        return result;
+        return new ApplyPlanResultVo(plan.getId(), semesterId, insertedCount, plan.getAppliedAt());
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> rollbackPlan(Long id) {
+    public ApplyPlanResultVo rollbackPlan(Long id) {
         SchedulePlan plan = planMapper.selectById(id);
         if (plan == null) {
             throw new BusinessException("排课方案不存在");
@@ -438,13 +434,8 @@ public class SchedulePlanService {
         }
 
         if (SchedulePlanStatus.APPLIED.is(plan.getStatus())) {
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("planId", plan.getId());
-            result.put("semesterId", plan.getSemesterId());
-            result.put("appliedCount", 0);
-            result.put("appliedAt", plan.getAppliedAt());
-            result.put("message", "目标方案已是当前应用方案");
-            return result;
+            return new ApplyPlanResultVo(
+                    plan.getId(), plan.getSemesterId(), 0, plan.getAppliedAt(), "目标方案已是当前应用方案");
         }
 
         // 回滚语义：将目标方案重新应用为正式课表（而不是只删除当前正式课表）。

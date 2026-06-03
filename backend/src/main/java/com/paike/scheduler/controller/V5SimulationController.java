@@ -5,6 +5,7 @@ import com.paike.scheduler.service.V5ConsistencyCheckService;
 import com.paike.scheduler.service.V5RepairExplanationService;
 import com.paike.scheduler.service.V5SimulationService;
 import com.paike.scheduler.service.dto.V5LocalReplanRequest;
+import com.paike.scheduler.service.vo.ApplyPlanResultVo;
 import com.paike.scheduler.service.vo.V5ConsistencyCheckReportVo;
 import com.paike.scheduler.service.vo.V5RepairExplanationVo;
 import com.paike.scheduler.service.vo.V5SimulationPlanDetailVo;
@@ -16,8 +17,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v5/repair-tasks/{taskId}/simulations")
@@ -44,7 +43,7 @@ public class V5SimulationController {
     }
 
     @PostMapping("/{planId}/apply")
-    public Result<Map<String, Object>> apply(@PathVariable Long taskId, @PathVariable Long planId) {
+    public Result<ApplyPlanResultVo> apply(@PathVariable Long taskId, @PathVariable Long planId) {
         return Result.success("试算方案已应用", simulationService.apply(taskId, planId));
     }
 
