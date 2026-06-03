@@ -2,6 +2,7 @@ package com.paike.scheduler.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.response.Result;
+import com.paike.scheduler.controller.vo.ConflictCheckResultVo;
 import com.paike.scheduler.entity.Schedule;
 import com.paike.scheduler.service.ScheduleService;
 import jakarta.validation.Valid;
@@ -18,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 @org.springframework.validation.annotation.Validated
 @RestController
@@ -84,15 +84,15 @@ public class ScheduleController {
 
     /** 冲突检测接口（前端预检用，保存时仍会再次检测） */
     @PostMapping("/check-conflict")
-    public Result<Map<String, Object>> checkConflict(@Valid @RequestBody ScheduleForm form) {
+    public Result<ConflictCheckResultVo> checkConflict(@Valid @RequestBody ScheduleForm form) {
         String conflict = scheduleService.checkConflict(
             form.getTeachingTaskId(),
             form.getTimeSlotId(),
             form.getClassroomId());
         if (conflict != null) {
-            return Result.success(Map.of("hasConflict", true, "message", conflict));
+            return Result.success(new ConflictCheckResultVo(true, conflict));
         }
-        return Result.success(Map.of("hasConflict", false, "message", ""));
+        return Result.success(new ConflictCheckResultVo(false, ""));
     }
 
     @Getter

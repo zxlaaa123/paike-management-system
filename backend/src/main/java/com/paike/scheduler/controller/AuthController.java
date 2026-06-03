@@ -3,6 +3,7 @@ package com.paike.scheduler.controller;
 import com.paike.scheduler.auth.AuthService;
 import com.paike.scheduler.auth.dto.LoginRequest;
 import com.paike.scheduler.auth.vo.LoginResponse;
+import com.paike.scheduler.auth.vo.LogoutResultVo;
 import com.paike.scheduler.auth.vo.UserInfoVo;
 import com.paike.scheduler.common.response.Result;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -71,7 +71,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public Result<Map<String, Object>> logout(HttpServletResponse response) {
+    public Result<LogoutResultVo> logout(HttpServletResponse response) {
         ResponseCookie clearJwt = ResponseCookie.from("paike_token", "")
                 .httpOnly(true)
                 .secure(cookieSecure)
@@ -90,7 +90,7 @@ public class AuthController {
                 .build();
         response.addHeader("Set-Cookie", clearCsrf.toString());
 
-        return Result.success(Map.of("success", true));
+        return Result.success(new LogoutResultVo(true));
     }
 
     /**
