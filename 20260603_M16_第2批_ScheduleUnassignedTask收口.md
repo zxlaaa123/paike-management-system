@@ -21,11 +21,11 @@
 
 ### 1.1 Entity 字段分布
 `ScheduleUnassignedTask.java`：**8 个持久化列** + **3 个 view 字段**：
-- 持久化列：`id` / `planId` / `semesterId` / `teachingTaskId` / `reasonCode` / `reasonMessage` / `suggestion` / `createdAt`（`@TableField("created_at")`）+ `deleted`（`@TableLogic`，软删除，不进 VO）。
+- 持久化列：`id` / `planId` / `semesterId` / `teachingTaskId` / `reasonCode` / `reasonMessage` / `suggestion` / `createdAt`（`@TableField("created_at")`）+ `deleted`（`@TableLogic`，软删除）。
 - view 字段（:39-46）：`courseName` / `teacherName` / `className`，均 `@TableField(exist = false)`，本批删除目标。
 - **注意与第1批不同**：`@TableField` 注解还被 `@TableField("created_at")`(:33) 使用，删 3 个 view 字段后 **`@TableField` import 保留**（第1批是删字段后 import 也删）。`@TableId`/`@TableName`/`@TableLogic` 保留。
 
-> VO 取 8 个持久化列中下发用的字段 + 3 view 字段。`deleted` 是软删除标记、历史 JSON 不下发（前端接口无此字段）→ VO 不含 deleted。VO = **11 字段**：id/planId/semesterId/teachingTaskId/reasonCode/reasonMessage/suggestion/createdAt/courseName/teacherName/className。
+> 【2026-06-03 勘误】最初判 `deleted` 不下发、VO 取 11 字段；实测 `application.yml` 无 jackson 全局配置、Entity `@TableLogic deleted` 被 Jackson 序列化为 `0`（历史 JSON **确含** `deleted`）。按拍板「`deleted` 进 VO（严格逐字段）」，VO = **12 字段**：id/planId/semesterId/teachingTaskId/reasonCode/reasonMessage/suggestion/createdAt/**deleted**/courseName/teacherName/className（已由 `fix/m16-batch2-vo-deleted-field` 回填）。
 
 ### 1.2 唯一查询入口 + 双消费方（本批关键差异）
 `SchedulePlanExplainService.listUnassignedTasks(planId)`（:118-125）：`selectList` 查出 → `fillUnassignedRelations` 填三字段 → 返回。**该方法被两处消费**：
@@ -47,7 +47,7 @@
 - 无后端测试直接断言 ScheduleUnassignedTask 的 view 字段（grep 确认）。
 - `M16TableFieldViewFieldsInvestigationTest` 锁现状：本批后 `ScheduleUnassignedTask=3` 命中归零、从 byEntity 消失。
 
-## 2. VO 字段表（`ScheduleUnassignedTaskVo`，11 字段，声明序照 Entity）
+## 2. VO 字段表（`ScheduleUnassignedTaskVo`，12 字段，声明序照 Entity）
 
 | # | 字段 | 类型 | 来源 |
 |---:|---|---|---|
@@ -59,21 +59,22 @@
 | 6 | reasonMessage | String | 持久化 |
 | 7 | suggestion | String | 持久化 |
 | 8 | createdAt | LocalDateTime | 持久化（`created_at`）|
-| 9 | courseName | String | view（fillUnassignedRelations 填）|
-| 10 | teacherName | String | view |
-| 11 | className | String | view |
+| 9 | deleted | Integer | 持久化（`@TableLogic`，恒 0；保留以维持 JSON 逐字段不变）|
+| 10 | courseName | String | view（fillUnassignedRelations 填）|
+| 11 | teacherName | String | view |
+| 12 | className | String | view |
 
-包：`com.paike.scheduler.service.vo`。注解：`@Data @NoArgsConstructor @AllArgsConstructor`（普通 POJO，保留 null 序列化）。**不含 `deleted`**（软删除标记、历史不下发）。
+包：`com.paike.scheduler.service.vo`。注解：`@Data @NoArgsConstructor @AllArgsConstructor`（普通 POJO，保留 null 序列化）。**含 `deleted`**（镜像 Entity 当前序列化、保 JSON 逐字段不变）。
 
 ## 3. 五层改法（第1批模板 + 内部消费方一层）
 
-1. **新建 VO** `ScheduleUnassignedTaskVo`（11 字段，§2）。
+1. **新建 VO** `ScheduleUnassignedTaskVo`（12 字段，§2）。
 2. **Entity 删字段**：删 courseName/teacherName/className 三个 `@TableField(exist=false)` 字段；**`@TableField` import 保留**（created_at 仍用）。
 3. **Service 改 VO**：`listUnassignedTasks` 返回 `List<ScheduleUnassignedTaskVo>`——查出 entity→`map(this::toVo)`→`fillUnassignedRelations` 改吃 `List<ScheduleUnassignedTaskVo>`；新增私有 `toVo(entity)` 拷 8 持久化列。`summarizeUnassignedTasks` 不动。
 4. **两个消费方同步改类型**：
    - `SchedulePlanController.getUnassignedTasks` → `Result<List<ScheduleUnassignedTaskVo>>`，import 换 VO（entity import 删，无其他引用）。
    - `V4ScheduleRiskService`：:70 变量 + :281 `detectUnscheduledTasks` 入参 + :282 循环变量改 VO 类型，读取逻辑不变；import 换 VO（entity import 删，无其他引用）。
-5. **测试**：新增 `M16UnassignedTaskVoSerializationTest`（11 字段集 + 三字段填充态/null 保留）；改 `M16TableFieldViewFieldsInvestigationTest` 计数 `42→39`、`8→7`、删 `assertEquals(3, byEntity.get("ScheduleUnassignedTask"))`。
+5. **测试**：新增 `M16UnassignedTaskVoSerializationTest`（12 字段集 + 三字段填充态/null 保留 + deleted=0）；改 `M16TableFieldViewFieldsInvestigationTest` 计数 `42→39`、`8→7`、删 `assertEquals(3, byEntity.get("ScheduleUnassignedTask"))`。
 
 ## 4. 跑测试 / 前端
 
