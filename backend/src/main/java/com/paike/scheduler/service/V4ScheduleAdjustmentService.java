@@ -9,6 +9,7 @@ import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.dto.SchedulePlanItemAdjustRequest;
 import com.paike.scheduler.service.dto.V4ScheduleAdjustmentRequest;
+import com.paike.scheduler.service.vo.AdjustPlanResultVo;
 import com.paike.scheduler.service.vo.ScheduleAdjustmentApplyVo;
 import com.paike.scheduler.service.vo.ScheduleAdjustmentCheckVo;
 import com.paike.scheduler.service.vo.ScheduleAdjustmentIssueVo;
@@ -120,15 +121,15 @@ public class V4ScheduleAdjustmentService {
 
         AdjustmentContext context = resolveContext(request);
         if (TARGET_PLAN_ITEM.equals(context.targetType)) {
-            Map<String, Object> saved = schedulePlanService.adjustPlanItem(context.planItem.getId(), toPlanAdjustRequest(request));
+            AdjustPlanResultVo saved = schedulePlanService.adjustPlanItem(context.planItem.getId(), toPlanAdjustRequest(request));
             result.setSaved(true);
             result.setRequiresConfirmation(false);
-            result.setSyncFormalSchedule(Boolean.TRUE.equals(saved.get("syncFormalSchedule")));
+            result.setSyncFormalSchedule(Boolean.TRUE.equals(saved.getSyncFormalSchedule()));
             result.setSyncPlanItem(true);
-            result.setScheduleId(asLong(saved.get("scheduleId"), context.schedule != null ? context.schedule.getId() : null));
+            result.setScheduleId(asLong(saved.getScheduleId(), context.schedule != null ? context.schedule.getId() : null));
             result.setMessage(Boolean.TRUE.equals(request.getForceAdjust()) && Boolean.TRUE.equals(checkResult.getHasConflict())
                     ? "已强制保存调整，并保留冲突记录"
-                    : asString(saved.get("message"), "调整成功"));
+                    : asString(saved.getMessage(), "调整成功"));
             return result;
         }
 

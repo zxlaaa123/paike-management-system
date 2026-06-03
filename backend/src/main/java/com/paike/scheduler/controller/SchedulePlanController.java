@@ -11,6 +11,8 @@ import com.paike.scheduler.service.ScheduleCompareService;
 import com.paike.scheduler.service.SchedulePlanExplainService;
 import com.paike.scheduler.service.SchedulePlanService;
 import com.paike.scheduler.service.SemesterService;
+import com.paike.scheduler.service.vo.ApplyPlanResultVo;
+import com.paike.scheduler.service.vo.CompareResultVo;
 import com.paike.scheduler.service.vo.UnassignedSummaryVo;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -19,7 +21,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @org.springframework.validation.annotation.Validated
 @RestController
@@ -83,7 +84,7 @@ public class SchedulePlanController {
      * 方案对比
      */
     @PostMapping("/compare")
-    public Result<Map<String, Object>> compare(@Valid @RequestBody CompareRequest request) {
+    public Result<CompareResultVo> compare(@Valid @RequestBody CompareRequest request) {
         Long resolvedSemesterId = request.getSemesterId();
         if (resolvedSemesterId == null) {
             resolvedSemesterId = semesterService.getCurrentSemester().getId();
@@ -95,7 +96,7 @@ public class SchedulePlanController {
      * 应用方案为正式课表
      */
     @PostMapping("/{id}/apply")
-    public Result<Map<String, Object>> apply(@PathVariable Long id) {
+    public Result<ApplyPlanResultVo> apply(@PathVariable Long id) {
         return Result.success("方案已应用为正式课表", planService.applyPlan(id));
     }
 
@@ -103,7 +104,7 @@ public class SchedulePlanController {
      * 回滚到历史方案（重新应用）
      */
     @PostMapping("/{id}/rollback")
-    public Result<Map<String, Object>> rollback(@PathVariable Long id) {
+    public Result<ApplyPlanResultVo> rollback(@PathVariable Long id) {
         return Result.success("已回滚到该方案", planService.rollbackPlan(id));
     }
 

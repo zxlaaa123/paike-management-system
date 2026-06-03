@@ -31,6 +31,7 @@ import com.paike.scheduler.mapper.ScheduleScoreDetailMapper;
 import com.paike.scheduler.mapper.TimeSlotMapper;
 import com.paike.scheduler.service.dto.V5CandidateEvaluateRequest;
 import com.paike.scheduler.service.dto.V5LocalReplanRequest;
+import com.paike.scheduler.service.vo.ApplyPlanResultVo;
 import com.paike.scheduler.service.vo.ScheduleRiskIssueVo;
 import com.paike.scheduler.service.vo.ScheduleRiskListVo;
 import com.paike.scheduler.service.vo.V5CandidateEvaluationVo;
@@ -327,7 +328,7 @@ public class V5SimulationService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> apply(Long taskId, Long planId) {
+    public ApplyPlanResultVo apply(Long taskId, Long planId) {
         ScheduleRepairTask task = requireTask(taskId);
         SchedulePlan plan = requireSimulationPlan(task, planId);
         if (!SchedulePlanStatus.SIMULATION.is(plan.getStatus()) && !SchedulePlanStatus.CONFIRMED.is(plan.getStatus())) {
@@ -354,7 +355,7 @@ public class V5SimulationService {
             plan.setUpdatedAt(LocalDateTime.now());
             planMapper.updateById(plan);
         }
-        Map<String, Object> result = schedulePlanService.applySimulationPlan(planId);
+        ApplyPlanResultVo result = schedulePlanService.applySimulationPlan(planId);
         plan = planMapper.selectById(planId);
         if (plan != null && !SchedulePlanStatus.APPLIED.is(plan.getStatus())) {
             plan.setStatus(SchedulePlanStatus.APPLIED.getCode());

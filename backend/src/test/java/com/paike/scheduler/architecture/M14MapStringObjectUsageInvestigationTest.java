@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class M14MapStringObjectUsageInvestigationTest {
@@ -24,18 +25,23 @@ class M14MapStringObjectUsageInvestigationTest {
     void mapStringObjectUsageIsBroadAndContractFacing() throws IOException {
         // 基线随 M-14 分阶段收敛逐步下调（棘轮）。
         // 阶段1（2026-06-03）：低风险端点改 VO，移除 9 行 / 5 个文件清零（Health/Auth/ScheduleScore/Schedule[checkConflict]/SchedulePlanExplain）。
-        //   66→57 处、16→11 文件、controller 21→14、service 45→43。Statistics/Plan/Compare（阶段2/3 目标）23/10/7 不变。
+        //   66→57 处、16→11 文件、controller 21→14、service 45→43。
+        // 阶段2（2026-06-03）：apply/adjust/rollback/compare 改 VO，移除 25 行 / 6 个文件清零
+        //   （SchedulePlanService/ScheduleCompareService/V4ScheduleAdjustmentService/V5SimulationService/SchedulePlanController[部分]/SchedulePlanItemController/V5SimulationController）。
+        //   57→32 处、11→4 文件、controller 14→9、service 43→23。剩余 4 文件均为阶段3 目标（ScheduleStatisticsService/Controller + Analysis/Risk 两个 refresh 端点）。
         List<Hit> hits = collectHits();
         Map<String, Long> byFile = countByFile(hits);
 
-        assertEquals(57, hits.size());
-        assertEquals(11, byFile.size());
-        assertEquals(14, hits.stream().filter(hit -> hit.path().contains("/controller/")).count());
-        assertEquals(43, hits.stream().filter(hit -> hit.path().contains("/service/")).count());
+        assertEquals(32, hits.size());
+        assertEquals(4, byFile.size());
+        assertEquals(9, hits.stream().filter(hit -> hit.path().contains("/controller/")).count());
+        assertEquals(23, hits.stream().filter(hit -> hit.path().contains("/service/")).count());
 
+        // 阶段3 的真正难点：统计聚合 23 处仍在。
         assertEquals(23, byFile.get("backend/src/main/java/com/paike/scheduler/service/ScheduleStatisticsService.java"));
-        assertEquals(10, byFile.get("backend/src/main/java/com/paike/scheduler/service/SchedulePlanService.java"));
-        assertEquals(7, byFile.get("backend/src/main/java/com/paike/scheduler/service/ScheduleCompareService.java"));
+        // 阶段2 已清零，不应再出现在分布里。
+        assertFalse(byFile.containsKey("backend/src/main/java/com/paike/scheduler/service/SchedulePlanService.java"));
+        assertFalse(byFile.containsKey("backend/src/main/java/com/paike/scheduler/service/ScheduleCompareService.java"));
     }
 
     @Test
@@ -46,9 +52,10 @@ class M14MapStringObjectUsageInvestigationTest {
                 .toList();
 
         // 阶段1 移除 6 个公开端点契约（health/logout/checkConflict/getScoreSummary/rescore/getUnassignedSummary）：18→12。
-        assertEquals(12, controllerContracts.size());
+        // 阶段2 再移除 5 个（compare/apply/rollback/adjust/v5-apply）：12→7，剩 Statistics 5 + Analysis/Risk 各 1。
+        assertEquals(7, controllerContracts.size());
         assertTrue(controllerContracts.stream().anyMatch(hit -> hit.path().endsWith("ScheduleStatisticsController.java")));
-        assertTrue(controllerContracts.stream().anyMatch(hit -> hit.path().endsWith("SchedulePlanController.java")));
+        assertFalse(controllerContracts.stream().anyMatch(hit -> hit.path().endsWith("SchedulePlanController.java")));
     }
 
     private List<Hit> collectHits() throws IOException {

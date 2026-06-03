@@ -4,6 +4,8 @@ import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.ScheduleScoreDetail;
 import com.paike.scheduler.mapper.SchedulePlanMapper;
+import com.paike.scheduler.service.vo.ComparePlanVo;
+import com.paike.scheduler.service.vo.CompareResultVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +19,7 @@ public class ScheduleCompareService {
     private final SchedulePlanMapper planMapper;
     private final ScheduleScoreService scoreService;
 
-    public Map<String, Object> compare(Long semesterId, List<Long> planIds) {
+    public CompareResultVo compare(Long semesterId, List<Long> planIds) {
         if (planIds == null || planIds.size() < 2) {
             throw new BusinessException("至少需要选择两个方案进行对比");
         }
@@ -25,7 +27,7 @@ public class ScheduleCompareService {
             throw new BusinessException("不能选择重复方案进行对比");
         }
 
-        List<Map<String, Object>> plans = new ArrayList<>();
+        List<ComparePlanVo> plans = new ArrayList<>();
         for (Long planId : planIds) {
             SchedulePlan plan = planMapper.selectById(planId);
             if (plan == null) {
@@ -40,23 +42,18 @@ public class ScheduleCompareService {
         // 推荐方案：总分最高 → 未排最少 → 冲突最少
         Long bestPlanId = plans.stream()
                 .max(Comparator
-                        .comparingDouble((Map<String, Object> p) -> ((Number) p.getOrDefault("totalScore", 0)).doubleValue())
-                        .thenComparingInt(p -> -((Number) p.getOrDefault("unscheduledCount", 0)).intValue())
-                        .thenComparingInt(p -> -((Number) p.getOrDefault("conflictCount", 0)).intValue()))
-                .map(p -> (Long) p.get("planId"))
+                        .comparingDouble((ComparePlanVo p) -> p.getTotalScore().doubleValue())
+                        .thenComparingInt(p -> -nullSafeInt(p.getUnscheduledCount()))
+                        .thenComparingInt(p -> -nullSafeInt(p.getConflictCount())))
+                .map(ComparePlanVo::getPlanId)
                 .orElse(null);
 
         String summary = buildSummary(plans, bestPlanId);
 
-        return Map.of(
-                "semesterId", semesterId,
-                "plans", plans,
-                "bestPlanId", bestPlanId,
-                "summary", summary
-        );
+        return new CompareResultVo(semesterId, plans, bestPlanId, summary);
     }
 
-    private Map<String, Object> buildPlanCompareInfo(SchedulePlan plan) {
+    private ComparePlanVo buildPlanCompareInfo(SchedulePlan plan) {
         List<ScheduleScoreDetail> details = scoreService.getScoreDetails(plan.getId());
         int hardViolation = 0;
         int softViolation = 0;
@@ -70,20 +67,19 @@ public class ScheduleCompareService {
             }
         }
 
-        Map<String, Object> info = new LinkedHashMap<>();
-        info.put("planId", plan.getId());
-        info.put("planName", plan.getName());
-        info.put("strategyType", plan.getStrategyType());
-        info.put("strategyName", strategyName(plan.getStrategyType()));
-        info.put("status", plan.getStatus());
-        info.put("totalScore", plan.getTotalScore() != null ? plan.getTotalScore() : BigDecimal.ZERO);
-        info.put("scheduledCount", plan.getScheduledCount());
-        info.put("unscheduledCount", plan.getUnscheduledCount());
-        info.put("conflictCount", plan.getConflictCount());
-        info.put("hardViolationCount", hardViolation);
-        info.put("softViolationCount", softViolation);
-        info.put("generatedAt", plan.getGeneratedAt());
-        return info;
+        return new ComparePlanVo(
+                plan.getId(),
+                plan.getName(),
+                plan.getStrategyType(),
+                strategyName(plan.getStrategyType()),
+                plan.getStatus(),
+                plan.getTotalScore() != null ? plan.getTotalScore() : BigDecimal.ZERO,
+                plan.getScheduledCount(),
+                plan.getUnscheduledCount(),
+                plan.getConflictCount(),
+                hardViolation,
+                softViolation,
+                plan.getGeneratedAt());
     }
 
     private String strategyName(String type) {
@@ -96,19 +92,19 @@ public class ScheduleCompareService {
         };
     }
 
-    private String buildSummary(List<Map<String, Object>> plans, Long bestPlanId) {
+    private String buildSummary(List<ComparePlanVo> plans, Long bestPlanId) {
         if (bestPlanId == null) return "无法确定推荐方案";
 
-        Map<String, Object> best = plans.stream()
-                .filter(p -> Objects.equals(p.get("planId"), bestPlanId))
+        ComparePlanVo best = plans.stream()
+                .filter(p -> Objects.equals(p.getPlanId(), bestPlanId))
                 .findFirst()
                 .orElse(null);
         if (best == null) return "无法确定推荐方案";
 
-        String bestName = (String) best.get("planName");
-        BigDecimal bestScore = (BigDecimal) best.get("totalScore");
-        int unscheduled = ((Number) best.get("unscheduledCount")).intValue();
-        int conflicts = ((Number) best.get("conflictCount")).intValue();
+        String bestName = best.getPlanName();
+        BigDecimal bestScore = best.getTotalScore();
+        int unscheduled = nullSafeInt(best.getUnscheduledCount());
+        int conflicts = nullSafeInt(best.getConflictCount());
 
         StringBuilder sb = new StringBuilder();
         sb.append(bestName).append(" 总分最高（").append(bestScore).append("分）");
@@ -124,5 +120,10 @@ public class ScheduleCompareService {
         }
         sb.append("，推荐应用为正式课表。");
         return sb.toString();
+    }
+
+    /** 计数缺失时按 0 处理，沿用原 Map.getOrDefault(key, 0) 语义。 */
+    private int nullSafeInt(Integer value) {
+        return value == null ? 0 : value;
     }
 }
