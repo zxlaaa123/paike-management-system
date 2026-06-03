@@ -33,6 +33,7 @@ import com.paike.scheduler.service.dto.V5CandidateEvaluateRequest;
 import com.paike.scheduler.service.dto.V5LocalReplanRequest;
 import com.paike.scheduler.service.vo.ApplyPlanResultVo;
 import com.paike.scheduler.service.vo.ScheduleAdjustLogVo;
+import com.paike.scheduler.service.vo.SchedulePlanItemVo;
 import com.paike.scheduler.service.vo.ScheduleRiskIssueVo;
 import com.paike.scheduler.service.vo.ScheduleRiskListVo;
 import com.paike.scheduler.service.vo.V5CandidateEvaluationVo;
@@ -783,10 +784,10 @@ public class V5SimulationService {
             SchedulePlanItem after
     ) {
         ensureComparableSemester(baseline, simulation);
-        List<SchedulePlanItem> baselineItems = loadCompareItems(baseline);
-        List<SchedulePlanItem> simulationItems = loadCompareItems(simulation);
-        Map<Long, SchedulePlanItem> baselineTaskMap = indexByTeachingTaskId(baselineItems);
-        Map<Long, SchedulePlanItem> simulationTaskMap = indexByTeachingTaskId(simulationItems);
+        List<SchedulePlanItemVo> baselineItems = loadCompareItems(baseline);
+        List<SchedulePlanItemVo> simulationItems = loadCompareItems(simulation);
+        Map<Long, SchedulePlanItemVo> baselineTaskMap = indexByTeachingTaskId(baselineItems);
+        Map<Long, SchedulePlanItemVo> simulationTaskMap = indexByTeachingTaskId(simulationItems);
         Map<Long, String> classroomNames = loadClassroomNames(baselineItems, simulationItems, before, after);
         Set<Long> changedLockedItemIds = findChangedLockedItemIds(baseline, baselineTaskMap, simulationTaskMap);
         List<V5SimulationItemChangeVo> changedItems = buildChangedItems(baselineTaskMap, simulationTaskMap, before, after, classroomNames);
@@ -829,8 +830,8 @@ public class V5SimulationService {
         vo.setChangedLockedCourseNames(resolveLockedCourseNames(baselineTaskMap, changedLockedItemIds));
         vo.setNewRisks(diffRisks(simulationRisks, baselineRisks));
         vo.setResolvedRisks(diffRisks(baselineRisks, simulationRisks));
-        vo.setTeacherLoadChanges(buildLoadChanges(baselineItems, simulationItems, SchedulePlanItem::getTeacherId, SchedulePlanItem::getTeacherName));
-        vo.setClassLoadChanges(buildLoadChanges(baselineItems, simulationItems, SchedulePlanItem::getClassId, SchedulePlanItem::getClassName));
+        vo.setTeacherLoadChanges(buildLoadChanges(baselineItems, simulationItems, SchedulePlanItemVo::getTeacherId, SchedulePlanItemVo::getTeacherName));
+        vo.setClassLoadChanges(buildLoadChanges(baselineItems, simulationItems, SchedulePlanItemVo::getClassId, SchedulePlanItemVo::getClassName));
         vo.setRoomUtilizationChanges(buildRoomUtilizationChanges(baselineItems, simulationItems, classroomNames));
         int newHardConflictCount = Math.max(0, vo.getSimulationConflictCount() - vo.getBaselineConflictCount());
         vo.setNewHardConflictCount(newHardConflictCount);
@@ -843,8 +844,8 @@ public class V5SimulationService {
     }
 
     private V5SimulationItemChangeVo buildItemChange(
-            SchedulePlanItem before,
-            SchedulePlanItem after,
+            SchedulePlanItemVo before,
+            SchedulePlanItemVo after,
             Map<Long, String> classroomNames
     ) {
         V5SimulationItemChangeVo vo = new V5SimulationItemChangeVo();
@@ -915,36 +916,38 @@ public class V5SimulationService {
         }
     }
 
-    private List<SchedulePlanItem> loadCompareItems(SchedulePlan plan) {
+    private List<SchedulePlanItemVo> loadCompareItems(SchedulePlan plan) {
         if (plan == null) {
             return List.of();
         }
         return schedulePlanService.getPlanItems(plan.getId());
     }
 
-    private Map<Long, SchedulePlanItem> indexByTeachingTaskId(List<SchedulePlanItem> items) {
+    private Map<Long, SchedulePlanItemVo> indexByTeachingTaskId(List<SchedulePlanItemVo> items) {
         return items.stream()
                 .filter(item -> item.getTeachingTaskId() != null)
-                .collect(Collectors.toMap(SchedulePlanItem::getTeachingTaskId, Function.identity(), (a, b) -> a, LinkedHashMap::new));
+                .collect(Collectors.toMap(SchedulePlanItemVo::getTeachingTaskId, Function.identity(), (a, b) -> a, LinkedHashMap::new));
     }
 
     private List<V5SimulationItemChangeVo> buildChangedItems(
-            Map<Long, SchedulePlanItem> baselineTaskMap,
-            Map<Long, SchedulePlanItem> simulationTaskMap,
+            Map<Long, SchedulePlanItemVo> baselineTaskMap,
+            Map<Long, SchedulePlanItemVo> simulationTaskMap,
             SchedulePlanItem acceptedBefore,
             SchedulePlanItem acceptedAfter,
             Map<Long, String> classroomNames
     ) {
         Map<Long, V5SimulationItemChangeVo> changed = new LinkedHashMap<>();
-        for (Map.Entry<Long, SchedulePlanItem> entry : simulationTaskMap.entrySet()) {
-            SchedulePlanItem source = baselineTaskMap.get(entry.getKey());
-            SchedulePlanItem target = entry.getValue();
+        for (Map.Entry<Long, SchedulePlanItemVo> entry : simulationTaskMap.entrySet()) {
+            SchedulePlanItemVo source = baselineTaskMap.get(entry.getKey());
+            SchedulePlanItemVo target = entry.getValue();
             if (source != null && hasPlacementChanged(source, target)) {
                 changed.put(entry.getKey(), buildItemChange(source, target, classroomNames));
             }
         }
         if (acceptedBefore != null && acceptedAfter != null && acceptedAfter.getTeachingTaskId() != null) {
-            changed.putIfAbsent(acceptedAfter.getTeachingTaskId(), buildItemChange(acceptedBefore, acceptedAfter, classroomNames));
+            changed.putIfAbsent(acceptedAfter.getTeachingTaskId(),
+                    buildItemChange(SchedulePlanItemVo.fromEntity(acceptedBefore),
+                            SchedulePlanItemVo.fromEntity(acceptedAfter), classroomNames));
         }
         return new ArrayList<>(changed.values());
     }
@@ -956,10 +959,18 @@ public class V5SimulationService {
                 || !Objects.equals(before.getClassroomId(), after.getClassroomId());
     }
 
+    /** M-16：VO 重载，供 VO 链 compare 使用（baselineTaskMap/simulationTaskMap 条目）。 */
+    private boolean hasPlacementChanged(SchedulePlanItemVo before, SchedulePlanItemVo after) {
+        return !Objects.equals(before.getWeekday(), after.getWeekday())
+                || !Objects.equals(before.getStartPeriod(), after.getStartPeriod())
+                || !Objects.equals(before.getEndPeriod(), after.getEndPeriod())
+                || !Objects.equals(before.getClassroomId(), after.getClassroomId());
+    }
+
     private Set<Long> findChangedLockedItemIds(
             SchedulePlan baseline,
-            Map<Long, SchedulePlanItem> baselineTaskMap,
-            Map<Long, SchedulePlanItem> simulationTaskMap
+            Map<Long, SchedulePlanItemVo> baselineTaskMap,
+            Map<Long, SchedulePlanItemVo> simulationTaskMap
     ) {
         if (baseline == null) {
             return Set.of();
@@ -979,8 +990,8 @@ public class V5SimulationService {
             if (baselineItem == null || baselineItem.getTeachingTaskId() == null) {
                 continue;
             }
-            SchedulePlanItem source = baselineTaskMap.get(baselineItem.getTeachingTaskId());
-            SchedulePlanItem target = simulationTaskMap.get(baselineItem.getTeachingTaskId());
+            SchedulePlanItemVo source = baselineTaskMap.get(baselineItem.getTeachingTaskId());
+            SchedulePlanItemVo target = simulationTaskMap.get(baselineItem.getTeachingTaskId());
             if (source != null && target != null && hasPlacementChanged(source, target)) {
                 changed.add(baselineItem.getTeachingTaskId());
             }
@@ -988,10 +999,10 @@ public class V5SimulationService {
         return changed;
     }
 
-    private List<String> resolveLockedCourseNames(Map<Long, SchedulePlanItem> baselineTaskMap, Set<Long> changedLockedItemIds) {
+    private List<String> resolveLockedCourseNames(Map<Long, SchedulePlanItemVo> baselineTaskMap, Set<Long> changedLockedItemIds) {
         List<String> names = new ArrayList<>();
         for (Long taskId : changedLockedItemIds) {
-            SchedulePlanItem item = baselineTaskMap.get(taskId);
+            SchedulePlanItemVo item = baselineTaskMap.get(taskId);
             if (item != null) {
                 names.add(firstNonBlank(item.getCourseName(), "教学任务#" + taskId));
             }
@@ -1024,10 +1035,10 @@ public class V5SimulationService {
     }
 
     private List<V5SimulationLoadChangeVo> buildLoadChanges(
-            List<SchedulePlanItem> baselineItems,
-            List<SchedulePlanItem> simulationItems,
-            Function<SchedulePlanItem, Long> idGetter,
-            Function<SchedulePlanItem, String> nameGetter
+            List<SchedulePlanItemVo> baselineItems,
+            List<SchedulePlanItemVo> simulationItems,
+            Function<SchedulePlanItemVo, Long> idGetter,
+            Function<SchedulePlanItemVo, String> nameGetter
     ) {
         Map<Long, Integer> baselineLoads = aggregateLoad(baselineItems, idGetter);
         Map<Long, Integer> simulationLoads = aggregateLoad(simulationItems, idGetter);
@@ -1057,9 +1068,9 @@ public class V5SimulationService {
         return changes;
     }
 
-    private Map<Long, Integer> aggregateLoad(List<SchedulePlanItem> items, Function<SchedulePlanItem, Long> idGetter) {
+    private Map<Long, Integer> aggregateLoad(List<SchedulePlanItemVo> items, Function<SchedulePlanItemVo, Long> idGetter) {
         Map<Long, Integer> loads = new LinkedHashMap<>();
-        for (SchedulePlanItem item : items) {
+        for (SchedulePlanItemVo item : items) {
             Long id = idGetter.apply(item);
             if (id == null) {
                 continue;
@@ -1076,13 +1087,13 @@ public class V5SimulationService {
     }
 
     private List<V5SimulationRoomUtilizationChangeVo> buildRoomUtilizationChanges(
-            List<SchedulePlanItem> baselineItems,
-            List<SchedulePlanItem> simulationItems,
+            List<SchedulePlanItemVo> baselineItems,
+            List<SchedulePlanItemVo> simulationItems,
             Map<Long, String> classroomNames
     ) {
         int totalPeriods = Math.max(1, timeSlotMapper.selectList(null).size() * 2);
-        Map<Long, Integer> baselineLoads = aggregateLoad(baselineItems, SchedulePlanItem::getClassroomId);
-        Map<Long, Integer> simulationLoads = aggregateLoad(simulationItems, SchedulePlanItem::getClassroomId);
+        Map<Long, Integer> baselineLoads = aggregateLoad(baselineItems, SchedulePlanItemVo::getClassroomId);
+        Map<Long, Integer> simulationLoads = aggregateLoad(simulationItems, SchedulePlanItemVo::getClassroomId);
         Set<Long> ids = new LinkedHashSet<>();
         ids.addAll(baselineLoads.keySet());
         ids.addAll(simulationLoads.keySet());
@@ -1115,7 +1126,7 @@ public class V5SimulationService {
                 .divide(BigDecimal.valueOf(Math.max(1, denominator)), 2, RoundingMode.HALF_UP);
     }
 
-    private int periodSpan(SchedulePlanItem item) {
+    private int periodSpan(SchedulePlanItemVo item) {
         int start = item.getStartPeriod() == null ? 0 : item.getStartPeriod();
         int end = item.getEndPeriod() == null ? start : item.getEndPeriod();
         return Math.max(0, end - start + 1);
@@ -1242,8 +1253,8 @@ public class V5SimulationService {
     }
 
     private Map<Long, String> loadClassroomNames(
-            List<SchedulePlanItem> baselineItems,
-            List<SchedulePlanItem> simulationItems,
+            List<SchedulePlanItemVo> baselineItems,
+            List<SchedulePlanItemVo> simulationItems,
             SchedulePlanItem before,
             SchedulePlanItem after
     ) {
@@ -1264,8 +1275,8 @@ public class V5SimulationService {
                 .collect(Collectors.toMap(Classroom::getId, Classroom::getRoomName, (a, b) -> a));
     }
 
-    private void addClassroomIds(Set<Long> ids, List<SchedulePlanItem> items) {
-        for (SchedulePlanItem item : items) {
+    private void addClassroomIds(Set<Long> ids, List<SchedulePlanItemVo> items) {
+        for (SchedulePlanItemVo item : items) {
             if (item.getClassroomId() != null) {
                 ids.add(item.getClassroomId());
             }

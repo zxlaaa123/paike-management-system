@@ -589,12 +589,7 @@ public class V5ConsistencyCheckService {
         vo.setWeekday(item.getWeekday());
         vo.setStartPeriod(item.getStartPeriod());
         vo.setEndPeriod(item.getEndPeriod());
-        vo.setCourseName(item.getCourseName());
-        if (vo.getTeacherName() == null) vo.setTeacherName(item.getTeacherName());
-        if (vo.getClassName() == null) vo.setClassName(item.getClassName());
-        if (item.getRoomName() != null) {
-            vo.setClassroomName(item.getRoomName());
-        } else if (roomCache != null && item.getClassroomId() != null) {
+        if (roomCache != null && item.getClassroomId() != null) {
             Classroom r = loadRoom(item.getClassroomId(), roomCache);
             if (r != null) vo.setClassroomName(r.getRoomName());
         }

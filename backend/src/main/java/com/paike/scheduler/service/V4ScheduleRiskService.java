@@ -218,8 +218,8 @@ public class V4ScheduleRiskService {
             risk.setRelatedItemIds(List.of(item.getId()));
             risk.setDetailLines(List.of(
                     "教师：" + safeName(teacher == null ? null : teacher.getName()),
-                    "课程：" + safeName(item.getCourseName()),
-                    "班级：" + safeName(item.getClassName()),
+                    "课程：" + safeName(context.courseMap.get(item.getCourseId()) == null ? null : context.courseMap.get(item.getCourseId()).getCourseName()),
+                    "班级：" + safeName(context.classMap.get(item.getClassId()) == null ? null : context.classMap.get(item.getClassId()).getClassName()),
                     "时间：" + safeName(slot.getTimeLabel())
             ));
             fillRelationsFromFirst(risk, item, context);
@@ -246,7 +246,7 @@ public class V4ScheduleRiskService {
             risk.setDetailLines(List.of(
                     "班级：" + safeName(classInfo.getClassName()) + "（" + classInfo.getStudentCount() + " 人）",
                     "教室：" + safeName(room.getRoomName()) + "（容量 " + room.getCapacity() + "）",
-                    "课程：" + safeName(item.getCourseName())
+                    "课程：" + safeName(context.courseMap.get(item.getCourseId()) == null ? null : context.courseMap.get(item.getCourseId()).getCourseName())
             ));
             fillRelationsFromFirst(risk, item, context);
             risks.add(risk);
@@ -423,13 +423,13 @@ public class V4ScheduleRiskService {
         Classroom room = context.roomMap.get(item.getClassroomId());
         Course course = context.courseMap.get(item.getCourseId());
         risk.setRelatedTeacherId(item.getTeacherId());
-        risk.setRelatedTeacherName(teacher == null ? item.getTeacherName() : teacher.getName());
+        risk.setRelatedTeacherName(teacher == null ? null : teacher.getName());
         risk.setRelatedClassId(item.getClassId());
-        risk.setRelatedClassName(classInfo == null ? item.getClassName() : classInfo.getClassName());
+        risk.setRelatedClassName(classInfo == null ? null : classInfo.getClassName());
         risk.setRelatedRoomId(item.getClassroomId());
-        risk.setRelatedRoomName(room == null ? item.getRoomName() : room.getRoomName());
+        risk.setRelatedRoomName(room == null ? null : room.getRoomName());
         risk.setRelatedCourseId(item.getCourseId());
-        risk.setRelatedCourseName(course == null ? item.getCourseName() : course.getCourseName());
+        risk.setRelatedCourseName(course == null ? null : course.getCourseName());
     }
 
     private List<String> buildConflictDetailLines(RiskContext context, List<SchedulePlanItem> items) {
@@ -458,7 +458,11 @@ public class V4ScheduleRiskService {
         List<String> courses = context.items.stream()
                 .filter(item -> Objects.equals(item.getClassId(), classId) && Objects.equals(item.getWeekday(), weekDay))
                 .sorted(Comparator.comparing(SchedulePlanItem::getStartPeriod))
-                .map(item -> formatPeriod(item) + " " + safeName(item.getCourseName()) + " / " + safeName(item.getTeacherName()))
+                .map(item -> {
+                    Course c = context.courseMap.get(item.getCourseId());
+                    Teacher t = context.teacherMap.get(item.getTeacherId());
+                    return formatPeriod(item) + " " + safeName(c == null ? null : c.getCourseName()) + " / " + safeName(t == null ? null : t.getName());
+                })
                 .toList();
         List<String> lines = new ArrayList<>();
         lines.add("当日总课时：" + totalLoad + " 节");
@@ -498,18 +502,18 @@ public class V4ScheduleRiskService {
         Teacher teacher = context.teacherMap.get(item.getTeacherId());
         ClassInfo classInfo = context.classMap.get(item.getClassId());
         return String.join(" / ", List.of(
-                safeName(course == null ? item.getCourseName() : course.getCourseName()),
-                safeName(teacher == null ? item.getTeacherName() : teacher.getName()),
-                safeName(classInfo == null ? item.getClassName() : classInfo.getClassName())
+                safeName(course == null ? null : course.getCourseName()),
+                safeName(teacher == null ? null : teacher.getName()),
+                safeName(classInfo == null ? null : classInfo.getClassName())
         ));
     }
 
     private String buildItemCourseLabel(SchedulePlanItem item, RiskContext context) {
         Course course = context.courseMap.get(item.getCourseId());
         ClassInfo classInfo = context.classMap.get(item.getClassId());
-        return safeName(course == null ? item.getCourseName() : course.getCourseName())
+        return safeName(course == null ? null : course.getCourseName())
                 + " / "
-                + safeName(classInfo == null ? item.getClassName() : classInfo.getClassName());
+                + safeName(classInfo == null ? null : classInfo.getClassName());
     }
 
     private TimeSlot resolveTimeSlot(SchedulePlanItem item, RiskContext context) {
