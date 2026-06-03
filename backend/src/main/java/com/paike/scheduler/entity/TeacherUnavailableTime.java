@@ -39,20 +39,4 @@ public class TeacherUnavailableTime {
 
     @TableField("update_time")
     private LocalDateTime updateTime;
-
-    /** 关联字段 */
-    @TableField(exist = false)
-    private String teacherName;
-
-    @TableField(exist = false)
-    private String department;
-
-    @TableField(exist = false)
-    private String timeSlotName;
-
-    @TableField(exist = false)
-    private Integer dayOfWeek;
-
-    @TableField(exist = false)
-    private Integer periodNo;
 }

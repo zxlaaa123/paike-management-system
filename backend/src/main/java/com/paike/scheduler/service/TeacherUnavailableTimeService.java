@@ -10,6 +10,7 @@ import com.paike.scheduler.mapper.TeacherMapper;
 import com.paike.scheduler.mapper.TeacherUnavailableTimeMapper;
 import com.paike.scheduler.mapper.TimeSlotMapper;
 import com.paike.scheduler.service.dto.TeacherUnavailableTimeForm;
+import com.paike.scheduler.service.vo.TeacherUnavailableTimeVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -35,7 +36,7 @@ public class TeacherUnavailableTimeService {
     /**
      * 列表查询支持按教师、时间段和状态筛选，返回前补齐页面展示所需的关联字段。
      */
-    public Page<TeacherUnavailableTime> list(Long teacherId, String teacherName, Long timeSlotId, Integer status, int page, int size) {
+    public Page<TeacherUnavailableTimeVo> list(Long teacherId, String teacherName, Long timeSlotId, Integer status, int page, int size) {
         LambdaQueryWrapper<TeacherUnavailableTime> wrapper = new LambdaQueryWrapper<TeacherUnavailableTime>();
 
         if (teacherId != null) {
@@ -60,19 +61,21 @@ public class TeacherUnavailableTimeService {
         wrapper.orderByDesc(TeacherUnavailableTime::getCreateTime);
         Page<TeacherUnavailableTime> result = unavailableTimeMapper.selectPage(new Page<>(page, size), wrapper);
 
+        Page<TeacherUnavailableTimeVo> voPage = new Page<>(result.getCurrent(), result.getSize(), result.getTotal());
+        voPage.setRecords(result.getRecords().stream().map(this::toVo).collect(Collectors.toList()));
         // 填充关联字段
-        fillRelationFields(result.getRecords());
-        return result;
+        fillRelationFields(voPage.getRecords());
+        return voPage;
     }
 
     /**
      * 页面表格直接展示教师姓名、部门、时间段名称，因此这里统一做一次关联字段回填。
      */
-    private void fillRelationFields(List<TeacherUnavailableTime> records) {
+    private void fillRelationFields(List<TeacherUnavailableTimeVo> records) {
         if (records.isEmpty()) return;
 
-        List<Long> teacherIds = records.stream().map(TeacherUnavailableTime::getTeacherId).distinct().collect(Collectors.toList());
-        List<Long> timeSlotIds = records.stream().map(TeacherUnavailableTime::getTimeSlotId).distinct().collect(Collectors.toList());
+        List<Long> teacherIds = records.stream().map(TeacherUnavailableTimeVo::getTeacherId).distinct().collect(Collectors.toList());
+        List<Long> timeSlotIds = records.stream().map(TeacherUnavailableTimeVo::getTimeSlotId).distinct().collect(Collectors.toList());
 
         Map<Long, Teacher> teacherMap = teacherMapper.selectList(new LambdaQueryWrapper<Teacher>()
                         .in(Teacher::getId, teacherIds)).stream()
@@ -82,7 +85,7 @@ public class TeacherUnavailableTimeService {
                         .in(TimeSlot::getId, timeSlotIds)).stream()
                 .collect(Collectors.toMap(TimeSlot::getId, ts -> ts, (a, b) -> a));
 
-        for (TeacherUnavailableTime record : records) {
+        for (TeacherUnavailableTimeVo record : records) {
             Teacher teacher = teacherMap.get(record.getTeacherId());
             if (teacher != null) {
                 record.setTeacherName(teacher.getName());
@@ -97,12 +100,26 @@ public class TeacherUnavailableTimeService {
         }
     }
 
+    private TeacherUnavailableTimeVo toVo(TeacherUnavailableTime entity) {
+        TeacherUnavailableTimeVo vo = new TeacherUnavailableTimeVo();
+        vo.setId(entity.getId());
+        vo.setTeacherId(entity.getTeacherId());
+        vo.setTimeSlotId(entity.getTimeSlotId());
+        vo.setReason(entity.getReason());
+        vo.setStatus(entity.getStatus());
+        vo.setRemark(entity.getRemark());
+        vo.setDeleted(entity.getDeleted());
+        vo.setCreateTime(entity.getCreateTime());
+        vo.setUpdateTime(entity.getUpdateTime());
+        return vo;
+    }
+
     /**
      * 禁排时间只允许配置到有效教师和有效时间段上。
      * 同一教师同一时间段只能有一条有效记录，避免冲突检测口径出现歧义。
      */
     @Transactional(rollbackFor = Exception.class)
-    public TeacherUnavailableTime create(TeacherUnavailableTimeForm form) {
+    public TeacherUnavailableTimeVo create(TeacherUnavailableTimeForm form) {
         UnavailableReference reference = validateUnavailableReference(form, null);
 
         TeacherUnavailableTime entity = new TeacherUnavailableTime();
@@ -119,15 +136,16 @@ public class TeacherUnavailableTimeService {
         } catch (DuplicateKeyException e) {
             throw new BusinessException(409, duplicateMessage(reference));
         }
-        fillRelationFields(java.util.Collections.singletonList(entity));
-        return entity;
+        TeacherUnavailableTimeVo vo = toVo(entity);
+        fillRelationFields(java.util.Collections.singletonList(vo));
+        return vo;
     }
 
     /**
      * 更新时沿用创建时的业务约束，但重复校验需要排除当前记录自身。
      */
     @Transactional(rollbackFor = Exception.class)
-    public TeacherUnavailableTime update(Long id, TeacherUnavailableTimeForm form) {
+    public TeacherUnavailableTimeVo update(Long id, TeacherUnavailableTimeForm form) {
         TeacherUnavailableTime existing = unavailableTimeMapper.selectById(id);
         if (existing == null || Integer.valueOf(1).equals(existing.getDeleted())) {
             throw new BusinessException("禁排时间记录不存在");
@@ -142,8 +160,9 @@ public class TeacherUnavailableTimeService {
         existing.setRemark(form.getRemark());
         existing.setUpdateTime(LocalDateTime.now());
         unavailableTimeMapper.updateById(existing);
-        fillRelationFields(java.util.Collections.singletonList(existing));
-        return existing;
+        TeacherUnavailableTimeVo vo = toVo(existing);
+        fillRelationFields(java.util.Collections.singletonList(vo));
+        return vo;
     }
 
     private UnavailableReference validateUnavailableReference(TeacherUnavailableTimeForm form, Long excludedId) {
