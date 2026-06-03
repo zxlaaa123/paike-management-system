@@ -57,20 +57,4 @@ public class SchedulePlanItem {
 
     @TableLogic
     private Integer deleted;
-
-    /** 关联字段 */
-    @TableField(exist = false)
-    private String courseName;
-
-    @TableField(exist = false)
-    private String teacherName;
-
-    @TableField(exist = false)
-    private String className;
-
-    @TableField(exist = false)
-    private String roomName;
-
-    @TableField(exist = false)
-    private String timeLabel;
 }

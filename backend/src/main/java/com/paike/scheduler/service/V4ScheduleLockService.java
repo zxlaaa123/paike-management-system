@@ -8,6 +8,7 @@ import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.dto.ScheduleLockRequest;
 import com.paike.scheduler.service.vo.ScheduleLockActionVo;
+import com.paike.scheduler.service.vo.SchedulePlanItemVo;
 import com.paike.scheduler.service.vo.ScheduleLockItemVo;
 import com.paike.scheduler.service.vo.ScheduleLockListVo;
 import lombok.RequiredArgsConstructor;
@@ -143,8 +144,8 @@ public class V4ScheduleLockService {
                         .orderByDesc(ScheduleLockedItem::getCreatedAt)
                         .orderByDesc(ScheduleLockedItem::getId));
 
-        Map<Long, SchedulePlanItem> planItemMap = schedulePlanService.getPlanItems(planId).stream()
-                .collect(Collectors.toMap(SchedulePlanItem::getId, Function.identity()));
+        Map<Long, SchedulePlanItemVo> planItemMap = schedulePlanService.getPlanItems(planId).stream()
+                .collect(Collectors.toMap(SchedulePlanItemVo::getId, Function.identity()));
         Map<Long, Schedule> scheduleMap = loadScheduleMap(locks);
         RelationContext relations = buildRelationContext(List.of(), scheduleMap.values());
 
@@ -160,7 +161,7 @@ public class V4ScheduleLockService {
 
     private ScheduleLockItemVo toVo(
             ScheduleLockedItem lock,
-            SchedulePlanItem planItem,
+            SchedulePlanItemVo planItem,
             Schedule schedule,
             RelationContext relations
     ) {

@@ -11,6 +11,7 @@ import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.dto.SchedulePlanItemAdjustRequest;
 import com.paike.scheduler.service.vo.AdjustPlanResultVo;
 import com.paike.scheduler.service.vo.ApplyPlanResultVo;
+import com.paike.scheduler.service.vo.SchedulePlanItemVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,14 +73,15 @@ public class SchedulePlanService {
         return plan;
     }
 
-    public List<SchedulePlanItem> getPlanItems(Long planId) {
+    public List<SchedulePlanItemVo> getPlanItems(Long planId) {
         List<SchedulePlanItem> items = planItemMapper.selectList(
                 new LambdaQueryWrapper<SchedulePlanItem>()
                         .eq(SchedulePlanItem::getPlanId, planId)
                         .orderByAsc(SchedulePlanItem::getWeekday)
                         .orderByAsc(SchedulePlanItem::getStartPeriod));
-        fillItemRelations(items);
-        return items;
+        List<SchedulePlanItemVo> vos = items.stream().map(this::planItemToVo).collect(Collectors.toList());
+        fillItemRelations(vos);
+        return vos;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -474,41 +476,41 @@ public class SchedulePlanService {
         }
     }
 
-    private void fillItemRelations(List<SchedulePlanItem> items) {
+    private void fillItemRelations(List<SchedulePlanItemVo> items) {
         if (items == null || items.isEmpty()) {
             return;
         }
 
         Map<Long, Course> courseMap = courseMapper.selectBatchIds(items.stream()
-                        .map(SchedulePlanItem::getCourseId)
+                        .map(SchedulePlanItemVo::getCourseId)
                         .filter(id -> id != null)
                         .distinct()
                         .toList())
                 .stream()
                 .collect(Collectors.toMap(Course::getId, Function.identity(), (a, b) -> a));
         Map<Long, Teacher> teacherMap = teacherMapper.selectBatchIds(items.stream()
-                        .map(SchedulePlanItem::getTeacherId)
+                        .map(SchedulePlanItemVo::getTeacherId)
                         .filter(id -> id != null)
                         .distinct()
                         .toList())
                 .stream()
                 .collect(Collectors.toMap(Teacher::getId, Function.identity(), (a, b) -> a));
         Map<Long, ClassInfo> classMap = classInfoMapper.selectBatchIds(items.stream()
-                        .map(SchedulePlanItem::getClassId)
+                        .map(SchedulePlanItemVo::getClassId)
                         .filter(id -> id != null)
                         .distinct()
                         .toList())
                 .stream()
                 .collect(Collectors.toMap(ClassInfo::getId, Function.identity(), (a, b) -> a));
         Map<Long, Classroom> roomMap = classroomMapper.selectBatchIds(items.stream()
-                        .map(SchedulePlanItem::getClassroomId)
+                        .map(SchedulePlanItemVo::getClassroomId)
                         .filter(id -> id != null)
                         .distinct()
                         .toList())
                 .stream()
                 .collect(Collectors.toMap(Classroom::getId, Function.identity(), (a, b) -> a));
 
-        for (SchedulePlanItem item : items) {
+        for (SchedulePlanItemVo item : items) {
             Course course = courseMap.get(item.getCourseId());
             Teacher teacher = teacherMap.get(item.getTeacherId());
             ClassInfo classInfo = classMap.get(item.getClassId());
@@ -519,6 +521,11 @@ public class SchedulePlanService {
             item.setRoomName(room != null ? room.getRoomName() : null);
             item.setTimeLabel("周" + item.getWeekday() + " 第" + item.getStartPeriod() + "-" + item.getEndPeriod() + "节");
         }
+    }
+
+    /** 委托 SchedulePlanItemVo.fromEntity 逐字段拷贝持久化列（view 字段由 fillItemRelations 填充）。 */
+    private SchedulePlanItemVo planItemToVo(SchedulePlanItem entity) {
+        return SchedulePlanItemVo.fromEntity(entity);
     }
 
     private List<String> buildConflictReasons(

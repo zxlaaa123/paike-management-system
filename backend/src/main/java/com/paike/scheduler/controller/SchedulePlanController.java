@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.SchedulePlan;
-import com.paike.scheduler.entity.SchedulePlanItem;
+import com.paike.scheduler.service.vo.SchedulePlanItemVo;
 import com.paike.scheduler.entity.ScheduleGenerateLog;
 import com.paike.scheduler.service.vo.ScheduleUnassignedTaskVo;
 import com.paike.scheduler.service.ScheduleCompareService;
@@ -64,7 +64,7 @@ public class SchedulePlanController {
     }
 
     @GetMapping("/{planId}/items")
-    public Result<List<SchedulePlanItem>> getItems(@PathVariable Long planId) {
+    public Result<List<SchedulePlanItemVo>> getItems(@PathVariable Long planId) {
         return Result.success(planService.getPlanItems(planId));
     }
 
