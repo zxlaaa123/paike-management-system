@@ -11,54 +11,63 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class M27AiHttpClientDuplicationInvestigationTest {
+/**
+ * M-27 收敛后回归：远程 AI 的 HttpClient、app.ai.* 配置、JSON 提取与 prompt 清洗
+ * 已统一到 RemoteAiChatClient + AiChatProperties；两个业务服务不再各自重复。
+ *
+ * 取代旧的 M27AiHttpClientDuplicationInvestigationTest（其锁定的是收敛前的重复现状）。
+ */
+class M27AiClientConsolidationTest {
 
     @Test
-    void remoteAiHttpClientUsageIsLimitedToTwoServices() throws IOException {
+    void httpClientUsageIsConsolidatedIntoSingleClient() throws IOException {
         List<SourceFile> httpClientUsers = sourceFiles().stream()
                 .filter(source -> source.content().contains("java.net.http.HttpClient"))
                 .toList();
 
-        assertEquals(2, httpClientUsers.size());
-        assertTrue(httpClientUsers.stream().anyMatch(source -> source.path().endsWith("V4ScheduleAiAnalysisService.java")));
-        assertTrue(httpClientUsers.stream().anyMatch(source -> source.path().endsWith("V5RepairExplanationService.java")));
-    }
+        assertEquals(1, httpClientUsers.size(), "远程 AI 的 HttpClient 用法应只剩共享客户端一处");
+        assertTrue(httpClientUsers.get(0).path().endsWith("RemoteAiChatClient.java"));
 
-    @Test
-    void servicesAlreadyShareHttpClientPerClassButDuplicateAiConfiguration() throws IOException {
-        Map<String, String> serviceSources = aiServiceSources();
-
-        for (String source : serviceSources.values()) {
-            assertTrue(source.contains("private static final HttpClient HTTP_CLIENT"));
-            assertTrue(source.contains("HttpClient.newBuilder()"));
-            assertTrue(source.contains("HTTP_CLIENT.send("));
-            assertTrue(source.contains("@Value(\"${app.ai.api-key:}\")"));
-            assertTrue(source.contains("@Value(\"${app.ai.base-url:https://api.openai.com/v1/chat/completions}\")"));
-            assertTrue(source.contains("@Value(\"${app.ai.model:gpt-4o-mini}\")"));
-            assertTrue(source.contains("@Value(\"${app.ai.timeout-ms:20000}\")"));
-        }
-
-        int newBuilderCount = serviceSources.values().stream()
-                .mapToInt(source -> count(source, "HttpClient.newBuilder()"))
+        int newBuilderCount = sourceFiles().stream()
+                .mapToInt(source -> count(source.content(), "HttpClient.newBuilder()"))
                 .sum();
-        int newHttpClientCount = serviceSources.values().stream()
-                .mapToInt(source -> count(source, "HttpClient.newHttpClient()"))
+        int newHttpClientCount = sourceFiles().stream()
+                .mapToInt(source -> count(source.content(), "HttpClient.newHttpClient()"))
                 .sum();
 
-        assertEquals(2, newBuilderCount);
+        assertEquals(1, newBuilderCount);
         assertEquals(0, newHttpClientCount);
     }
 
     @Test
-    void promptSanitizingAndJsonExtractionRemainServiceLocal() throws IOException {
-        Map<String, String> serviceSources = aiServiceSources();
+    void aiConfigurationIsCentralizedInProperties() throws IOException {
+        String properties = source("src/main/java/com/paike/scheduler/config/AiChatProperties.java");
+        assertTrue(properties.contains("@ConfigurationProperties(prefix = \"app.ai\")"));
+        assertTrue(properties.contains("private String apiKey"));
+        assertTrue(properties.contains("private String baseUrl"));
+        assertTrue(properties.contains("private String model"));
+        assertTrue(properties.contains("private long timeoutMs"));
 
-        for (String source : serviceSources.values()) {
-            assertTrue(source.contains("private String sanitizeForPrompt(String value)"));
-            assertTrue(source.contains("private String extractJson(String content)"));
-            assertTrue(source.contains("private static final int FIELD_MAX_LEN = 80"));
+        for (String svc : aiServiceSources().values()) {
+            assertFalse(svc.contains("@Value(\"${app.ai"), "业务服务不应再直接注入 app.ai.* 配置");
+            assertFalse(svc.contains("private static final HttpClient HTTP_CLIENT"), "业务服务不应再各自持有 HttpClient");
+            assertTrue(svc.contains("RemoteAiChatClient"), "业务服务应依赖共享客户端");
+        }
+    }
+
+    @Test
+    void promptSanitizingAndJsonExtractionAreSharedInClient() throws IOException {
+        String client = source("src/main/java/com/paike/scheduler/service/RemoteAiChatClient.java");
+        assertTrue(client.contains("public String sanitizeForPrompt(String value)"));
+        assertTrue(client.contains("public String extractJson(String content)"));
+        assertTrue(client.contains("public String chat(String systemPrompt, String userPrompt)"));
+
+        for (String svc : aiServiceSources().values()) {
+            assertFalse(svc.contains("private String sanitizeForPrompt(String value)"), "prompt 清洗应收敛到共享客户端");
+            assertFalse(svc.contains("private String extractJson(String content)"), "JSON 提取应收敛到共享客户端");
         }
     }
 
@@ -119,4 +128,3 @@ class M27AiHttpClientDuplicationInvestigationTest {
     private record SourceFile(String path, String content) {
     }
 }
-
