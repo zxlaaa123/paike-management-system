@@ -3,6 +3,7 @@ package com.paike.scheduler.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.entity.TeachingTask;
+import com.paike.scheduler.service.vo.TeachingTaskVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -26,5 +27,5 @@ public interface TeachingTaskMapper extends BaseMapper<TeachingTask> {
     /**
      * 冲突检查详情：一次加载教学任务及硬约束所需的课程、教师、班级字段。
      */
-    TeachingTask selectConflictCheckById(@Param("id") Long id);
+    TeachingTaskVo selectConflictCheckById(@Param("id") Long id);
 }

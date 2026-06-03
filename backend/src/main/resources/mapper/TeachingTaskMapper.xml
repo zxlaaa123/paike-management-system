@@ -28,7 +28,7 @@
         ORDER BY tt.create_time DESC
     </select>
 
-    <select id="selectConflictCheckById" resultType="com.paike.scheduler.entity.TeachingTask">
+    <select id="selectConflictCheckById" resultType="com.paike.scheduler.service.vo.TeachingTaskVo">
         SELECT
             tt.*,
             c.course_type AS courseType,
