@@ -2,8 +2,8 @@ package com.paike.scheduler.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.response.Result;
-import com.paike.scheduler.entity.ScheduleConflictReport;
 import com.paike.scheduler.service.ScheduleConflictReportService;
+import com.paike.scheduler.service.vo.ScheduleConflictReportVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,7 +23,7 @@ public class ScheduleConflictReportController {
     }
 
     @GetMapping
-    public Result<Page<ScheduleConflictReport>> list(
+    public Result<Page<ScheduleConflictReportVo>> list(
             @RequestParam(required = false) Long semesterId,
             @RequestParam(required = false) String reportNo,
             @RequestParam(required = false) String conflictType,
