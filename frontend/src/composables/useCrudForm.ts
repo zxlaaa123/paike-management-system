@@ -20,23 +20,23 @@
  * 后续可按需逐页面迁移以减少重复代码。
  */
 
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import type { PageResult } from '../api/types'
 import { extractMessage } from '../utils/errors'
 
-export interface CrudOptions<T, F extends object> {
+export interface CrudOptions<T, F extends object, S extends Record<string, unknown> = Record<string, unknown>> {
   /** 获取列表数据的 API 函数 */
-  fetchList: (params: Record<string, unknown>) => Promise<PageResult<T>>
+  fetchList: (params: S & { page: number; size: number }) => Promise<PageResult<T>>
   /** 创建记录的 API 函数 */
   createItem: (form: F) => Promise<unknown>
   /** 更新记录的 API 函数 */
   updateItem: (id: number, form: F) => Promise<unknown>
   /** 删除记录的 API 函数 */
   deleteItem: (id: number) => Promise<unknown>
-  /** 搜索表单的初始值 */
-  searchDefaults: Record<string, unknown>
+  /** 搜索表单的初始值（其形状即搜索表单类型 S） */
+  searchDefaults: S
   /** 表单的初始值 */
   formDefaults: F
   /** 表单验证规则 */
@@ -47,14 +47,18 @@ export interface CrudOptions<T, F extends object> {
   transformRecords?: (records: T[]) => T[]
 }
 
-export function useCrudForm<T extends { id: number }, F extends object>(options: CrudOptions<T, F>) {
+export function useCrudForm<
+  T extends { id: number },
+  F extends object,
+  S extends Record<string, unknown> = Record<string, unknown>,
+>(options: CrudOptions<T, F, S>) {
   const loading = ref(false)
-  const tableData = ref<T[]>([]) as { value: T[] }
+  const tableData = ref<T[]>([]) as Ref<T[]>
   const total = ref(0)
   const currentPage = ref(1)
   const pageSize = ref(10)
 
-  const searchForm = reactive<Record<string, unknown>>({ ...options.searchDefaults })
+  const searchForm = reactive({ ...options.searchDefaults }) as S
 
   const dialogVisible = ref(false)
   const dialogTitle = ref('')
@@ -66,11 +70,11 @@ export function useCrudForm<T extends { id: number }, F extends object>(options:
   async function fetchData() {
     loading.value = true
     try {
-      const params: Record<string, unknown> = {
+      const params = {
         ...searchForm,
         page: currentPage.value,
         size: pageSize.value,
-      }
+      } as S & { page: number; size: number }
       const res = await options.fetchList(params)
       tableData.value = options.transformRecords ? options.transformRecords(res.records) : res.records
       total.value = res.total
