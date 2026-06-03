@@ -32,6 +32,7 @@ import com.paike.scheduler.mapper.TimeSlotMapper;
 import com.paike.scheduler.service.dto.V5CandidateEvaluateRequest;
 import com.paike.scheduler.service.dto.V5LocalReplanRequest;
 import com.paike.scheduler.service.vo.ApplyPlanResultVo;
+import com.paike.scheduler.service.vo.ScheduleAdjustLogVo;
 import com.paike.scheduler.service.vo.ScheduleRiskIssueVo;
 import com.paike.scheduler.service.vo.ScheduleRiskListVo;
 import com.paike.scheduler.service.vo.V5CandidateEvaluationVo;
@@ -301,7 +302,7 @@ public class V5SimulationService {
         vo.setScoreDetails(scoreDetailMapper.selectList(new LambdaQueryWrapper<ScheduleScoreDetail>()
                 .eq(ScheduleScoreDetail::getPlanId, plan.getId())
                 .orderByAsc(ScheduleScoreDetail::getRuleCode)));
-        List<ScheduleAdjustLog> adjustLogs = explainService.listAdjustLogs(plan.getSemesterId(), plan.getId(), null, 1, 500).getRecords();
+        List<ScheduleAdjustLogVo> adjustLogs = explainService.listAdjustLogs(plan.getSemesterId(), plan.getId(), null, 1, 500).getRecords();
         vo.setAdjustLogs(adjustLogs);
         vo.setRisks(risks);
         vo.setCompare(buildCompare(baseline, plan, baselineRisks, risks, changedItem.before(), changedItem.after()));
@@ -627,20 +628,20 @@ public class V5SimulationService {
         explainService.appendAdjustLog(log);
     }
 
-    private V5LocalReplanSummaryVo buildPersistedLocalReplanSummary(ScheduleRepairTask task, SchedulePlan plan, List<ScheduleAdjustLog> adjustLogs) {
+    private V5LocalReplanSummaryVo buildPersistedLocalReplanSummary(ScheduleRepairTask task, SchedulePlan plan, List<ScheduleAdjustLogVo> adjustLogs) {
         if (!"V5_LOCAL_REPLAN".equals(plan.getGeneratedBy())) {
             return null;
         }
-        List<ScheduleAdjustLog> logs = adjustLogs == null ? List.of() : adjustLogs;
+        List<ScheduleAdjustLogVo> logs = adjustLogs == null ? List.of() : adjustLogs;
         List<Long> movedItemIds = logs.stream()
-                .map(ScheduleAdjustLog::getTeachingTaskId)
+                .map(ScheduleAdjustLogVo::getTeachingTaskId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
         List<String> messages = new ArrayList<>();
         messages.add("局部重排试算方案：" + plan.getName() + "，来源方案 " + plan.getSourcePlanId() + "，未写入正式课表。");
         messages.add("范围课程 " + intValue(task.getTargetItemCount()) + " 条，锁定课程 " + intValue(task.getLockedItemCount()) + " 条，可重排课程 " + intValue(task.getProcessedItemCount()) + " 条。");
-        for (ScheduleAdjustLog log : logs) {
+        for (ScheduleAdjustLogVo log : logs) {
             messages.add((log.getAdjustReason() == null ? "局部重排调整" : log.getAdjustReason())
                     + "：周" + log.getOldWeekday() + " 第" + log.getOldStartPeriod() + "-" + log.getOldEndPeriod()
                     + "节 -> 周" + log.getNewWeekday() + " 第" + log.getNewStartPeriod() + "-" + log.getNewEndPeriod() + "节。");
