@@ -6,7 +6,7 @@ import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
 import com.paike.scheduler.entity.ScheduleGenerateLog;
-import com.paike.scheduler.entity.ScheduleUnassignedTask;
+import com.paike.scheduler.service.vo.ScheduleUnassignedTaskVo;
 import com.paike.scheduler.service.ScheduleCompareService;
 import com.paike.scheduler.service.SchedulePlanExplainService;
 import com.paike.scheduler.service.SchedulePlanService;
@@ -124,7 +124,7 @@ public class SchedulePlanController {
     }
 
     @GetMapping("/{planId}/unassigned-tasks")
-    public Result<List<ScheduleUnassignedTask>> getUnassignedTasks(@PathVariable Long planId) {
+    public Result<List<ScheduleUnassignedTaskVo>> getUnassignedTasks(@PathVariable Long planId) {
         return Result.success(explainService.listUnassignedTasks(planId));
     }
 

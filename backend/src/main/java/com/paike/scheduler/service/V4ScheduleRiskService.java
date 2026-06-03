@@ -10,7 +10,6 @@ import com.paike.scheduler.entity.Classroom;
 import com.paike.scheduler.entity.Course;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
-import com.paike.scheduler.entity.ScheduleUnassignedTask;
 import com.paike.scheduler.entity.Teacher;
 import com.paike.scheduler.entity.TeachingTask;
 import com.paike.scheduler.entity.TimeSlot;
@@ -24,6 +23,7 @@ import com.paike.scheduler.mapper.TeachingTaskMapper;
 import com.paike.scheduler.mapper.TimeSlotMapper;
 import com.paike.scheduler.service.vo.ScheduleRiskIssueVo;
 import com.paike.scheduler.service.vo.ScheduleRiskListVo;
+import com.paike.scheduler.service.vo.ScheduleUnassignedTaskVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -67,7 +67,7 @@ public class V4ScheduleRiskService {
                         .eq(SchedulePlanItem::getPlanId, planId)
                         .orderByAsc(SchedulePlanItem::getWeekday)
                         .orderByAsc(SchedulePlanItem::getStartPeriod));
-        List<ScheduleUnassignedTask> unassignedTasks = schedulePlanExplainService.listUnassignedTasks(planId);
+        List<ScheduleUnassignedTaskVo> unassignedTasks = schedulePlanExplainService.listUnassignedTasks(planId);
 
         RiskContext context = buildContext(items);
         AtomicLong idGenerator = new AtomicLong(1);
@@ -278,8 +278,8 @@ public class V4ScheduleRiskService {
         }
     }
 
-    private void detectUnscheduledTasks(List<ScheduleUnassignedTask> unassignedTasks, RiskContext context, AtomicLong idGenerator, List<ScheduleRiskIssueVo> risks) {
-        for (ScheduleUnassignedTask task : unassignedTasks) {
+    private void detectUnscheduledTasks(List<ScheduleUnassignedTaskVo> unassignedTasks, RiskContext context, AtomicLong idGenerator, List<ScheduleRiskIssueVo> risks) {
+        for (ScheduleUnassignedTaskVo task : unassignedTasks) {
             ScheduleRiskIssueVo risk = baseRisk(idGenerator, "UNSCHEDULED_TASK", "教学任务未排", "HIGH");
             risk.setTitle(safeName(task.getClassName()) + " 的 " + safeName(task.getCourseName()) + " 仍未排入课表");
             risk.setDescription(safeName(task.getReasonMessage()));

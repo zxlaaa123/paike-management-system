@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
+import com.paike.scheduler.service.vo.ScheduleUnassignedTaskVo;
 import com.paike.scheduler.service.vo.UnassignedSummaryVo;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
@@ -115,13 +116,27 @@ public class SchedulePlanExplainService {
         unassignedTaskMapper.insert(record);
     }
 
-    public List<ScheduleUnassignedTask> listUnassignedTasks(Long planId) {
+    public List<ScheduleUnassignedTaskVo> listUnassignedTasks(Long planId) {
         List<ScheduleUnassignedTask> records = unassignedTaskMapper.selectList(
                 new LambdaQueryWrapper<ScheduleUnassignedTask>()
                         .eq(ScheduleUnassignedTask::getPlanId, planId)
                         .orderByDesc(ScheduleUnassignedTask::getCreatedAt));
-        fillUnassignedRelations(records);
-        return records;
+        List<ScheduleUnassignedTaskVo> vos = records.stream().map(this::toVo).collect(Collectors.toList());
+        fillUnassignedRelations(vos);
+        return vos;
+    }
+
+    private ScheduleUnassignedTaskVo toVo(ScheduleUnassignedTask entity) {
+        ScheduleUnassignedTaskVo vo = new ScheduleUnassignedTaskVo();
+        vo.setId(entity.getId());
+        vo.setPlanId(entity.getPlanId());
+        vo.setSemesterId(entity.getSemesterId());
+        vo.setTeachingTaskId(entity.getTeachingTaskId());
+        vo.setReasonCode(entity.getReasonCode());
+        vo.setReasonMessage(entity.getReasonMessage());
+        vo.setSuggestion(entity.getSuggestion());
+        vo.setCreatedAt(entity.getCreatedAt());
+        return vo;
     }
 
     public List<UnassignedSummaryVo> summarizeUnassignedTasks(Long planId) {
@@ -165,12 +180,12 @@ public class SchedulePlanExplainService {
         return REASON_NAME_MAP.getOrDefault(reasonCode, reasonCode);
     }
 
-    private void fillUnassignedRelations(List<ScheduleUnassignedTask> records) {
+    private void fillUnassignedRelations(List<ScheduleUnassignedTaskVo> records) {
         if (records == null || records.isEmpty()) {
             return;
         }
         Map<Long, TeachingTask> taskMap = teachingTaskMapper.selectBatchIds(records.stream()
-                        .map(ScheduleUnassignedTask::getTeachingTaskId)
+                        .map(ScheduleUnassignedTaskVo::getTeachingTaskId)
                         .filter(Objects::nonNull)
                         .distinct()
                         .toList())
@@ -199,7 +214,7 @@ public class SchedulePlanExplainService {
                 .stream()
                 .collect(Collectors.toMap(ClassInfo::getId, Function.identity(), (a, b) -> a));
 
-        for (ScheduleUnassignedTask record : records) {
+        for (ScheduleUnassignedTaskVo record : records) {
             TeachingTask task = taskMap.get(record.getTeachingTaskId());
             if (task == null) {
                 continue;
