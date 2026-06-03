@@ -59,12 +59,4 @@ public class SchedulePlan {
 
     @TableLogic
     private Integer deleted;
-
-    /** 关联字段 */
-    @TableField(exist = false)
-    private String semesterName;
-
-    /** 关联字段 */
-    @TableField(exist = false)
-    private String strategyName;
 }
