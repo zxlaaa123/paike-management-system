@@ -2,8 +2,8 @@ package com.paike.scheduler.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.response.Result;
-import com.paike.scheduler.entity.TeacherUnavailableTime;
 import com.paike.scheduler.service.TeacherUnavailableTimeService;
+import com.paike.scheduler.service.vo.TeacherUnavailableTimeVo;
 import com.paike.scheduler.service.dto.TeacherUnavailableTimeForm;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -20,7 +20,7 @@ public class TeacherUnavailableTimeController {
     private final TeacherUnavailableTimeService unavailableTimeService;
 
     @GetMapping
-    public Result<Page<TeacherUnavailableTime>> list(
+    public Result<Page<TeacherUnavailableTimeVo>> list(
             @RequestParam(required = false) Long teacherId,
             @RequestParam(required = false) String teacherName,
             @RequestParam(required = false) Long timeSlotId,
@@ -31,19 +31,19 @@ public class TeacherUnavailableTimeController {
             @jakarta.validation.constraints.Max(value = 200, message = "每页数量不能超过200")
             @RequestParam(defaultValue = "10") int size
     ) {
-        Page<TeacherUnavailableTime> result = unavailableTimeService.list(teacherId, teacherName, timeSlotId, status, page, size);
+        Page<TeacherUnavailableTimeVo> result = unavailableTimeService.list(teacherId, teacherName, timeSlotId, status, page, size);
         return Result.success(result);
     }
 
     @PostMapping
-    public Result<TeacherUnavailableTime> create(@Valid @RequestBody TeacherUnavailableTimeForm form) {
-        TeacherUnavailableTime result = unavailableTimeService.create(form);
+    public Result<TeacherUnavailableTimeVo> create(@Valid @RequestBody TeacherUnavailableTimeForm form) {
+        TeacherUnavailableTimeVo result = unavailableTimeService.create(form);
         return Result.success(result);
     }
 
     @PutMapping("/{id}")
-    public Result<TeacherUnavailableTime> update(@PathVariable Long id, @Valid @RequestBody TeacherUnavailableTimeForm form) {
-        TeacherUnavailableTime result = unavailableTimeService.update(id, form);
+    public Result<TeacherUnavailableTimeVo> update(@PathVariable Long id, @Valid @RequestBody TeacherUnavailableTimeForm form) {
+        TeacherUnavailableTimeVo result = unavailableTimeService.update(id, form);
         return Result.success(result);
     }
 
