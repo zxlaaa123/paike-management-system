@@ -8,7 +8,9 @@ import com.paike.scheduler.service.AutoScheduleService;
 import com.paike.scheduler.service.TimeSlotService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -55,5 +57,18 @@ class ControllerNotFoundStatusTest {
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertEquals(404, response.getBody().getCode());
         assertEquals("资源不存在", response.getBody().getMessage());
+    }
+
+    @Test
+    void noResourceFoundUsesHttpNotFoundStatus() {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+        ResponseEntity<Result<Void>> response = handler.handleNoResourceFound(
+                new NoResourceFoundException(HttpMethod.GET, "/api/semesters")
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertEquals(404, response.getBody().getCode());
+        assertEquals("接口不存在：/api/semesters", response.getBody().getMessage());
     }
 }
