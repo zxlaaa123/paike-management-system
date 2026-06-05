@@ -2,7 +2,7 @@
 
 基于 Spring Boot 3、Vue 3、MyBatis Plus、MySQL 的高校排课管理系统。
 
-当前 `main` 已完成 V1-V5 功能与 V5 阶段 11 验收，并合入 bug 审计修复：登录安全、CSRF、排课并发冲突、学期唯一性、P3 前端鲁棒性等问题已修复。
+当前 `main` 已完成 V1-V5 功能与 V5 阶段 11 验收、bug 审计修复（登录安全、CSRF、排课并发冲突、学期唯一性、P3 前端鲁棒性等），以及 M-13~M-19 架构收口系列（Controller 服务边界、Map\<String,Object\> → VO、课表导出职责分离、Entity view 字段 → VO、Mapper 契约收敛、全局工具抽取等），后端 74 个测试全部通过。
 
 ## 当前状态
 
@@ -11,7 +11,7 @@
 - 包管理：前端使用 npm，提交 `frontend/package-lock.json`。不要提交 `frontend/pnpm-lock.yaml`，除非项目明确切换到 pnpm。
 - 默认后端端口：`8090`。
 - 默认前端端口：`5173`。
-- 验收状态：API 冒烟、Playwright E2E、前端构建、后端测试已通过。
+- 验收状态：后端 74 测试通过、API 冒烟、Playwright E2E、前端构建均已通过。
 
 ## 功能范围
 
@@ -28,12 +28,22 @@
 ├─ backend/                  # Spring Boot 后端
 │  ├─ src/main/java/com/paike/scheduler
 │  │  ├─ auth/               # JWT、登录、拦截器、CSRF 校验
-│  │  ├─ common/             # 响应、异常、枚举
-│  │  ├─ config/             # CORS、初始化配置
-│  │  ├─ controller/         # REST 接口
-│  │  ├─ entity/             # 实体
+│  │  │  ├─ dto/             # 登录请求 DTO
+│  │  │  └─ vo/              # 登录响应 VO
+│  │  ├─ common/             # 响应、异常、枚举、工具
+│  │  │  ├─ enums/
+│  │  │  ├─ exception/
+│  │  │  ├─ response/
+│  │  │  └─ util/
+│  │  ├─ config/             # CORS、安全、初始化配置
+│  │  ├─ controller/         # REST 接口（35 个 Controller）
+│  │  │  └─ vo/              # Controller 层响应 VO
+│  │  ├─ entity/             # 实体（30 个，纯持久化列，无 view 字段）
 │  │  ├─ mapper/             # MyBatis Mapper
-│  │  └─ service/            # 业务逻辑
+│  │  └─ service/            # 业务逻辑（~50 个 Service）
+│  │     ├─ dto/             # Service 层请求 DTO
+│  │     ├─ vo/              # Service 层响应 VO（~60 个，承载派生字段）
+│  │     └─ scheduling/      # 排课算法核心
 │  └─ src/main/resources
 │     ├─ application.yml
 │     └─ db/                 # schema 与阶段 SQL
@@ -197,7 +207,7 @@ cd D:\paike
 npx playwright install chromium
 ```
 
-当前 V5 阶段 11 已验证通过：
+当前 V5 阶段 11 与 M-13~M-19 架构收口已验证通过：
 
 ```powershell
 cd D:\paike
@@ -267,3 +277,5 @@ $env:DB_PASSWORD="你的MySQL密码"
 - `docs/v5/`
 - `claude-opus-4.7-bug验证报告.md`
 - `claude-opus-4.7-bug修复建议.md`
+
+> 以上两个文件已纳入 `.gitignore`，仅本地保留。
