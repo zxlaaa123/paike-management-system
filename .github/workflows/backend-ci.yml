@@ -42,7 +42,7 @@ jobs:
           cache: maven
 
       - name: Build and test
-        run: mvn -B verify
+        run: mvn -B verify --no-transfer-progress
         working-directory: backend
         env:
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/paike?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
