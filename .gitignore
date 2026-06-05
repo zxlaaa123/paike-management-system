@@ -82,5 +82,13 @@ mimov25发现的bug.md
 .cursor/
 .Codex.json
 
+# AI assistant artifacts (提示词草稿、会话记录等)
+*提示词.md
+*前置确认清单.md
+CLAUDE*.md
+GIT_LOG.md
+claudeopus*.md
+.codebuddy/
+
 # Package manager drift
 frontend/pnpm-lock.yaml

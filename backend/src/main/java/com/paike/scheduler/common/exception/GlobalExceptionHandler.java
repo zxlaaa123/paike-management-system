@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -99,6 +100,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleNotFound(NoHandlerFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Result.fail(404, "接口不存在：" + ex.getRequestURL()));
+    }
+
+    /** Spring Boot 3 未匹配到接口时可能按静态资源缺失抛出 */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Result<Void>> handleNoResourceFound(NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Result.fail(404, "接口不存在：" + ex.getResourcePath()));
     }
 
     @ExceptionHandler(Exception.class)
