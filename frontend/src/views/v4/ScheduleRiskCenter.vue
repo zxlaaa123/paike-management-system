@@ -12,7 +12,6 @@ import {
   type ScheduleRiskList,
 } from '../../api/v4ScheduleAnalysisApi'
 import { createRepairTask } from '../../api/v5RepairTaskApi'
-import type { ScheduleAdjustmentApplyResult } from '../../api/v4ScheduleAdjustmentApi'
 import type { ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
 import { strategyText } from '../../utils/status'
 import { extractMessage } from '../../utils/errors'

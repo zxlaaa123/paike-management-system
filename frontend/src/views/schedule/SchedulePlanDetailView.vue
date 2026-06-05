@@ -24,7 +24,6 @@ import {
   type UnassignedSummaryItem,
 } from '../../api/schedulePlan'
 import { createRepairTask } from '../../api/v5RepairTaskApi'
-import type { ScheduleAdjustmentApplyResult } from '../../api/v4ScheduleAdjustmentApi'
 import type { ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
 import { getScoreDetails, getScoreSummary, rescore, type ScheduleScoreDetail, type ScoreSummary } from '../../api/scheduleScore'
 import { schedulePlanStatusTagType as statusTagType, schedulePlanStatusText as statusText, strategyText } from '../../utils/status'
