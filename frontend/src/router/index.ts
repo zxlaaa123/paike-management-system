@@ -269,7 +269,7 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach(async (to, _from) => {
+router.beforeEach(async (to, _) => {
   const authStore = useAuthStore()
   const needAuth = to.matched.some((record) => record.meta.requiresAuth)
 
@@ -283,7 +283,7 @@ router.beforeEach(async (to, _from) => {
   if (!authStore.userInfo) {
     try {
       await authStore.fetchCurrentUser()
-    } catch (_error) {
+    } catch {
       return { path: '/login', query: { redirect: to.fullPath } }
     }
   }

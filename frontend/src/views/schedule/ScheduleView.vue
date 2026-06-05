@@ -187,7 +187,7 @@ function openAdjust(row: Schedule) {
   adjustVisible.value = true
 }
 
-async function handleAdjustSuccess(_result: ScheduleAdjustmentApplyResult) {
+async function handleAdjustSuccess() {
   adjustVisible.value = false
   await fetchData()
   if (currentSemester.value) {

@@ -122,7 +122,7 @@ async function fetchStats() {
     stats.classCount = classRes.total
     stats.classroomCount = classroomRes.total
     stats.courseCount = courseRes.total
-  } catch (_error) {
+  } catch {
     loadError.value = '统计数据加载失败，请稍后重试。'
     ElMessage.error(loadError.value)
   }
@@ -134,7 +134,7 @@ async function fetchDashboard() {
     if (currentSemester.value) {
       dashboardStats.value = await getDashboardStats({ semesterId: currentSemester.value.id })
     }
-  } catch (_error) {
+  } catch {
     // 无当前学期时不报错
   }
 }

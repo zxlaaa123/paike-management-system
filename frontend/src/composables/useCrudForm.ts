@@ -124,7 +124,7 @@ export function useCrudForm<
       }
       dialogVisible.value = false
       await fetchData()
-    } catch (_e) {
+    } catch {
       // 错误已由 request interceptor 处理
     }
   }

@@ -18,7 +18,7 @@ async function fetchCurrentSemester() {
   semesterLoading.value = true
   try {
     currentSemester.value = await getCurrentSemester()
-  } catch (_e) {
+  } catch {
     currentSemester.value = null
   } finally {
     semesterLoading.value = false
@@ -28,7 +28,7 @@ async function fetchCurrentSemester() {
 async function fetchAllSemesters() {
   try {
     allSemesterList.value = await getAllSemesters()
-  } catch (_e) {
+  } catch {
     allSemesterList.value = []
   }
 }

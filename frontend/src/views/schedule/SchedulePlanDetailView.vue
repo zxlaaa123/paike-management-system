@@ -254,7 +254,7 @@ function openCandidatesByItem(item: SchedulePlanItem) {
   router.push(`/v5/candidate-positions?planItemId=${item.id}`)
 }
 
-async function handleAdjustSuccess(_result: ScheduleAdjustmentApplyResult) {
+async function handleAdjustSuccess() {
   adjustDialogVisible.value = false
   await Promise.all([fetchData(), fetchScoreData(), loadExplainData()])
   if (taskLogDialogVisible.value && currentTaskId.value) {

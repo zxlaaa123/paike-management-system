@@ -172,7 +172,7 @@ function openCandidates(risk: ScheduleRiskIssue) {
   router.push(`/v5/candidate-positions?planItemId=${planItemId}`)
 }
 
-async function handleAdjustSuccess(_result: ScheduleAdjustmentApplyResult) {
+async function handleAdjustSuccess() {
   adjustVisible.value = false
   detailVisible.value = false
   await fetchData()

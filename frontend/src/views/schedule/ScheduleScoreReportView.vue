@@ -71,7 +71,7 @@ async function handleGenerate() {
 async function fetchLatest() {
   try {
     latestReport.value = await getLatestScheduleScore()
-  } catch (_e) {
+  } catch {
     // 首次进入系统时可能还没有任何评分记录，这里按“无数据”处理，不打断页面展示。
     latestReport.value = null
   }

@@ -81,7 +81,7 @@ async function handleRunAutoSchedule() {
         '危险操作确认',
         { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
       )
-    } catch (_e) {
+    } catch {
       return
     }
   }
