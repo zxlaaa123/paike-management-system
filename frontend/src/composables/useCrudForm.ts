@@ -26,7 +26,7 @@ import type { FormInstance } from 'element-plus'
 import type { PageResult } from '../api/types'
 import { extractMessage } from '../utils/errors'
 
-export interface CrudOptions<T, F extends object, S extends Record<string, unknown> = Record<string, unknown>> {
+export interface CrudOptions<T, F extends object, S extends Record<string, unknown> = Record<string, unknown>, R = Record<string, unknown>> {
   /** 获取列表数据的 API 函数 */
   fetchList: (params: S & { page: number; size: number }) => Promise<PageResult<T>>
   /** 创建记录的 API 函数 */
@@ -40,7 +40,7 @@ export interface CrudOptions<T, F extends object, S extends Record<string, unkno
   /** 表单的初始值 */
   formDefaults: F
   /** 表单验证规则 */
-  rules?: Record<string, unknown>
+  rules?: R
   /** 实体名称（用于提示信息） */
   entityName: string
   /** 列表数据转换函数（可选） */
@@ -51,7 +51,8 @@ export function useCrudForm<
   T extends { id: number },
   F extends object,
   S extends Record<string, unknown> = Record<string, unknown>,
->(options: CrudOptions<T, F, S>) {
+  R = Record<string, unknown>,
+>(options: CrudOptions<T, F, S, R>) {
   const loading = ref(false)
   const tableData = ref<T[]>([]) as Ref<T[]>
   const total = ref(0)
@@ -159,6 +160,7 @@ export function useCrudForm<
     formRef,
     editingId,
     form,
+    rules: options.rules,
     fetchData,
     handleSearch,
     handleReset,

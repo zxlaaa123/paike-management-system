@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import type { FormInstance } from 'element-plus'
+import { ElMessageBox, ElMessage } from 'element-plus'
 import {
   getTeacherList,
   createTeacher,
@@ -12,124 +10,41 @@ import {
   type TeacherForm,
 } from '../../api/teacher'
 import { statusText, statusTagType } from '../../utils/status'
-import { extractMessage } from '../../utils/errors'
+import { useCrudForm } from '../../composables/useCrudForm'
 
-const loading = ref(false)
-const tableData = ref<Teacher[]>([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(10)
-
-const searchForm = reactive({
-  name: '',
-  teacherNo: '',
-  department: '',
-  status: undefined as number | undefined,
+const {
+  loading,
+  tableData,
+  total,
+  currentPage,
+  pageSize,
+  searchForm,
+  dialogVisible,
+  dialogTitle,
+  formRef,
+  form,
+  fetchData,
+  handleSearch,
+  handleReset,
+  openAdd,
+  openEdit,
+  handleSubmit,
+  handleDelete,
+} = useCrudForm<Teacher, TeacherForm>({
+  fetchList: (q) => getTeacherList(q as Parameters<typeof getTeacherList>[0]),
+  createItem: createTeacher,
+  updateItem: updateTeacher,
+  deleteItem: deleteTeacher,
+  searchDefaults: { name: '', teacherNo: '', department: '', status: undefined as number | undefined },
+  formDefaults: { teacherNo: '', name: '', department: '', phone: '', status: 1, remark: '' },
+  entityName: '教师',
 })
 
-const dialogVisible = ref(false)
-const dialogTitle = ref('')
-const formRef = ref<FormInstance>()
-const editingId = ref<number | null>(null)
-
-const form = reactive<TeacherForm>({
-  teacherNo: '',
-  name: '',
-  department: '',
-  phone: '',
-  status: 1,
-  remark: '',
-})
+void formRef
 
 const rules = {
   teacherNo: [{ required: true, message: '请输入教师编号', trigger: 'blur' }],
   name: [{ required: true, message: '请输入教师姓名', trigger: 'blur' }],
-}
-
-async function fetchData() {
-  loading.value = true
-  try {
-    const res = await getTeacherList({
-      ...searchForm,
-      page: currentPage.value,
-      size: pageSize.value,
-    })
-    tableData.value = res.records
-    total.value = res.total
-  } finally {
-    loading.value = false
-  }
-}
-
-function handleSearch() {
-  currentPage.value = 1
-  fetchData()
-}
-
-function handleReset() {
-  searchForm.name = ''
-  searchForm.teacherNo = ''
-  searchForm.department = ''
-  searchForm.status = undefined
-  handleSearch()
-}
-
-function openAdd() {
-  dialogTitle.value = '新增教师'
-  editingId.value = null
-  form.teacherNo = ''
-  form.name = ''
-  form.department = ''
-  form.phone = ''
-  form.status = 1
-  form.remark = ''
-  dialogVisible.value = true
-}
-
-function openEdit(row: Teacher) {
-  dialogTitle.value = '编辑教师'
-  editingId.value = row.id
-  form.teacherNo = row.teacherNo
-  form.name = row.name
-  form.department = row.department || ''
-  form.phone = row.phone || ''
-  form.status = row.status
-  form.remark = row.remark || ''
-  dialogVisible.value = true
-}
-
-async function handleSubmit() {
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
-  try {
-    if (editingId.value) {
-      await updateTeacher(editingId.value, form)
-      ElMessage.success('修改成功')
-    } else {
-      await createTeacher(form)
-      ElMessage.success('新增成功')
-    }
-    dialogVisible.value = false
-    fetchData()
-  } catch (_e) {
-    console.error(_e)
-    ElMessage.error('保存教师失败')
-  }
-}
-
-async function handleDelete(row: Teacher) {
-  try {
-    await ElMessageBox.confirm(`确定删除教师「${row.name}」吗？`, '提示', { type: 'warning' })
-  } catch {
-    return
-  }
-  try {
-    await deleteTeacher(row.id)
-    ElMessage.success('删除成功')
-    fetchData()
-  } catch (e: unknown) {
-    ElMessage.error(extractMessage(e, '删除失败'))
-  }
 }
 
 async function handleStatusChange(row: Teacher) {
@@ -144,12 +59,10 @@ async function handleStatusChange(row: Teacher) {
     await updateTeacherStatus(row.id, newStatus)
     ElMessage.success(`${action}成功`)
     fetchData()
-  } catch (e: unknown) {
-    ElMessage.error(extractMessage(e, `${action}失败`))
+  } catch {
+    // 错误已由 request interceptor 处理
   }
 }
-
-onMounted(fetchData)
 </script>
 
 <template>
@@ -202,7 +115,7 @@ onMounted(fetchData)
             <el-button type="primary" link @click="handleStatusChange(row)">
               {{ row.status === 1 ? '停用' : '启用' }}
             </el-button>
-            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+            <el-button type="danger" link @click="handleDelete(row, 'name')">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
