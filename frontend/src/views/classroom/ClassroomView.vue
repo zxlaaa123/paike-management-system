@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import type { FormInstance } from 'element-plus'
+import { ElMessageBox, ElMessage } from 'element-plus'
 import {
   getClassroomList,
   createClassroom,
@@ -12,39 +10,7 @@ import {
   type ClassroomForm,
 } from '../../api/classroom'
 import { statusText, statusTagType } from '../../utils/status'
-import { extractMessage } from '../../utils/errors'
-
-const loading = ref(false)
-const tableData = ref<Classroom[]>([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(10)
-
-const searchForm = reactive({
-  roomName: '',
-  building: '',
-  roomType: '',
-  status: undefined as number | undefined,
-})
-
-const dialogVisible = ref(false)
-const dialogTitle = ref('')
-const formRef = ref<FormInstance>()
-const editingId = ref<number | null>(null)
-
-const form = reactive<ClassroomForm>({
-  roomName: '',
-  building: '',
-  capacity: 50,
-  roomType: 'NORMAL',
-  status: 1,
-  remark: '',
-})
-
-const rules = {
-  roomName: [{ required: true, message: '请输入教室名称', trigger: 'blur' }],
-  capacity: [{ required: true, message: '请输入教室容量', trigger: 'blur' }],
-}
+import { useCrudForm } from '../../composables/useCrudForm'
 
 const roomTypeOptions = [
   { label: '普通教室', value: 'NORMAL' },
@@ -57,90 +23,39 @@ function roomTypeLabel(type: string) {
   return roomTypeOptions.find((o) => o.value === type)?.label || type
 }
 
-async function fetchData() {
-  loading.value = true
-  try {
-    const res = await getClassroomList({
-      ...searchForm,
-      page: currentPage.value,
-      size: pageSize.value,
-    })
-    tableData.value = res.records
-    total.value = res.total
-  } finally {
-    loading.value = false
-  }
-}
+const {
+  loading,
+  tableData,
+  total,
+  currentPage,
+  pageSize,
+  searchForm,
+  dialogVisible,
+  dialogTitle,
+  formRef,
+  form,
+  fetchData,
+  handleSearch,
+  handleReset,
+  openAdd,
+  openEdit,
+  handleSubmit,
+  handleDelete,
+} = useCrudForm<Classroom, ClassroomForm>({
+  fetchList: (q) => getClassroomList(q as Parameters<typeof getClassroomList>[0]),
+  createItem: createClassroom,
+  updateItem: updateClassroom,
+  deleteItem: deleteClassroom,
+  searchDefaults: { roomName: '', building: '', roomType: '', status: undefined as number | undefined },
+  formDefaults: { roomName: '', building: '', capacity: 50, roomType: 'NORMAL', status: 1, remark: '' },
+  entityName: '教室',
+})
 
-function handleSearch() {
-  currentPage.value = 1
-  fetchData()
-}
+void formRef
 
-function handleReset() {
-  searchForm.roomName = ''
-  searchForm.building = ''
-  searchForm.roomType = ''
-  searchForm.status = undefined
-  handleSearch()
-}
-
-function openAdd() {
-  dialogTitle.value = '新增教室'
-  editingId.value = null
-  form.roomName = ''
-  form.building = ''
-  form.capacity = 50
-  form.roomType = 'NORMAL'
-  form.status = 1
-  form.remark = ''
-  dialogVisible.value = true
-}
-
-function openEdit(row: Classroom) {
-  dialogTitle.value = '编辑教室'
-  editingId.value = row.id
-  form.roomName = row.roomName
-  form.building = row.building || ''
-  form.capacity = row.capacity
-  form.roomType = row.roomType
-  form.status = row.status
-  form.remark = row.remark || ''
-  dialogVisible.value = true
-}
-
-async function handleSubmit() {
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
-  try {
-    if (editingId.value) {
-      await updateClassroom(editingId.value, form)
-      ElMessage.success('修改成功')
-    } else {
-      await createClassroom(form)
-      ElMessage.success('新增成功')
-    }
-    dialogVisible.value = false
-    fetchData()
-  } catch (_e) {
-    console.error(_e)
-    ElMessage.error('保存教室失败')
-  }
-}
-
-async function handleDelete(row: Classroom) {
-  try {
-    await ElMessageBox.confirm(`确定删除教室「${row.roomName}」吗？`, '提示', { type: 'warning' })
-  } catch {
-    return
-  }
-  try {
-    await deleteClassroom(row.id)
-    ElMessage.success('删除成功')
-    await fetchData()
-  } catch (error: unknown) {
-    ElMessage.error(extractMessage(error, '删除失败'))
-  }
+const rules = {
+  roomName: [{ required: true, message: '请输入教室名称', trigger: 'blur' }],
+  capacity: [{ required: true, message: '请输入教室容量', trigger: 'blur' }],
 }
 
 async function handleStatusChange(row: Classroom) {
@@ -154,13 +69,11 @@ async function handleStatusChange(row: Classroom) {
   try {
     await updateClassroomStatus(row.id, newStatus)
     ElMessage.success(`${action}成功`)
-    await fetchData()
-  } catch (error: unknown) {
-    ElMessage.error(extractMessage(error, `${action}失败`))
+    fetchData()
+  } catch {
+    // 错误已由 request interceptor 处理
   }
 }
-
-onMounted(fetchData)
 </script>
 
 <template>
@@ -219,7 +132,7 @@ onMounted(fetchData)
             <el-button type="primary" link @click="handleStatusChange(row)">
               {{ row.status === 1 ? '停用' : '启用' }}
             </el-button>
-            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+            <el-button type="danger" link @click="handleDelete(row, 'roomName')">删除</el-button>
           </template>
         </el-table-column>
       </el-table>

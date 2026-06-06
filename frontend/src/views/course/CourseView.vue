@@ -1,7 +1,4 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import type { FormInstance } from 'element-plus'
 import {
   getCourseList,
   createCourse,
@@ -10,41 +7,7 @@ import {
   type Course,
   type CourseForm,
 } from '../../api/course'
-import { extractMessage } from '../../utils/errors'
-
-const loading = ref(false)
-const tableData = ref<Course[]>([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(10)
-
-const searchForm = reactive({
-  courseName: '',
-  courseNo: '',
-  courseType: '',
-})
-
-const dialogVisible = ref(false)
-const dialogTitle = ref('')
-const formRef = ref<FormInstance>()
-const editingId = ref<number | null>(null)
-
-const form = reactive<CourseForm>({
-  courseNo: '',
-  courseName: '',
-  courseType: 'NORMAL',
-  courseNature: '',
-  totalHours: 48,
-  weeklyHours: 4,
-  remark: '',
-})
-
-const rules = {
-  courseNo: [{ required: true, message: '请输入课程编号', trigger: 'blur' }],
-  courseName: [{ required: true, message: '请输入课程名称', trigger: 'blur' }],
-  totalHours: [{ required: true, message: '请输入总学时', trigger: 'blur' }],
-  weeklyHours: [{ required: true, message: '请输入每周课时', trigger: 'blur' }],
-}
+import { useCrudForm } from '../../composables/useCrudForm'
 
 const courseTypeOptions = [
   { label: '普通课', value: 'NORMAL' },
@@ -57,94 +20,42 @@ function courseTypeLabel(type: string) {
   return courseTypeOptions.find((o) => o.value === type)?.label || type
 }
 
-async function fetchData() {
-  loading.value = true
-  try {
-    const res = await getCourseList({
-      ...searchForm,
-      page: currentPage.value,
-      size: pageSize.value,
-    })
-    tableData.value = res.records
-    total.value = res.total
-  } finally {
-    loading.value = false
-  }
-}
+const {
+  loading,
+  tableData,
+  total,
+  currentPage,
+  pageSize,
+  searchForm,
+  dialogVisible,
+  dialogTitle,
+  formRef,
+  form,
+  fetchData,
+  handleSearch,
+  handleReset,
+  openAdd,
+  openEdit,
+  handleSubmit,
+  handleDelete,
+} = useCrudForm<Course, CourseForm>({
+  fetchList: (q) => getCourseList(q as Parameters<typeof getCourseList>[0]),
+  createItem: createCourse,
+  updateItem: updateCourse,
+  deleteItem: deleteCourse,
+  searchDefaults: { courseName: '', courseNo: '', courseType: '' },
+  formDefaults: { courseNo: '', courseName: '', courseType: 'NORMAL', courseNature: '', totalHours: 48, weeklyHours: 4, remark: '' },
+  entityName: '课程',
+})
 
-function handleSearch() {
-  currentPage.value = 1
-  fetchData()
-}
+void formRef
 
-function handleReset() {
-  searchForm.courseName = ''
-  searchForm.courseNo = ''
-  searchForm.courseType = ''
-  handleSearch()
+const rules = {
+  courseNo: [{ required: true, message: '请输入课程编号', trigger: 'blur' }],
+  courseName: [{ required: true, message: '请输入课程名称', trigger: 'blur' }],
+  totalHours: [{ required: true, message: '请输入总学时', trigger: 'blur' }],
+  weeklyHours: [{ required: true, message: '请输入每周课时', trigger: 'blur' }],
 }
-
-function openAdd() {
-  dialogTitle.value = '新增课程'
-  editingId.value = null
-  form.courseNo = ''
-  form.courseName = ''
-  form.courseType = 'NORMAL'
-  form.courseNature = ''
-  form.totalHours = 48
-  form.weeklyHours = 4
-  form.remark = ''
-  dialogVisible.value = true
-}
-
-function openEdit(row: Course) {
-  dialogTitle.value = '编辑课程'
-  editingId.value = row.id
-  form.courseNo = row.courseNo
-  form.courseName = row.courseName
-  form.courseType = row.courseType
-  form.courseNature = row.courseNature || ''
-  form.totalHours = row.totalHours
-  form.weeklyHours = row.weeklyHours
-  form.remark = row.remark || ''
-  dialogVisible.value = true
-}
-
-async function handleSubmit() {
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
-  try {
-    if (editingId.value) {
-      await updateCourse(editingId.value, form)
-      ElMessage.success('修改成功')
-    } else {
-      await createCourse(form)
-      ElMessage.success('新增成功')
-    }
-    dialogVisible.value = false
-    fetchData()
-  } catch (_e) {
-    console.error(_e)
-    ElMessage.error('保存课程失败')
-  }
-}
-
-async function handleDelete(row: Course) {
-  try {
-    await ElMessageBox.confirm(`确定删除课程「${row.courseName}」吗？`, '提示', { type: 'warning' })
-  } catch {
-    return
-  }
-  try {
-    await deleteCourse(row.id)
-    ElMessage.success('删除成功')
-    await fetchData()
-  } catch (error: unknown) {
-    ElMessage.error(extractMessage(error, '删除失败'))
-  }
-}
-
-onMounted(fetchData)
 </script>
 
 <template>
@@ -191,7 +102,7 @@ onMounted(fetchData)
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="openEdit(row)">编辑</el-button>
-            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+            <el-button type="danger" link @click="handleDelete(row, 'courseName')">删除</el-button>
           </template>
         </el-table-column>
       </el-table>

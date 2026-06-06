@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import type { FormInstance } from 'element-plus'
+import { ElMessageBox, ElMessage } from 'element-plus'
 import {
   getClassList,
   createClass,
@@ -12,127 +10,41 @@ import {
   type ClassForm,
 } from '../../api/classInfo'
 import { statusText, statusTagType } from '../../utils/status'
-import { extractMessage } from '../../utils/errors'
+import { useCrudForm } from '../../composables/useCrudForm'
 
-const loading = ref(false)
-const tableData = ref<ClassInfo[]>([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(10)
-
-const searchForm = reactive({
-  className: '',
-  major: '',
-  grade: '',
-  status: undefined as number | undefined,
+const {
+  loading,
+  tableData,
+  total,
+  currentPage,
+  pageSize,
+  searchForm,
+  dialogVisible,
+  dialogTitle,
+  formRef,
+  form,
+  fetchData,
+  handleSearch,
+  handleReset,
+  openAdd,
+  openEdit,
+  handleSubmit,
+  handleDelete,
+} = useCrudForm<ClassInfo, ClassForm>({
+  fetchList: (q) => getClassList(q as Parameters<typeof getClassList>[0]),
+  createItem: createClass,
+  updateItem: updateClass,
+  deleteItem: deleteClass,
+  searchDefaults: { className: '', major: '', grade: '', status: undefined as number | undefined },
+  formDefaults: { className: '', major: '', grade: '', studentCount: 30, headTeacher: '', status: 1, remark: '' },
+  entityName: '班级',
 })
 
-const dialogVisible = ref(false)
-const dialogTitle = ref('')
-const formRef = ref<FormInstance>()
-const editingId = ref<number | null>(null)
-
-const form = reactive<ClassForm>({
-  className: '',
-  major: '',
-  grade: '',
-  studentCount: 30,
-  headTeacher: '',
-  status: 1,
-  remark: '',
-})
+void formRef
 
 const rules = {
   className: [{ required: true, message: '请输入班级名称', trigger: 'blur' }],
   studentCount: [{ required: true, message: '请输入班级人数', trigger: 'blur' }],
-}
-
-async function fetchData() {
-  loading.value = true
-  try {
-    const res = await getClassList({
-      ...searchForm,
-      page: currentPage.value,
-      size: pageSize.value,
-    })
-    tableData.value = res.records
-    total.value = res.total
-  } finally {
-    loading.value = false
-  }
-}
-
-function handleSearch() {
-  currentPage.value = 1
-  fetchData()
-}
-
-function handleReset() {
-  searchForm.className = ''
-  searchForm.major = ''
-  searchForm.grade = ''
-  searchForm.status = undefined
-  handleSearch()
-}
-
-function openAdd() {
-  dialogTitle.value = '新增班级'
-  editingId.value = null
-  form.className = ''
-  form.major = ''
-  form.grade = ''
-  form.studentCount = 30
-  form.headTeacher = ''
-  form.status = 1
-  form.remark = ''
-  dialogVisible.value = true
-}
-
-function openEdit(row: ClassInfo) {
-  dialogTitle.value = '编辑班级'
-  editingId.value = row.id
-  form.className = row.className
-  form.major = row.major || ''
-  form.grade = row.grade || ''
-  form.studentCount = row.studentCount
-  form.headTeacher = row.headTeacher || ''
-  form.status = row.status
-  form.remark = row.remark || ''
-  dialogVisible.value = true
-}
-
-async function handleSubmit() {
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
-  try {
-    if (editingId.value) {
-      await updateClass(editingId.value, form)
-      ElMessage.success('修改成功')
-    } else {
-      await createClass(form)
-      ElMessage.success('新增成功')
-    }
-    dialogVisible.value = false
-    fetchData()
-  } catch (_e) {
-    console.error(_e)
-    ElMessage.error('保存班级失败')
-  }
-}
-
-async function handleDelete(row: ClassInfo) {
-  try {
-    await ElMessageBox.confirm(`确定删除班级「${row.className}」吗？`, '提示', { type: 'warning' })
-  } catch {
-    return
-  }
-  try {
-    await deleteClass(row.id)
-    ElMessage.success('删除成功')
-    await fetchData()
-  } catch (error: unknown) {
-    ElMessage.error(extractMessage(error, '删除失败'))
-  }
 }
 
 async function handleStatusChange(row: ClassInfo) {
@@ -146,13 +58,11 @@ async function handleStatusChange(row: ClassInfo) {
   try {
     await updateClassStatus(row.id, newStatus)
     ElMessage.success(`${action}成功`)
-    await fetchData()
-  } catch (error: unknown) {
-    ElMessage.error(extractMessage(error, `${action}失败`))
+    fetchData()
+  } catch {
+    // 错误已由 request interceptor 处理
   }
 }
-
-onMounted(fetchData)
 </script>
 
 <template>
@@ -206,7 +116,7 @@ onMounted(fetchData)
             <el-button type="primary" link @click="handleStatusChange(row)">
               {{ row.status === 1 ? '停用' : '启用' }}
             </el-button>
-            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+            <el-button type="danger" link @click="handleDelete(row, 'className')">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
