@@ -201,6 +201,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/v5/CandidatePositionView.vue'),
       },
       {
+        path: 'v6/audit-logs',
+        name: 'V6AuditLogs',
+        component: () => import('../views/v6/AuditLogView.vue'),
+      },
+      {
         path: 'v4/schedule-analysis/:planId',
         name: 'V4ScheduleAnalysisDetail',
         component: () => import('../views/v4/ScheduleAnalysisDetail.vue'),
