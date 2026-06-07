@@ -44,9 +44,27 @@ public class V4ScheduleReplanService {
     private final SchedulePlanService schedulePlanService;
     private final ScheduleScoreService scheduleScoreService;
     private final SchedulePlanExplainService schedulePlanExplainService;
+    private final SystemAuditLogService auditLogService;
 
     @Transactional(rollbackFor = Exception.class)
     public ScheduleReplanResultVo createLocalReplanPlan(Long sourcePlanId, V4ScheduleReplanRequest request) {
+        try {
+            return createLocalReplanPlanInternal(sourcePlanId, request);
+        } catch (RuntimeException ex) {
+            SchedulePlan sourcePlan = schedulePlanMapper.selectById(sourcePlanId);
+            auditLogService.recordFailure(
+                    SystemAuditLogService.ACTION_CREATE_LOCAL_REPLAN_PLAN,
+                    SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                    sourcePlanId,
+                    sourcePlan == null ? null : sourcePlan.getSemesterId(),
+                    sourcePlanId,
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage());
+            throw ex;
+        }
+    }
+
+    private ScheduleReplanResultVo createLocalReplanPlanInternal(Long sourcePlanId, V4ScheduleReplanRequest request) {
         SchedulePlan sourcePlan = schedulePlanMapper.selectById(sourcePlanId);
         if (sourcePlan == null) {
             throw new BusinessException("来源排课方案不存在");
@@ -110,6 +128,13 @@ public class V4ScheduleReplanService {
         result.setStrategyCode(strategyCode);
         result.setMinimalMode(true);
         result.setMessage("局部重排方案已生成");
+        auditLogService.recordSuccess(
+                SystemAuditLogService.ACTION_CREATE_LOCAL_REPLAN_PLAN,
+                SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                newPlan.getId(),
+                newPlan.getSemesterId(),
+                newPlan.getId(),
+                "创建局部重排方案成功：来源方案 " + sourcePlanId + "，新方案 " + newPlan.getId());
         return result;
     }
 
