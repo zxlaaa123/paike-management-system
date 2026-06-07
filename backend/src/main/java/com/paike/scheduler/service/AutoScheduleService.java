@@ -77,7 +77,7 @@ public class AutoScheduleService {
             auditLogService.recordFailure(
                     SystemAuditLogService.ACTION_RUN_AUTO_SCHEDULE,
                     SystemAuditLogService.TARGET_AUTO_SCHEDULE_BATCH,
-                    batch == null ? null : batch.getId(),
+                    null,
                     semesterId,
                     null,
                     SystemAuditLogService.auditErrorCode(ex),
