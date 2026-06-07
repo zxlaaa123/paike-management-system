@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { House, DataLine, Calendar, Reading, PieChart, School, ArrowDown, Warning, Loading, Collection } from '@element-plus/icons-vue'
+import { House, DataLine, Calendar, Reading, PieChart, School, ArrowDown, Warning, Loading, Collection, Tickets } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
@@ -115,6 +115,13 @@ onMounted(() => {
             <span>V5 修复流程</span>
           </template>
           <el-menu-item index="/v5/repair-tasks">修复任务管理</el-menu-item>
+        </el-sub-menu>
+        <el-sub-menu index="v6-governance">
+          <template #title>
+            <el-icon><Tickets /></el-icon>
+            <span>V6 系统治理</span>
+          </template>
+          <el-menu-item index="/v6/audit-logs">审计日志</el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="analysis">
           <template #title>

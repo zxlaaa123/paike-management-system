@@ -89,10 +89,23 @@ public class V5SimulationService {
     private final V5ConsistencyCheckService consistencyCheckService;
     private final ObjectMapper objectMapper;
     private final PlatformTransactionManager transactionManager;
+    private final SystemAuditLogService auditLogService;
 
     public V5SimulationPlanDetailVo generate(Long taskId, Long suggestionId) {
-        Long simulationPlanId = runInTransaction(() -> generateInTransaction(taskId, suggestionId));
-        return detail(taskId, simulationPlanId);
+        try {
+            Long simulationPlanId = runInTransaction(() -> generateInTransaction(taskId, suggestionId));
+            return detail(taskId, simulationPlanId);
+        } catch (RuntimeException ex) {
+            auditLogService.recordFailure(
+                    SystemAuditLogService.ACTION_GENERATE_SIMULATION_PLAN,
+                    SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                    null,
+                    null,
+                    null,
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage());
+            throw ex;
+        }
     }
 
     private Long generateInTransaction(Long taskId, Long suggestionId) {
@@ -152,15 +165,34 @@ public class V5SimulationService {
         task.setFailureItemCount(0);
         task.setFinishedAt(LocalDateTime.now());
         repairTaskMapper.updateById(task);
+        auditLogService.recordSuccess(
+                SystemAuditLogService.ACTION_GENERATE_SIMULATION_PLAN,
+                SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                simulation.getId(),
+                simulation.getSemesterId(),
+                simulation.getId(),
+                "生成试算方案成功：修复任务 " + taskId + "，建议 " + suggestionId + "，方案 " + simulation.getId());
 
         return simulation.getId();
     }
 
     public V5SimulationPlanDetailVo localReplan(Long taskId, V5LocalReplanRequest request) {
-        LocalReplanResult result = runInTransaction(() -> localReplanInTransaction(taskId, request));
-        V5SimulationPlanDetailVo detail = detail(taskId, result.planId());
-        detail.setLocalReplanSummary(result.summary());
-        return detail;
+        try {
+            LocalReplanResult result = runInTransaction(() -> localReplanInTransaction(taskId, request));
+            V5SimulationPlanDetailVo detail = detail(taskId, result.planId());
+            detail.setLocalReplanSummary(result.summary());
+            return detail;
+        } catch (RuntimeException ex) {
+            auditLogService.recordFailure(
+                    SystemAuditLogService.ACTION_GENERATE_LOCAL_REPLAN_SIMULATION,
+                    SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                    null,
+                    null,
+                    null,
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage());
+            throw ex;
+        }
     }
 
     private LocalReplanResult localReplanInTransaction(Long taskId, V5LocalReplanRequest request) {
@@ -285,6 +317,13 @@ public class V5SimulationService {
         summary.setMovedItemIds(movedItemIds);
         summary.setFailedItemIds(failedItemIds);
         summary.setLogs(logs);
+        auditLogService.recordSuccess(
+                SystemAuditLogService.ACTION_GENERATE_LOCAL_REPLAN_SIMULATION,
+                SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                simulation.getId(),
+                simulation.getSemesterId(),
+                simulation.getId(),
+                "生成局部重排试算方案成功：修复任务 " + taskId + "，方案 " + simulation.getId());
 
         return new LocalReplanResult(simulation.getId(), summary);
     }
@@ -331,44 +370,65 @@ public class V5SimulationService {
 
     @Transactional(rollbackFor = Exception.class)
     public ApplyPlanResultVo apply(Long taskId, Long planId) {
-        ScheduleRepairTask task = requireTask(taskId);
-        SchedulePlan plan = requireSimulationPlan(task, planId);
-        if (!SchedulePlanStatus.SIMULATION.is(plan.getStatus()) && !SchedulePlanStatus.CONFIRMED.is(plan.getStatus())) {
-            throw new BusinessException("只有试算或已确认方案可以应用");
+        ScheduleRepairTask task = null;
+        SchedulePlan plan = null;
+        try {
+            task = requireTask(taskId);
+            plan = requireSimulationPlan(task, planId);
+            if (!SchedulePlanStatus.SIMULATION.is(plan.getStatus()) && !SchedulePlanStatus.CONFIRMED.is(plan.getStatus())) {
+                throw new BusinessException("只有试算或已确认方案可以应用");
+            }
+            // apply gate：强制后端重跑一致性校验，存在 BLOCKING 时阻止应用
+            consistencyCheckService.ensurePassBeforeApply(taskId, planId);
+            schedulePlanService.refreshPlanConflictState(planId);
+            scoreService.rescore(planMapper.selectById(planId));
+            plan = planMapper.selectById(planId);
+            SchedulePlan baseline = resolveCompareBaseline(task, plan);
+            ScheduleRiskListVo risks = riskService.getPlanRisks(plan.getId(), null, null, null);
+            ScheduleRiskListVo baselineRisks = baseline == null ? emptyRisks(null) : riskService.getPlanRisks(baseline.getId(), null, null, null);
+            ItemPair changedItem = resolveAcceptedSuggestionChange(task, plan);
+            V5SimulationCompareVo compare = buildCompare(baseline, plan, baselineRisks, risks, changedItem.before(), changedItem.after());
+            if (plan.getConflictCount() != null && plan.getConflictCount() > 0) {
+                throw new BusinessException("试算方案仍存在冲突，不能应用");
+            }
+            if (Boolean.TRUE.equals(compare.getHasNewHardConflicts())) {
+                throw new BusinessException("试算方案引入新的硬冲突，不推荐应用");
+            }
+            if (SchedulePlanStatus.SIMULATION.is(plan.getStatus())) {
+                plan.setStatus(SchedulePlanStatus.CONFIRMED.getCode());
+                plan.setUpdatedAt(LocalDateTime.now());
+                planMapper.updateById(plan);
+            }
+            ApplyPlanResultVo result = schedulePlanService.applySimulationPlan(planId);
+            plan = planMapper.selectById(planId);
+            if (plan != null && !SchedulePlanStatus.APPLIED.is(plan.getStatus())) {
+                plan.setStatus(SchedulePlanStatus.APPLIED.getCode());
+                plan.setUpdatedAt(LocalDateTime.now());
+                planMapper.updateById(plan);
+            }
+            task.setStatus(V5RepairTaskStatus.APPLIED.getCode());
+            task.setResultPlanId(planId);
+            task.setFinishedAt(LocalDateTime.now());
+            repairTaskMapper.updateById(task);
+            auditLogService.recordSuccess(
+                    SystemAuditLogService.ACTION_APPLY_SIMULATION_PLAN,
+                    SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                    planId,
+                    plan == null ? null : plan.getSemesterId(),
+                    planId,
+                    "应用试算方案成功：修复任务 " + taskId + "，方案 " + planId);
+            return result;
+        } catch (RuntimeException ex) {
+            auditLogService.recordFailure(
+                    SystemAuditLogService.ACTION_APPLY_SIMULATION_PLAN,
+                    SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                    planId,
+                    plan == null ? (task == null ? null : task.getSemesterId()) : plan.getSemesterId(),
+                    planId,
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage());
+            throw ex;
         }
-        // apply gate：强制后端重跑一致性校验，存在 BLOCKING 时阻止应用
-        consistencyCheckService.ensurePassBeforeApply(taskId, planId);
-        schedulePlanService.refreshPlanConflictState(planId);
-        scoreService.rescore(planMapper.selectById(planId));
-        plan = planMapper.selectById(planId);
-        SchedulePlan baseline = resolveCompareBaseline(task, plan);
-        ScheduleRiskListVo risks = riskService.getPlanRisks(plan.getId(), null, null, null);
-        ScheduleRiskListVo baselineRisks = baseline == null ? emptyRisks(null) : riskService.getPlanRisks(baseline.getId(), null, null, null);
-        ItemPair changedItem = resolveAcceptedSuggestionChange(task, plan);
-        V5SimulationCompareVo compare = buildCompare(baseline, plan, baselineRisks, risks, changedItem.before(), changedItem.after());
-        if (plan.getConflictCount() != null && plan.getConflictCount() > 0) {
-            throw new BusinessException("试算方案仍存在冲突，不能应用");
-        }
-        if (Boolean.TRUE.equals(compare.getHasNewHardConflicts())) {
-            throw new BusinessException("试算方案引入新的硬冲突，不推荐应用");
-        }
-        if (SchedulePlanStatus.SIMULATION.is(plan.getStatus())) {
-            plan.setStatus(SchedulePlanStatus.CONFIRMED.getCode());
-            plan.setUpdatedAt(LocalDateTime.now());
-            planMapper.updateById(plan);
-        }
-        ApplyPlanResultVo result = schedulePlanService.applySimulationPlan(planId);
-        plan = planMapper.selectById(planId);
-        if (plan != null && !SchedulePlanStatus.APPLIED.is(plan.getStatus())) {
-            plan.setStatus(SchedulePlanStatus.APPLIED.getCode());
-            plan.setUpdatedAt(LocalDateTime.now());
-            planMapper.updateById(plan);
-        }
-        task.setStatus(V5RepairTaskStatus.APPLIED.getCode());
-        task.setResultPlanId(planId);
-        task.setFinishedAt(LocalDateTime.now());
-        repairTaskMapper.updateById(task);
-        return result;
     }
 
     @Transactional(rollbackFor = Exception.class)

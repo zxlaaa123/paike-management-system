@@ -47,28 +47,43 @@ public class AutoScheduleService {
     private final SchedulingReferenceLoader referenceLoader;
     private final SemesterService semesterService;
     private final ScheduleLockGuardService lockGuardService;
+    private final SystemAuditLogService auditLogService;
 
     @Transactional(rollbackFor = Exception.class)
     public AutoScheduleResult run(AutoScheduleRequest request) {
-        Long semesterId = resolveSemesterId(request);
-        clearSchedulesIfNeeded(request, semesterId);
+        Long semesterId = null;
+        AutoScheduleBatch batch = null;
+        try {
+            semesterId = resolveSemesterId(request);
+            clearSchedulesIfNeeded(request, semesterId);
 
-        List<TeachingTask> targetTasks = loadTargetTasks(semesterId, request.getTaskIds());
-        AutoScheduleBatch batch = batchService.createBatch(
-                semesterId, targetTasks.size(), request.isClearOldAutoSchedule());
+            List<TeachingTask> targetTasks = loadTargetTasks(semesterId, request.getTaskIds());
+            batch = batchService.createBatch(
+                    semesterId, targetTasks.size(), request.isClearOldAutoSchedule());
 
-        SchedulingReferenceData refData = referenceLoader.loadForAutoSchedule();
-        RuleConfig rules = loadRuleConfig();
+            SchedulingReferenceData refData = referenceLoader.loadForAutoSchedule();
+            RuleConfig rules = loadRuleConfig();
 
-        List<TeachingTask> sortedTasks = SchedulingSupport.sortTasks(
-                targetTasks,
-                refData.unavailableCountByTeacher(),
-                refData.courseMap(),
-                refData.classMap());
+            List<TeachingTask> sortedTasks = SchedulingSupport.sortTasks(
+                    targetTasks,
+                    refData.unavailableCountByTeacher(),
+                    refData.courseMap(),
+                    refData.classMap());
 
-        ArrangeStats stats = arrangeAllTasks(sortedTasks, batch, semesterId, refData, rules);
+            ArrangeStats stats = arrangeAllTasks(sortedTasks, batch, semesterId, refData, rules);
 
-        return finalizeBatch(batch, targetTasks.size(), stats);
+            return finalizeBatch(batch, targetTasks.size(), stats);
+        } catch (RuntimeException ex) {
+            auditLogService.recordFailure(
+                    SystemAuditLogService.ACTION_RUN_AUTO_SCHEDULE,
+                    SystemAuditLogService.TARGET_AUTO_SCHEDULE_BATCH,
+                    null,
+                    semesterId,
+                    null,
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage());
+            throw ex;
+        }
     }
 
     // ========== 阶段方法 ==========
@@ -291,6 +306,13 @@ public class AutoScheduleService {
         result.setGeneratedScheduleCount(stats.generatedCount());
         result.setStatus(status);
         result.setMessage(message);
+        auditLogService.recordSuccess(
+                SystemAuditLogService.ACTION_RUN_AUTO_SCHEDULE,
+                SystemAuditLogService.TARGET_AUTO_SCHEDULE_BATCH,
+                batch.getId(),
+                batch.getSemesterId(),
+                null,
+                "自动排课批次完成：" + result.getBatchNo() + "，生成 " + result.getGeneratedScheduleCount() + " 条");
         return result;
     }
 

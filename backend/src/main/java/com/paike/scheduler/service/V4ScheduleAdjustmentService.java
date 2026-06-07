@@ -48,6 +48,7 @@ public class V4ScheduleAdjustmentService {
     private final ScheduleLockGuardService lockGuardService;
     private final TeacherUnavailableTimeService unavailableTimeService;
     private final TransactionTemplate transactionTemplate;
+    private final SystemAuditLogService auditLogService;
     private final Object adjustmentMutationMutex = new Object();
 
     public ScheduleAdjustmentCheckVo checkAdjustment(V4ScheduleAdjustmentRequest request) {
@@ -95,7 +96,31 @@ public class V4ScheduleAdjustmentService {
     }
 
     public ScheduleAdjustmentApplyVo applyAdjustment(V4ScheduleAdjustmentRequest request) {
-        return runAdjustmentMutation(() -> applyAdjustmentInternal(request));
+        try {
+            return runAdjustmentMutation(() -> {
+                ScheduleAdjustmentApplyVo result = applyAdjustmentInternal(request);
+                if (Boolean.TRUE.equals(result.getSaved())) {
+                    auditLogService.recordSuccess(
+                            SystemAuditLogService.ACTION_ADJUST_SCHEDULE,
+                            auditTargetType(request),
+                            auditTargetId(result),
+                            null,
+                            result.getPlanId(),
+                            "局部调整成功：" + result.getMessage());
+                }
+                return result;
+            });
+        } catch (RuntimeException ex) {
+            auditLogService.recordFailure(
+                    SystemAuditLogService.ACTION_ADJUST_SCHEDULE,
+                    auditTargetType(request),
+                    auditTargetId(request),
+                    null,
+                    request == null ? null : request.getPlanId(),
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage());
+            throw ex;
+        }
     }
 
     private ScheduleAdjustmentApplyVo applyAdjustmentInternal(V4ScheduleAdjustmentRequest request) {
@@ -481,6 +506,26 @@ public class V4ScheduleAdjustmentService {
         } else if (TARGET_SCHEDULE.equals(context.targetType) && context.schedule != null) {
             lockGuardService.ensureScheduleAndLinkedPlanUnlocked(context.schedule, "该课程已锁定，不能调整");
         }
+    }
+
+    private String auditTargetType(V4ScheduleAdjustmentRequest request) {
+        String targetType = request == null || request.getTargetType() == null
+                ? ""
+                : request.getTargetType().trim().toUpperCase(Locale.ROOT);
+        return TARGET_PLAN_ITEM.equals(targetType)
+                ? SystemAuditLogService.TARGET_SCHEDULE_PLAN_ITEM
+                : SystemAuditLogService.TARGET_SCHEDULE;
+    }
+
+    private Long auditTargetId(V4ScheduleAdjustmentRequest request) {
+        if (request == null) return null;
+        String targetType = request.getTargetType() == null ? "" : request.getTargetType().trim().toUpperCase(Locale.ROOT);
+        return TARGET_PLAN_ITEM.equals(targetType) ? request.getPlanItemId() : request.getScheduleId();
+    }
+
+    private Long auditTargetId(ScheduleAdjustmentApplyVo result) {
+        if (result == null) return null;
+        return result.getPlanItemId() != null ? result.getPlanItemId() : result.getScheduleId();
     }
 
     private static class AdjustmentContext {
