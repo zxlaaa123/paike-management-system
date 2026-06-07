@@ -62,7 +62,7 @@
 产出：
 
 1. 写一份调查记录，建议文件：
-   - `docs/v6/V6_12_回归测试中心现状调查.md`
+   - `docs/v6/V6_13_回归测试中心现状调查.md`
 2. 明确：
    - 已有能力
    - 缺口
@@ -194,4 +194,3 @@ npx vite build
 3. 后端启动需要显式配置 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD`、`JWT_SECRET`。
 4. 后端原则上由用户在独立 PowerShell 终端手动启动；AI 不要擅自后台启动 Spring Boot。
 5. 如果 Vite dev server 出现 `504 Outdated Optimize Dep`，优先刷新或重启前端 dev server，不要先改代码。
-

@@ -21,54 +21,34 @@ V6 接口只提供治理能力，不替代 V1-V5 业务接口。
 
 ## 二、回归测试接口
 
-### 2.1 创建回归批次
+当前状态校准（2026-06-08）：
+
+1. 不直接新增 `regression_test_run` / `regression_test_case_result`。
+2. V6 第二阶段最小可交付版复用 V5 已有 `schedule_regression_test`。
+3. 当前只提供只读查询，不提供一键运行回归测试。
+
+### 2.1 查询回归测试记录
 
 ```http
-POST /api/v6/regression/runs
-```
-
-请求：
-
-```json
-{
-  "runName": "V1-V5核心回归",
-  "versions": ["V1", "V2", "V3", "V4", "V5"]
-}
-```
-
-响应：
-
-```json
-{
-  "id": 1,
-  "status": "RUNNING"
-}
-```
-
-### 2.2 查询回归批次列表
-
-```http
-GET /api/v6/regression/runs
+GET /api/v6/regression-tests
 ```
 
 查询参数：
 
 | 参数 | 说明 |
 |---|---|
-| status | 批次状态 |
+| testStage | 测试阶段 |
+| testSuite | 测试套件 |
+| status | PASS / FAIL / BLOCKED / RUNNING |
+| semesterId | 学期 ID |
+| planId | 方案 ID |
 | page | 页码 |
 | size | 每页数量 |
 
-### 2.3 查询回归批次详情
+### 2.2 查询回归测试详情
 
 ```http
-GET /api/v6/regression/runs/{runId}
-```
-
-### 2.4 查询用例结果
-
-```http
-GET /api/v6/regression/runs/{runId}/cases
+GET /api/v6/regression-tests/{id}
 ```
 
 ## 三、数据一致性接口

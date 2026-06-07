@@ -122,6 +122,7 @@ onMounted(() => {
             <span>V6 系统治理</span>
           </template>
           <el-menu-item index="/v6/audit-logs">审计日志</el-menu-item>
+          <el-menu-item index="/v6/regression-tests">回归测试</el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="analysis">
           <template #title>
