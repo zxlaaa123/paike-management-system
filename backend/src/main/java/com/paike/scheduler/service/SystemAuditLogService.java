@@ -23,6 +23,10 @@ public class SystemAuditLogService {
     public static final String ACTION_UNLOCK_PLAN_ITEM = "UNLOCK_PLAN_ITEM";
     public static final String ACTION_LOCK_SCHEDULE = "LOCK_SCHEDULE";
     public static final String ACTION_UNLOCK_SCHEDULE = "UNLOCK_SCHEDULE";
+    public static final String ACTION_CREATE_SCHEDULE = "CREATE_SCHEDULE";
+    public static final String ACTION_DELETE_SCHEDULE = "DELETE_SCHEDULE";
+    public static final String ACTION_ADJUST_SCHEDULE = "ADJUST_SCHEDULE";
+    public static final String ACTION_APPLY_SIMULATION_PLAN = "APPLY_SIMULATION_PLAN";
     public static final String TARGET_SCHEDULE_PLAN = "SCHEDULE_PLAN";
     public static final String TARGET_SCHEDULE_PLAN_ITEM = "SCHEDULE_PLAN_ITEM";
     public static final String TARGET_SCHEDULE = "SCHEDULE";

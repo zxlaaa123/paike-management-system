@@ -54,6 +54,7 @@ public class ScheduleService {
     private final ScheduleLockGuardService lockGuardService;
     private final AutoScheduleBatchMapper autoScheduleBatchMapper;
     private final SemesterService semesterService;
+    private final SystemAuditLogService auditLogService;
 
     public Page<ScheduleVo> list(String courseName, String teacherName, String className, String roomName,
             Integer dayOfWeek, Long semesterId, int page, int size) {
@@ -96,47 +97,79 @@ public class ScheduleService {
 
     @Transactional(rollbackFor = Exception.class)
     public ScheduleVo create(Long teachingTaskId, Long timeSlotId, Long classroomId) {
-        String conflict = conflictService.checkConflict(teachingTaskId, timeSlotId, classroomId, null);
-        if (conflict != null) {
-            throw new BusinessException(400, ScheduleConflictService.stripReasonTag(conflict));
-        }
-
-        TeachingTask task = teachingTaskMapper.selectById(teachingTaskId);
-        if (task == null || Integer.valueOf(1).equals(task.getDeleted())) {
-            throw new BusinessException(400, "教学任务不存在或已删除");
-        }
-
-        Schedule schedule = new Schedule();
-        schedule.setSemesterId(task.getSemesterId());
-        schedule.setTeachingTaskId(teachingTaskId);
-        schedule.setCourseId(task.getCourseId());
-        schedule.setTeacherId(task.getTeacherId());
-        schedule.setClassId(task.getClassId());
-        schedule.setTimeSlotId(timeSlotId);
-        schedule.setClassroomId(classroomId);
-        schedule.setSourceType(ScheduleSourceType.MANUAL.getCode());
-        schedule.setDeleted(0);
-        schedule.setCreateTime(LocalDateTime.now());
-        schedule.setUpdateTime(LocalDateTime.now());
         try {
-            scheduleMapper.insert(schedule);
-        } catch (DuplicateKeyException ex) {
-            throw new BusinessException(409, "排课冲突：该时间段已有其他课程占用，请刷新后重试");
-        }
+            String conflict = conflictService.checkConflict(teachingTaskId, timeSlotId, classroomId, null);
+            if (conflict != null) {
+                throw new BusinessException(400, ScheduleConflictService.stripReasonTag(conflict));
+            }
 
-        ScheduleVo vo = ScheduleVo.fromEntity(schedule);
-        fillRelation(vo);
-        return vo;
+            TeachingTask task = teachingTaskMapper.selectById(teachingTaskId);
+            if (task == null || Integer.valueOf(1).equals(task.getDeleted())) {
+                throw new BusinessException(400, "教学任务不存在或已删除");
+            }
+
+            Schedule schedule = new Schedule();
+            schedule.setSemesterId(task.getSemesterId());
+            schedule.setTeachingTaskId(teachingTaskId);
+            schedule.setCourseId(task.getCourseId());
+            schedule.setTeacherId(task.getTeacherId());
+            schedule.setClassId(task.getClassId());
+            schedule.setTimeSlotId(timeSlotId);
+            schedule.setClassroomId(classroomId);
+            schedule.setSourceType(ScheduleSourceType.MANUAL.getCode());
+            schedule.setDeleted(0);
+            schedule.setCreateTime(LocalDateTime.now());
+            schedule.setUpdateTime(LocalDateTime.now());
+            scheduleMapper.insert(schedule);
+
+            auditLogService.recordSuccess(
+                    SystemAuditLogService.ACTION_CREATE_SCHEDULE,
+                    SystemAuditLogService.TARGET_SCHEDULE,
+                    schedule.getId(),
+                    schedule.getSemesterId(),
+                    schedule.getPlanId(),
+                    "手动排课成功：教学任务 " + teachingTaskId + "，时间段 " + timeSlotId + "，教室 " + classroomId);
+            ScheduleVo vo = ScheduleVo.fromEntity(schedule);
+            fillRelation(vo);
+            return vo;
+        } catch (DuplicateKeyException ex) {
+            recordScheduleFailure(SystemAuditLogService.ACTION_CREATE_SCHEDULE, null, teachingTaskId,
+                    "DUPLICATE_SCHEDULE", "排课冲突：该时间段已有其他课程占用，请刷新后重试");
+            throw new BusinessException(409, "排课冲突：该时间段已有其他课程占用，请刷新后重试");
+        } catch (RuntimeException ex) {
+            recordScheduleFailure(SystemAuditLogService.ACTION_CREATE_SCHEDULE, null, teachingTaskId,
+                    auditErrorCode(ex), ex.getMessage());
+            throw ex;
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         Schedule schedule = scheduleMapper.selectById(id);
-        if (schedule == null || Integer.valueOf(1).equals(schedule.getDeleted())) {
-            throw new BusinessException(404, "排课记录不存在");
+        try {
+            if (schedule == null || Integer.valueOf(1).equals(schedule.getDeleted())) {
+                throw new BusinessException(404, "排课记录不存在");
+            }
+            lockGuardService.ensureScheduleAndLinkedPlanUnlocked(schedule, "该课程已锁定，不能删除");
+            scheduleMapper.deleteById(id);
+            auditLogService.recordSuccess(
+                    SystemAuditLogService.ACTION_DELETE_SCHEDULE,
+                    SystemAuditLogService.TARGET_SCHEDULE,
+                    schedule.getId(),
+                    schedule.getSemesterId(),
+                    schedule.getPlanId(),
+                    "删除手动排课记录：" + schedule.getId());
+        } catch (RuntimeException ex) {
+            auditLogService.recordFailure(
+                    SystemAuditLogService.ACTION_DELETE_SCHEDULE,
+                    SystemAuditLogService.TARGET_SCHEDULE,
+                    id,
+                    schedule == null ? null : schedule.getSemesterId(),
+                    schedule == null ? null : schedule.getPlanId(),
+                    auditErrorCode(ex),
+                    ex.getMessage());
+            throw ex;
         }
-        lockGuardService.ensureScheduleAndLinkedPlanUnlocked(schedule, "该课程已锁定，不能删除");
-        scheduleMapper.deleteById(id);
     }
 
     /** 按班级查询排课列表 */
@@ -280,5 +313,20 @@ public class ScheduleService {
 
     private void fillRelation(ScheduleVo vo) {
         fillRelations(List.of(vo));
+    }
+
+    private void recordScheduleFailure(String actionType, Long scheduleId, Long teachingTaskId,
+                                       String errorCode, String errorMessage) {
+        Long semesterId = null;
+        if (teachingTaskId != null) {
+            TeachingTask task = teachingTaskMapper.selectById(teachingTaskId);
+            semesterId = task == null ? null : task.getSemesterId();
+        }
+        auditLogService.recordFailure(actionType, SystemAuditLogService.TARGET_SCHEDULE, scheduleId,
+                semesterId, null, errorCode, errorMessage);
+    }
+
+    private String auditErrorCode(RuntimeException ex) {
+        return ex instanceof BusinessException ? "BUSINESS_ERROR" : "SYSTEM_ERROR";
     }
 }
