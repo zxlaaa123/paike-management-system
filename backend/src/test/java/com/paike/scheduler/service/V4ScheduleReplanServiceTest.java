@@ -39,6 +39,7 @@ class V4ScheduleReplanServiceTest {
     private SchedulePlanService schedulePlanService;
     private ScheduleScoreService scheduleScoreService;
     private SchedulePlanExplainService schedulePlanExplainService;
+    private SystemAuditLogService auditLogService;
     private V4ScheduleReplanService service;
 
     @BeforeEach
@@ -50,6 +51,7 @@ class V4ScheduleReplanServiceTest {
         schedulePlanService = mock(SchedulePlanService.class);
         scheduleScoreService = mock(ScheduleScoreService.class);
         schedulePlanExplainService = mock(SchedulePlanExplainService.class);
+        auditLogService = mock(SystemAuditLogService.class);
         service = new V4ScheduleReplanService(
                 schedulePlanMapper,
                 schedulePlanItemMapper,
@@ -57,7 +59,8 @@ class V4ScheduleReplanServiceTest {
                 scheduleUnassignedTaskMapper,
                 schedulePlanService,
                 scheduleScoreService,
-                schedulePlanExplainService);
+                schedulePlanExplainService,
+                auditLogService);
     }
 
     @Test
@@ -74,6 +77,14 @@ class V4ScheduleReplanServiceTest {
         verify(schedulePlanMapper, never()).insert(any(SchedulePlan.class));
         verifyNoInteractions(scheduleLockedItemMapper, scheduleUnassignedTaskMapper, schedulePlanService,
                 scheduleScoreService, schedulePlanExplainService);
+        verify(auditLogService).recordFailure(
+                SystemAuditLogService.ACTION_CREATE_LOCAL_REPLAN_PLAN,
+                SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                10L,
+                1L,
+                10L,
+                SystemAuditLogService.ERROR_BUSINESS,
+                "V5 修复约束：锁定课程不可移动，局部重排必须保留锁定项");
     }
 
     @Test
@@ -107,6 +118,13 @@ class V4ScheduleReplanServiceTest {
         assertEquals(20L, lockCaptor.getValue().getPlanId());
         assertEquals(201L, lockCaptor.getValue().getPlanItemId());
         assertEquals(1, lockCaptor.getValue().getActiveFlag());
+        verify(auditLogService).recordSuccess(
+                SystemAuditLogService.ACTION_CREATE_LOCAL_REPLAN_PLAN,
+                SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                20L,
+                1L,
+                20L,
+                "创建局部重排方案成功：来源方案 10，新方案 20");
     }
 
     private SchedulePlan sourcePlan() {

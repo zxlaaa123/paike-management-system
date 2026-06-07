@@ -14,6 +14,7 @@ import com.paike.scheduler.mapper.ScheduleRepairSuggestionMapper;
 import com.paike.scheduler.mapper.ScheduleRepairTaskMapper;
 import com.paike.scheduler.mapper.ScheduleScoreDetailMapper;
 import com.paike.scheduler.mapper.TimeSlotMapper;
+import com.paike.scheduler.service.dto.V5LocalReplanRequest;
 import com.paike.scheduler.service.vo.ApplyPlanResultVo;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -85,6 +86,50 @@ class V5SimulationServiceAuditTest {
                 eq(20L),
                 eq(null),
                 eq(20L),
+                eq(SystemAuditLogService.ERROR_BUSINESS),
+                any());
+    }
+
+    @Test
+    void generate_recordsFailureAuditWhenTaskMissing() {
+        ScheduleRepairTaskMapper repairTaskMapper = mock(ScheduleRepairTaskMapper.class);
+        ScheduleRepairSuggestionMapper suggestionMapper = mock(ScheduleRepairSuggestionMapper.class);
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SchedulePlanService schedulePlanService = mock(SchedulePlanService.class);
+        SystemAuditLogService auditLogService = mock(SystemAuditLogService.class);
+        V5SimulationService service = newService(
+                repairTaskMapper, suggestionMapper, planMapper, schedulePlanService, auditLogService);
+
+        assertThrows(RuntimeException.class, () -> service.generate(10L, 30L));
+
+        verify(auditLogService).recordFailure(
+                eq(SystemAuditLogService.ACTION_GENERATE_SIMULATION_PLAN),
+                eq(SystemAuditLogService.TARGET_SCHEDULE_PLAN),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(SystemAuditLogService.ERROR_BUSINESS),
+                any());
+    }
+
+    @Test
+    void localReplan_recordsFailureAuditWhenTaskMissing() {
+        ScheduleRepairTaskMapper repairTaskMapper = mock(ScheduleRepairTaskMapper.class);
+        ScheduleRepairSuggestionMapper suggestionMapper = mock(ScheduleRepairSuggestionMapper.class);
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SchedulePlanService schedulePlanService = mock(SchedulePlanService.class);
+        SystemAuditLogService auditLogService = mock(SystemAuditLogService.class);
+        V5SimulationService service = newService(
+                repairTaskMapper, suggestionMapper, planMapper, schedulePlanService, auditLogService);
+
+        assertThrows(RuntimeException.class, () -> service.localReplan(10L, new V5LocalReplanRequest()));
+
+        verify(auditLogService).recordFailure(
+                eq(SystemAuditLogService.ACTION_GENERATE_LOCAL_REPLAN_SIMULATION),
+                eq(SystemAuditLogService.TARGET_SCHEDULE_PLAN),
+                eq(null),
+                eq(null),
+                eq(null),
                 eq(SystemAuditLogService.ERROR_BUSINESS),
                 any());
     }

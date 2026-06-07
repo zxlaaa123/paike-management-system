@@ -28,11 +28,16 @@ public class SystemAuditLogService {
     public static final String ACTION_DELETE_SCHEDULE = "DELETE_SCHEDULE";
     public static final String ACTION_ADJUST_SCHEDULE = "ADJUST_SCHEDULE";
     public static final String ACTION_APPLY_SIMULATION_PLAN = "APPLY_SIMULATION_PLAN";
+    public static final String ACTION_CREATE_LOCAL_REPLAN_PLAN = "CREATE_LOCAL_REPLAN_PLAN";
+    public static final String ACTION_GENERATE_SIMULATION_PLAN = "GENERATE_SIMULATION_PLAN";
+    public static final String ACTION_GENERATE_LOCAL_REPLAN_SIMULATION = "GENERATE_LOCAL_REPLAN_SIMULATION";
+    public static final String ACTION_RUN_AUTO_SCHEDULE = "RUN_AUTO_SCHEDULE";
     public static final String ERROR_BUSINESS = "BUSINESS_ERROR";
     public static final String ERROR_SYSTEM = "SYSTEM_ERROR";
     public static final String TARGET_SCHEDULE_PLAN = "SCHEDULE_PLAN";
     public static final String TARGET_SCHEDULE_PLAN_ITEM = "SCHEDULE_PLAN_ITEM";
     public static final String TARGET_SCHEDULE = "SCHEDULE";
+    public static final String TARGET_AUTO_SCHEDULE_BATCH = "AUTO_SCHEDULE_BATCH";
 
     private final SystemAuditLogMapper auditLogMapper;
 

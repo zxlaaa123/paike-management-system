@@ -92,8 +92,20 @@ public class V5SimulationService {
     private final SystemAuditLogService auditLogService;
 
     public V5SimulationPlanDetailVo generate(Long taskId, Long suggestionId) {
-        Long simulationPlanId = runInTransaction(() -> generateInTransaction(taskId, suggestionId));
-        return detail(taskId, simulationPlanId);
+        try {
+            Long simulationPlanId = runInTransaction(() -> generateInTransaction(taskId, suggestionId));
+            return detail(taskId, simulationPlanId);
+        } catch (RuntimeException ex) {
+            auditLogService.recordFailure(
+                    SystemAuditLogService.ACTION_GENERATE_SIMULATION_PLAN,
+                    SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                    null,
+                    null,
+                    null,
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage());
+            throw ex;
+        }
     }
 
     private Long generateInTransaction(Long taskId, Long suggestionId) {
@@ -153,15 +165,34 @@ public class V5SimulationService {
         task.setFailureItemCount(0);
         task.setFinishedAt(LocalDateTime.now());
         repairTaskMapper.updateById(task);
+        auditLogService.recordSuccess(
+                SystemAuditLogService.ACTION_GENERATE_SIMULATION_PLAN,
+                SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                simulation.getId(),
+                simulation.getSemesterId(),
+                simulation.getId(),
+                "生成试算方案成功：修复任务 " + taskId + "，建议 " + suggestionId + "，方案 " + simulation.getId());
 
         return simulation.getId();
     }
 
     public V5SimulationPlanDetailVo localReplan(Long taskId, V5LocalReplanRequest request) {
-        LocalReplanResult result = runInTransaction(() -> localReplanInTransaction(taskId, request));
-        V5SimulationPlanDetailVo detail = detail(taskId, result.planId());
-        detail.setLocalReplanSummary(result.summary());
-        return detail;
+        try {
+            LocalReplanResult result = runInTransaction(() -> localReplanInTransaction(taskId, request));
+            V5SimulationPlanDetailVo detail = detail(taskId, result.planId());
+            detail.setLocalReplanSummary(result.summary());
+            return detail;
+        } catch (RuntimeException ex) {
+            auditLogService.recordFailure(
+                    SystemAuditLogService.ACTION_GENERATE_LOCAL_REPLAN_SIMULATION,
+                    SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                    null,
+                    null,
+                    null,
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage());
+            throw ex;
+        }
     }
 
     private LocalReplanResult localReplanInTransaction(Long taskId, V5LocalReplanRequest request) {
@@ -286,6 +317,13 @@ public class V5SimulationService {
         summary.setMovedItemIds(movedItemIds);
         summary.setFailedItemIds(failedItemIds);
         summary.setLogs(logs);
+        auditLogService.recordSuccess(
+                SystemAuditLogService.ACTION_GENERATE_LOCAL_REPLAN_SIMULATION,
+                SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                simulation.getId(),
+                simulation.getSemesterId(),
+                simulation.getId(),
+                "生成局部重排试算方案成功：修复任务 " + taskId + "，方案 " + simulation.getId());
 
         return new LocalReplanResult(simulation.getId(), summary);
     }
