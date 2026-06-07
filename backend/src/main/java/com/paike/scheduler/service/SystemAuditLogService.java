@@ -2,6 +2,7 @@ package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.auth.AuthUserContext;
 import com.paike.scheduler.entity.SysUser;
 import com.paike.scheduler.entity.SystemAuditLog;
@@ -23,11 +24,21 @@ public class SystemAuditLogService {
     public static final String ACTION_UNLOCK_PLAN_ITEM = "UNLOCK_PLAN_ITEM";
     public static final String ACTION_LOCK_SCHEDULE = "LOCK_SCHEDULE";
     public static final String ACTION_UNLOCK_SCHEDULE = "UNLOCK_SCHEDULE";
+    public static final String ACTION_CREATE_SCHEDULE = "CREATE_SCHEDULE";
+    public static final String ACTION_DELETE_SCHEDULE = "DELETE_SCHEDULE";
+    public static final String ACTION_ADJUST_SCHEDULE = "ADJUST_SCHEDULE";
+    public static final String ACTION_APPLY_SIMULATION_PLAN = "APPLY_SIMULATION_PLAN";
+    public static final String ERROR_BUSINESS = "BUSINESS_ERROR";
+    public static final String ERROR_SYSTEM = "SYSTEM_ERROR";
     public static final String TARGET_SCHEDULE_PLAN = "SCHEDULE_PLAN";
     public static final String TARGET_SCHEDULE_PLAN_ITEM = "SCHEDULE_PLAN_ITEM";
     public static final String TARGET_SCHEDULE = "SCHEDULE";
 
     private final SystemAuditLogMapper auditLogMapper;
+
+    public static String auditErrorCode(RuntimeException ex) {
+        return ex instanceof BusinessException ? ERROR_BUSINESS : ERROR_SYSTEM;
+    }
 
     public Page<SystemAuditLog> list(String actionType, Long semesterId, Long planId, Boolean success,
                                      int page, int size) {

@@ -15,6 +15,7 @@ import com.paike.scheduler.service.ScheduleConflictService;
 import com.paike.scheduler.service.ScheduleLockGuardService;
 import com.paike.scheduler.service.ScheduleService;
 import com.paike.scheduler.service.SemesterService;
+import com.paike.scheduler.service.SystemAuditLogService;
 import org.junit.jupiter.api.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -40,7 +41,8 @@ class ScheduleControllerTest {
                 mock(ScheduleConflictService.class),
                 mock(ScheduleLockGuardService.class),
                 mock(AutoScheduleBatchMapper.class),
-                semesterService);
+                semesterService,
+                mock(SystemAuditLogService.class));
         Semester semester = new Semester();
         semester.setId(8L);
         when(semesterService.getCurrentSemester()).thenReturn(semester);
