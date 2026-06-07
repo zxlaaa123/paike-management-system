@@ -138,7 +138,7 @@ public class ScheduleService {
             throw new BusinessException(409, "排课冲突：该时间段已有其他课程占用，请刷新后重试");
         } catch (RuntimeException ex) {
             recordScheduleFailure(SystemAuditLogService.ACTION_CREATE_SCHEDULE, null, teachingTaskId,
-                    auditErrorCode(ex), ex.getMessage());
+                    SystemAuditLogService.auditErrorCode(ex), ex.getMessage());
             throw ex;
         }
     }
@@ -166,7 +166,7 @@ public class ScheduleService {
                     id,
                     schedule == null ? null : schedule.getSemesterId(),
                     schedule == null ? null : schedule.getPlanId(),
-                    auditErrorCode(ex),
+                    SystemAuditLogService.auditErrorCode(ex),
                     ex.getMessage());
             throw ex;
         }
@@ -324,9 +324,5 @@ public class ScheduleService {
         }
         auditLogService.recordFailure(actionType, SystemAuditLogService.TARGET_SCHEDULE, scheduleId,
                 semesterId, null, errorCode, errorMessage);
-    }
-
-    private String auditErrorCode(RuntimeException ex) {
-        return ex instanceof BusinessException ? "BUSINESS_ERROR" : "SYSTEM_ERROR";
     }
 }

@@ -387,7 +387,7 @@ public class V5SimulationService {
                     planId,
                     plan == null ? (task == null ? null : task.getSemesterId()) : plan.getSemesterId(),
                     planId,
-                    auditErrorCode(ex),
+                    SystemAuditLogService.auditErrorCode(ex),
                     ex.getMessage());
             throw ex;
         }
@@ -725,10 +725,6 @@ public class V5SimulationService {
 
     private int nullSafe(Integer value) {
         return value == null ? Integer.MAX_VALUE : value;
-    }
-
-    private String auditErrorCode(RuntimeException ex) {
-        return ex instanceof BusinessException ? "BUSINESS_ERROR" : "SYSTEM_ERROR";
     }
 
     private Map<Long, Long> copyItems(SchedulePlan simulation, List<SchedulePlanItem> sourceItems) {

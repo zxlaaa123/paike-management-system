@@ -97,17 +97,19 @@ public class V4ScheduleAdjustmentService {
 
     public ScheduleAdjustmentApplyVo applyAdjustment(V4ScheduleAdjustmentRequest request) {
         try {
-            ScheduleAdjustmentApplyVo result = runAdjustmentMutation(() -> applyAdjustmentInternal(request));
-            if (Boolean.TRUE.equals(result.getSaved())) {
-                auditLogService.recordSuccess(
-                        SystemAuditLogService.ACTION_ADJUST_SCHEDULE,
-                        auditTargetType(request),
-                        auditTargetId(result),
-                        null,
-                        result.getPlanId(),
-                        "局部调整成功：" + result.getMessage());
-            }
-            return result;
+            return runAdjustmentMutation(() -> {
+                ScheduleAdjustmentApplyVo result = applyAdjustmentInternal(request);
+                if (Boolean.TRUE.equals(result.getSaved())) {
+                    auditLogService.recordSuccess(
+                            SystemAuditLogService.ACTION_ADJUST_SCHEDULE,
+                            auditTargetType(request),
+                            auditTargetId(result),
+                            null,
+                            result.getPlanId(),
+                            "局部调整成功：" + result.getMessage());
+                }
+                return result;
+            });
         } catch (RuntimeException ex) {
             auditLogService.recordFailure(
                     SystemAuditLogService.ACTION_ADJUST_SCHEDULE,
@@ -115,7 +117,7 @@ public class V4ScheduleAdjustmentService {
                     auditTargetId(request),
                     null,
                     request == null ? null : request.getPlanId(),
-                    auditErrorCode(ex),
+                    SystemAuditLogService.auditErrorCode(ex),
                     ex.getMessage());
             throw ex;
         }
@@ -524,10 +526,6 @@ public class V4ScheduleAdjustmentService {
     private Long auditTargetId(ScheduleAdjustmentApplyVo result) {
         if (result == null) return null;
         return result.getPlanItemId() != null ? result.getPlanItemId() : result.getScheduleId();
-    }
-
-    private String auditErrorCode(RuntimeException ex) {
-        return ex instanceof BusinessException ? "BUSINESS_ERROR" : "SYSTEM_ERROR";
     }
 
     private static class AdjustmentContext {

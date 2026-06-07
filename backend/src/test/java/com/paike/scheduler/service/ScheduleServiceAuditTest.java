@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -63,6 +64,51 @@ class ScheduleServiceAuditTest {
     }
 
     @Test
+    void delete_recordsSuccessAuditAfterScheduleDeleted() {
+        ScheduleMapper scheduleMapper = mock(ScheduleMapper.class);
+        TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
+        SystemAuditLogService auditLogService = mock(SystemAuditLogService.class);
+        ScheduleService service = newService(scheduleMapper, teachingTaskMapper, mock(TimeSlotMapper.class),
+                mock(ClassroomMapper.class), mock(ScheduleConflictService.class), auditLogService);
+        Schedule schedule = new Schedule();
+        schedule.setId(99L);
+        schedule.setSemesterId(3L);
+        schedule.setPlanId(7L);
+        schedule.setDeleted(0);
+        when(scheduleMapper.selectById(99L)).thenReturn(schedule);
+
+        service.delete(99L);
+
+        verify(auditLogService).recordSuccess(
+                eq(SystemAuditLogService.ACTION_DELETE_SCHEDULE),
+                eq(SystemAuditLogService.TARGET_SCHEDULE),
+                eq(99L),
+                eq(3L),
+                eq(7L),
+                any());
+    }
+
+    @Test
+    void delete_recordsFailureAuditWhenScheduleMissing() {
+        ScheduleMapper scheduleMapper = mock(ScheduleMapper.class);
+        TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
+        SystemAuditLogService auditLogService = mock(SystemAuditLogService.class);
+        ScheduleService service = newService(scheduleMapper, teachingTaskMapper, mock(TimeSlotMapper.class),
+                mock(ClassroomMapper.class), mock(ScheduleConflictService.class), auditLogService);
+
+        assertThrows(RuntimeException.class, () -> service.delete(99L));
+
+        verify(auditLogService).recordFailure(
+                eq(SystemAuditLogService.ACTION_DELETE_SCHEDULE),
+                eq(SystemAuditLogService.TARGET_SCHEDULE),
+                eq(99L),
+                eq(null),
+                eq(null),
+                eq(SystemAuditLogService.ERROR_BUSINESS),
+                any());
+    }
+
+    @Test
     void create_recordsFailureAuditWhenConflictRejected() {
         ScheduleMapper scheduleMapper = mock(ScheduleMapper.class);
         TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
@@ -87,7 +133,7 @@ class ScheduleServiceAuditTest {
                 eq(null),
                 eq(3L),
                 eq(null),
-                eq("BUSINESS_ERROR"),
+                eq(SystemAuditLogService.ERROR_BUSINESS),
                 any());
     }
 
