@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 重点覆盖（蓝图 §1.4 / §3.1 的坑）：
  * - {@code dailyPeriods} 动态键对象（{"1":3,...}）——TeacherWorkloadVo / ClassBalanceVo 均保留 Map；
  * - {@code courseCount} 是去重后的 size（Integer），不是 Set；
- * - {@code maxContinuousPeriods} 历史恒 0（占位字段）仍保留——TeacherWorkloadVo 10 字段；
+ * - {@code maxContinuousPeriods} 字段仍保留——TeacherWorkloadVo 10 字段；
  * - {@code dailyPeriods} 在 ClassBalanceVo 中保留——12 字段；
  * - PlanOverviewVo 17 字段：有方案 / 无方案（best/applied 块 null）两态都验；
  * - DashboardStatsVo 嵌套 PlanOverviewVo。

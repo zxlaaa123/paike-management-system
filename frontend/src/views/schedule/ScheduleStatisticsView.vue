@@ -242,7 +242,7 @@ onMounted(async () => {
 
           <!-- 教师工作量 Tab -->
           <el-tab-pane label="教师工作量" name="workload">
-            <div class="summary-note">统计每位教师的周课时总数、每日最大课时、课程数和班级数。</div>
+            <div class="summary-note">统计每位教师的周课时总数、每日最大课时、最长连续大节、课程数和班级数。</div>
             <el-table :data="workloadData" stripe size="small">
               <el-table-column prop="teacherName" label="教师" width="120" />
               <el-table-column prop="department" label="院系" width="120" />
@@ -251,6 +251,9 @@ onMounted(async () => {
               </el-table-column>
               <el-table-column label="日最大课时" width="100" align="center">
                 <template #default="{ row }"><span>{{ row.maxDailyPeriods }}</span> 节</template>
+              </el-table-column>
+              <el-table-column label="最长连续" width="100" align="center">
+                <template #default="{ row }"><span>{{ row.maxContinuousPeriods }}</span> 大节</template>
               </el-table-column>
               <el-table-column prop="courseCount" label="课程数" width="80" align="center" />
               <el-table-column prop="classCount" label="班级数" width="80" align="center" />
