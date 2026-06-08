@@ -226,6 +226,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/v6/MigrationStatusView.vue'),
       },
       {
+        path: 'v6/error-codes',
+        name: 'V6ErrorCodes',
+        component: () => import('../views/v6/ErrorCodeView.vue'),
+      },
+      {
         path: 'v4/schedule-analysis/:planId',
         name: 'V4ScheduleAnalysisDetail',
         component: () => import('../views/v4/ScheduleAnalysisDetail.vue'),

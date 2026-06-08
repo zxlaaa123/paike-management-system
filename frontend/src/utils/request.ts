@@ -38,6 +38,11 @@ function handleBusinessUnauthorized(code?: number) {
   return false
 }
 
+function formatErrorMessage(message?: string, code?: number) {
+  const fallback = message || '请求失败'
+  return typeof code === 'number' ? `[${code}] ${fallback}` : fallback
+}
+
 async function parseJsonBlob(data: Blob): Promise<Partial<ApiResponse> | null> {
   try {
     const text = await data.text()
@@ -69,8 +74,9 @@ request.interceptors.response.use(
         if (handleBusinessUnauthorized(payload.code)) {
           return Promise.reject(new Error(payload.message))
         }
-        ElMessage.error(payload.message)
-        return Promise.reject(new Error(payload.message))
+        const message = formatErrorMessage(payload.message, payload.code)
+        ElMessage.error(message)
+        return Promise.reject(new Error(message))
       }
       return response
     }
@@ -79,8 +85,9 @@ request.interceptors.response.use(
       if (handleBusinessUnauthorized(payload.code)) {
         return Promise.reject(new Error(payload.message || '未登录或登录已过期'))
       }
-      ElMessage.error(payload.message || '请求失败')
-      return Promise.reject(new Error(payload.message || '请求失败'))
+      const message = formatErrorMessage(payload.message, payload.code)
+      ElMessage.error(message)
+      return Promise.reject(new Error(message))
     }
     return response
   },
@@ -94,7 +101,10 @@ request.interceptors.response.use(
       return Promise.reject(error)
     }
     const blobMessage = blobPayload?.message
-    const message = blobMessage || error?.response?.data?.message || error?.message || '网络异常'
+    const message = formatErrorMessage(
+      blobMessage || error?.response?.data?.message || error?.message || '网络异常',
+      blobPayload?.code || error?.response?.data?.code,
+    )
     ElMessage.error(message)
     return Promise.reject(error)
   },
