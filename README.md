@@ -2,7 +2,7 @@
 
 基于 Spring Boot 3、Vue 3、MyBatis Plus、MySQL 的高校排课管理系统。
 
-当前 `main` 已完成 V1-V5 功能与 V5 阶段 11 验收、bug 审计修复（登录安全、CSRF、排课并发冲突、学期唯一性、P3 前端鲁棒性等），以及 M-13~M-19 架构收口系列（Controller 服务边界、Map\<String,Object\> → VO、课表导出职责分离、Entity view 字段 → VO、Mapper 契约收敛、全局工具抽取等），后端 74 个测试全部通过。
+当前 `main` 已完成 V1-V7。V6 已收口系统治理能力（审计日志、回归测试中心、一致性检查、性能基线、迁移状态、错误码中心），V7 已完成统计与展示补全、首页治理摘要、性能趋势和 E2E Cookie 认证统一，并完成总体验收。
 
 ## 当前状态
 
@@ -11,7 +11,7 @@
 - 包管理：前端使用 npm，提交 `frontend/package-lock.json`。不要提交 `frontend/pnpm-lock.yaml`，除非项目明确切换到 pnpm。
 - 默认后端端口：`8090`。
 - 默认前端端口：`5173`。
-- 验收状态：后端 74 测试通过、API 冒烟、Playwright E2E、前端构建均已通过。
+- 验收状态：后端全量测试、前端类型检查、前端构建、V6 smoke、旧 stage E2E Cookie 认证回归均已通过。
 
 ## 功能范围
 
@@ -20,6 +20,8 @@
 - V3：学期管理、排课方案、多方案生成、评分明细、方案对比、方案应用、历史回滚、排课日志。
 - V4：排课质量分析、风险诊断、图表、局部调整、课程锁定、报告导出、AI 辅助分析。
 - V5：智能修复建议、候选位置推荐、试算方案、局部重排、优化前后对比、一致性检查、AI 修复解释、最终回归验收。
+- V6：系统治理中心，包括审计日志、回归测试中心、一致性检查、性能基线、迁移状态和错误码中心。
+- V7：统计与展示补全，包括方案展示字段补齐、教师连续节次统计、首页治理摘要、性能趋势、E2E Cookie 认证统一和总体验收。
 
 ## 目录结构
 
@@ -207,28 +209,30 @@ cd D:\paike
 npx playwright install chromium
 ```
 
-当前 V5 阶段 11 与 M-13~M-19 架构收口已验证通过：
+当前 V7 总体验收已验证通过：
 
 ```powershell
-cd D:\paike
-npm run smoke:api
-npx playwright test tests/stage6.spec.ts tests/stage7.spec.ts tests/stage9.spec.ts --reporter=line
-
-cd D:\paike\frontend
-npm run build
-
 cd D:\paike\backend
+$env:DB_URL="jdbc:mysql://127.0.0.1:3306/paike?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai"
 $env:JWT_SECRET="dev_local_secret_please_change_32_chars_minimum"
 $env:DB_USERNAME="root"
 $env:DB_PASSWORD="你的MySQL密码"
-mvn test
+mvn -q test
+
+cd D:\paike\frontend
+npx vue-tsc -b
+npx vite build
+
+cd D:\paike
+npm run test:v6
+npx playwright test tests/stage9.spec.ts --reporter=line
 ```
 
-说明：E2E 页面用例会复用 API 登录拿到的 token，避免连续 UI 登录触发后端登录限流。
+说明：E2E 页面用例统一使用 API 登录后拿到的 `paike_token` 与 `XSRF-TOKEN` Cookie，不再向 `localStorage` 注入旧 token。运行 Playwright 前需按本文启动后端 `8090` 和前端 `5173`。
 
 ## 安全与部署注意
 
-- JWT 使用 httpOnly Cookie；前端只把 localStorage token 作为兼容标志，不作为权威登录判断。
+- JWT 使用 httpOnly Cookie；浏览器鉴权以 `paike_token` Cookie 为准，不再依赖 `localStorage` token。
 - Cookie 登录下，POST、PUT、DELETE、PATCH 请求需要 `X-CSRF-Token`。
 - CORS origin 通过 `CORS_ALLOWED_ORIGINS` 配置，不要在生产中使用不受控的通配配置。
 - 正式课表写入路径已事务化，冲突检测仍以前端预检 + 后端保存时二次校验 + 数据库唯一约束兜底。
@@ -275,6 +279,8 @@ $env:DB_PASSWORD="你的MySQL密码"
 - `docs/v3/`
 - `docs/v4/`
 - `docs/v5/`
+- `docs/v6/`
+- `docs/v7/`
 - `claude-opus-4.7-bug验证报告.md`
 - `claude-opus-4.7-bug修复建议.md`
 
