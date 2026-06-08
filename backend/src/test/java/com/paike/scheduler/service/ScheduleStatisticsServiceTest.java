@@ -8,11 +8,14 @@ import com.paike.scheduler.entity.Teacher;
 import com.paike.scheduler.entity.TimeSlot;
 import com.paike.scheduler.mapper.ClassInfoMapper;
 import com.paike.scheduler.mapper.ClassroomMapper;
+import com.paike.scheduler.mapper.CourseMapper;
 import com.paike.scheduler.mapper.ScheduleMapper;
 import com.paike.scheduler.mapper.SchedulePlanItemMapper;
 import com.paike.scheduler.mapper.SchedulePlanMapper;
 import com.paike.scheduler.mapper.TeacherMapper;
+import com.paike.scheduler.mapper.TeachingTaskMapper;
 import com.paike.scheduler.mapper.TimeSlotMapper;
+import com.paike.scheduler.service.vo.DashboardStatsVo;
 import com.paike.scheduler.service.vo.TeacherWorkloadVo;
 import org.junit.jupiter.api.Test;
 
@@ -91,6 +94,54 @@ class ScheduleStatisticsServiceTest {
         assertEquals(3, workload.getMaxContinuousPeriods());
     }
 
+    @Test
+    void dashboardStats_includesCurrentSemesterGovernanceSummary() {
+        ScheduleMapper scheduleMapper = mock(ScheduleMapper.class);
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        TeacherMapper teacherMapper = mock(TeacherMapper.class);
+        ClassInfoMapper classInfoMapper = mock(ClassInfoMapper.class);
+        ClassroomMapper classroomMapper = mock(ClassroomMapper.class);
+        CourseMapper courseMapper = mock(CourseMapper.class);
+        TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
+        ScheduleStatisticsService service = new ScheduleStatisticsService(
+                scheduleMapper,
+                mock(SchedulePlanItemMapper.class),
+                planMapper,
+                classroomMapper,
+                courseMapper,
+                teacherMapper,
+                classInfoMapper,
+                teachingTaskMapper,
+                mock(TimeSlotMapper.class),
+                mock(ScheduleThresholdProperties.class));
+
+        SchedulePlan appliedPlan = new SchedulePlan();
+        appliedPlan.setId(10L);
+        appliedPlan.setSemesterId(1L);
+        appliedPlan.setName("已应用方案");
+        appliedPlan.setStatus("APPLIED");
+        appliedPlan.setUnscheduledCount(2);
+        appliedPlan.setConflictCount(0);
+        when(teacherMapper.selectCount(any())).thenReturn(3L);
+        when(classInfoMapper.selectCount(any())).thenReturn(4L);
+        when(classroomMapper.selectCount(any())).thenReturn(5L);
+        when(courseMapper.selectCount(any())).thenReturn(6L);
+        when(teachingTaskMapper.selectCount(any())).thenReturn(7L);
+        when(planMapper.selectList(any())).thenReturn(List.of(appliedPlan));
+        when(scheduleMapper.selectCount(any())).thenReturn(8L);
+
+        DashboardStatsVo stats = service.dashboardStats(1L);
+
+        assertEquals(3L, stats.getTeacherCount());
+        assertEquals(6L, stats.getCourseCount());
+        assertEquals(7L, stats.getTeachingTaskCount());
+        assertEquals(2, stats.getTotalUnassignedTasks());
+        assertEquals(0, stats.getTotalConflicts());
+        assertEquals(true, stats.getHasAppliedPlan());
+        assertEquals("存在未排任务", stats.getGovernanceSummary());
+        assertEquals(8L, stats.getV3Overview().getFormalScheduleCount());
+    }
+
     private ScheduleStatisticsService newService(
             ScheduleMapper scheduleMapper,
             SchedulePlanItemMapper planItemMapper,
@@ -103,8 +154,10 @@ class ScheduleStatisticsServiceTest {
                 planItemMapper,
                 planMapper,
                 mock(ClassroomMapper.class),
+                mock(CourseMapper.class),
                 teacherMapper,
                 mock(ClassInfoMapper.class),
+                mock(TeachingTaskMapper.class),
                 timeSlotMapper,
                 mock(ScheduleThresholdProperties.class));
     }
