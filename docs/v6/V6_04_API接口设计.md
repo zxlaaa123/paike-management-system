@@ -201,11 +201,35 @@ GET /api/v6/migrations/status
 GET /api/v6/error-codes
 ```
 
+查询参数：
+
+| 参数 | 说明 |
+| --- | --- |
+| category | 可选，错误分类：AUTH / VALIDATION / BUSINESS / CONFLICT / SYSTEM |
+
+响应：
+
+```json
+[
+  {
+    "code": "AUTH_UNAUTHORIZED",
+    "numericCode": 401,
+    "category": "AUTH",
+    "httpStatus": 401,
+    "defaultMessage": "未登录或登录已过期",
+    "frontendPrompt": "请重新登录后再操作。",
+    "handlingSuggestion": "检查登录态、Token 或 Cookie。"
+  }
+]
+```
+
 ### 7.2 查询错误码详情
 
 ```http
 GET /api/v6/error-codes/{code}
 ```
+
+响应字段同列表单项。
 
 ## 八、统一响应建议
 

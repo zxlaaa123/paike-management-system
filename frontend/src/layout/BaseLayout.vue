@@ -126,6 +126,7 @@ onMounted(() => {
           <el-menu-item index="/v6/consistency-checks">一致性检查</el-menu-item>
           <el-menu-item index="/v6/performance-baselines">性能基线</el-menu-item>
           <el-menu-item index="/v6/migrations">数据库迁移</el-menu-item>
+          <el-menu-item index="/v6/error-codes">错误码中心</el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="analysis">
           <template #title>
