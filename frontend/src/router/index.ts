@@ -221,6 +221,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/v6/PerformanceBaselineView.vue'),
       },
       {
+        path: 'v6/migrations',
+        name: 'V6Migrations',
+        component: () => import('../views/v6/MigrationStatusView.vue'),
+      },
+      {
         path: 'v4/schedule-analysis/:planId',
         name: 'V4ScheduleAnalysisDetail',
         component: () => import('../views/v4/ScheduleAnalysisDetail.vue'),
