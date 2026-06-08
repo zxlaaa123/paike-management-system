@@ -1,51 +1,18 @@
 import { expect, test } from '@playwright/test'
+import { apiHeaders, loginAndGoTo, loginAsAdmin, type AuthState } from './helpers/auth'
 
 const API_URL = process.env.API_URL || 'http://127.0.0.1:8090'
 const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:5173'
 
-function cookieHeaderFromSetCookie(setCookie: string | string[] | undefined) {
-  const values = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : []
-  return values
-    .flatMap((value) => value.split(/,\s*(?=[^=;,]+=)/))
-    .map((value) => value.split(';')[0])
-    .filter((value) => value.startsWith('paike_token=') || value.startsWith('XSRF-TOKEN='))
-    .join('; ')
-}
-
-function cookiesForBrowser(cookieHeader: string) {
-  return cookieHeader.split('; ')
-    .filter(Boolean)
-    .map((pair) => {
-      const [name, ...valueParts] = pair.split('=')
-      return {
-        name,
-        value: valueParts.join('='),
-        domain: '127.0.0.1',
-        path: '/',
-      }
-    })
-}
-
-async function login(request: any) {
-  const res = await request.post(`${API_URL}/api/auth/login`, {
-    data: { username: 'admin', password: '123456' },
-  })
-  const body = await res.json()
-  expect(body.code).toBe(200)
-  const cookieHeader = cookieHeaderFromSetCookie(res.headers()['set-cookie'])
-  expect(cookieHeader).toContain('paike_token=')
-  return cookieHeader
-}
-
 test.describe.serial('V6 系统治理 smoke', () => {
-  let cookieHeader = ''
+  let authState: AuthState
 
   test.beforeAll(async ({ request }) => {
-    cookieHeader = await login(request)
+    authState = await loginAsAdmin(request, API_URL)
   })
 
   test('V6 只读接口返回 200', async ({ request }) => {
-    const headers = { Cookie: cookieHeader }
+    const headers = apiHeaders(authState)
     const endpoints = [
       '/api/v6/audit-logs?page=1&size=10',
       '/api/v6/regression-tests?page=1&size=10',
@@ -66,8 +33,6 @@ test.describe.serial('V6 系统治理 smoke', () => {
   })
 
   test('V6 页面可进入且无控制台错误', async ({ page }) => {
-    await page.context().addCookies(cookiesForBrowser(cookieHeader))
-
     const errors: string[] = []
     page.on('console', (message) => {
       if (message.type() === 'error') {
@@ -85,7 +50,7 @@ test.describe.serial('V6 系统治理 smoke', () => {
     ]
 
     for (const item of pages) {
-      await page.goto(`${BASE_URL}${item.path}`, { waitUntil: 'networkidle' })
+      await loginAndGoTo(page, item.path, authState, BASE_URL)
       await expect(page.getByText(item.title).first(), item.path).toBeVisible()
       await expect(page.getByText('V6 系统治理').first(), item.path).toBeVisible()
     }

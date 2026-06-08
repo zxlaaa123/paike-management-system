@@ -1,24 +1,27 @@
 import { test, expect } from '@playwright/test'
+import { apiHeaders, loginAndGoTo as openAuthenticatedPage, loginAsAdmin, type AuthState } from './helpers/auth'
 
 const API_URL = 'http://127.0.0.1:8090'
 const BASE_URL = 'http://127.0.0.1:5173'
 
-let authToken = ''
+let authState: AuthState | null = null
 let ids: {
   teacher?: number; class?: number; room?: number; course?: number;
   task?: number; schedule?: number
 } = {}
 
-async function loginAndGoTo(page: any, path: string) {
-  if (!authToken) {
-    throw new Error('authToken 未初始化，请先执行登录用例')
+function authHeaders() {
+  if (!authState) {
+    throw new Error('authState 未初始化，请先执行登录用例')
   }
-  await page.addInitScript(
-    ([key, token]) => window.localStorage.setItem(key, token),
-    ['paike_admin_token', authToken],
-  )
-  await page.goto(`${BASE_URL}${path}`)
-  await page.waitForTimeout(1000)
+  return apiHeaders(authState)
+}
+
+async function loginAndGoTo(page: any, path: string) {
+  if (!authState) {
+    throw new Error('authState 未初始化，请先执行登录用例')
+  }
+  await openAuthenticatedPage(page, path, authState, BASE_URL)
 }
 
 test.describe.serial('阶段 9：课表查询', () => {
@@ -29,16 +32,11 @@ test.describe.serial('阶段 9：课表查询', () => {
   const CO_NO = `C${ts}`
 
   test('1. 登录', async ({ request }) => {
-    const res = await request.post(`${API_URL}/api/auth/login`, {
-      data: { username: 'admin', password: '123456' },
-    })
-    const body = await res.json()
-    expect(body.code).toBe(200)
-    authToken = body.data.token
+    authState = await loginAsAdmin(request, API_URL)
   })
 
   test('2. 准备基础数据并创建排课', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
 
     const t = await (await request.post(`${API_URL}/api/teachers`, { headers: h, data: { teacherNo: T_NO, name: `张${ts}老师`, department: '计算机学院' } })).json()
     expect(t.code).toBe(200); ids.teacher = t.data.id
@@ -66,7 +64,7 @@ test.describe.serial('阶段 9：课表查询', () => {
   })
 
   test('3. 班级课表 API', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const res = await request.get(`${API_URL}/api/timetables/classes/${ids.class}`, { headers: h })
     const body = await res.json()
     expect(body.code).toBe(200)
@@ -81,7 +79,7 @@ test.describe.serial('阶段 9：课表查询', () => {
   })
 
   test('4. 教师课表 API', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const res = await request.get(`${API_URL}/api/timetables/teachers/${ids.teacher}`, { headers: h })
     const body = await res.json()
     expect(body.code).toBe(200)
@@ -91,7 +89,7 @@ test.describe.serial('阶段 9：课表查询', () => {
   })
 
   test('5. 教室课表 API', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const res = await request.get(`${API_URL}/api/timetables/classrooms/${ids.room}`, { headers: h })
     const body = await res.json()
     expect(body.code).toBe(200)
