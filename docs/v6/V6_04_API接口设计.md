@@ -92,6 +92,8 @@ GET /api/v6/consistency-checks/{id}
 
 ## 四、性能基线接口
 
+当前状态校准（2026-06-08）：V6 第四阶段已新增 `performance_baseline_record`，性能记录为旁路治理数据，记录失败不阻塞主业务。
+
 ### 4.1 查询性能基线
 
 ```http

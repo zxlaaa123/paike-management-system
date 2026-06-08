@@ -48,9 +48,11 @@ public class AutoScheduleService {
     private final SemesterService semesterService;
     private final ScheduleLockGuardService lockGuardService;
     private final SystemAuditLogService auditLogService;
+    private final PerformanceBaselineService performanceBaselineService;
 
     @Transactional(rollbackFor = Exception.class)
     public AutoScheduleResult run(AutoScheduleRequest request) {
+        long startedNanos = System.nanoTime();
         Long semesterId = null;
         AutoScheduleBatch batch = null;
         try {
@@ -72,7 +74,20 @@ public class AutoScheduleService {
 
             ArrangeStats stats = arrangeAllTasks(sortedTasks, batch, semesterId, refData, rules);
 
-            return finalizeBatch(batch, targetTasks.size(), stats);
+            AutoScheduleResult result = finalizeBatch(batch, targetTasks.size(), stats);
+            performanceBaselineService.recordSafely(
+                    PerformanceBaselineService.OP_AUTO_SCHEDULE,
+                    semesterId,
+                    null,
+                    batch.getId(),
+                    targetTasks.size(),
+                    result.getGeneratedScheduleCount(),
+                    PerformanceBaselineService.elapsedMillis(startedNanos),
+                    true,
+                    null,
+                    null,
+                    null);
+            return result;
         } catch (RuntimeException ex) {
             auditLogService.recordFailure(
                     SystemAuditLogService.ACTION_RUN_AUTO_SCHEDULE,
@@ -82,6 +97,18 @@ public class AutoScheduleService {
                     null,
                     SystemAuditLogService.auditErrorCode(ex),
                     ex.getMessage());
+            performanceBaselineService.recordSafely(
+                    PerformanceBaselineService.OP_AUTO_SCHEDULE,
+                    semesterId,
+                    null,
+                    batch == null ? null : batch.getId(),
+                    null,
+                    null,
+                    PerformanceBaselineService.elapsedMillis(startedNanos),
+                    false,
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage(),
+                    null);
             throw ex;
         }
     }

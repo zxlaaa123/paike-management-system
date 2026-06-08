@@ -90,11 +90,26 @@ public class V5SimulationService {
     private final ObjectMapper objectMapper;
     private final PlatformTransactionManager transactionManager;
     private final SystemAuditLogService auditLogService;
+    private final PerformanceBaselineService performanceBaselineService;
 
     public V5SimulationPlanDetailVo generate(Long taskId, Long suggestionId) {
+        long startedNanos = System.nanoTime();
         try {
             Long simulationPlanId = runInTransaction(() -> generateInTransaction(taskId, suggestionId));
-            return detail(taskId, simulationPlanId);
+            V5SimulationPlanDetailVo detail = detail(taskId, simulationPlanId);
+            performanceBaselineService.recordSafely(
+                    PerformanceBaselineService.OP_V5_GENERATE_SIMULATION,
+                    detail.getPlan() == null ? null : detail.getPlan().getSemesterId(),
+                    simulationPlanId,
+                    taskId,
+                    1,
+                    detail.getItems() == null ? null : detail.getItems().size(),
+                    PerformanceBaselineService.elapsedMillis(startedNanos),
+                    true,
+                    null,
+                    null,
+                    null);
+            return detail;
         } catch (RuntimeException ex) {
             auditLogService.recordFailure(
                     SystemAuditLogService.ACTION_GENERATE_SIMULATION_PLAN,
@@ -104,6 +119,18 @@ public class V5SimulationService {
                     null,
                     SystemAuditLogService.auditErrorCode(ex),
                     ex.getMessage());
+            performanceBaselineService.recordSafely(
+                    PerformanceBaselineService.OP_V5_GENERATE_SIMULATION,
+                    null,
+                    null,
+                    taskId,
+                    1,
+                    null,
+                    PerformanceBaselineService.elapsedMillis(startedNanos),
+                    false,
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage(),
+                    null);
             throw ex;
         }
     }
@@ -177,10 +204,23 @@ public class V5SimulationService {
     }
 
     public V5SimulationPlanDetailVo localReplan(Long taskId, V5LocalReplanRequest request) {
+        long startedNanos = System.nanoTime();
         try {
             LocalReplanResult result = runInTransaction(() -> localReplanInTransaction(taskId, request));
             V5SimulationPlanDetailVo detail = detail(taskId, result.planId());
             detail.setLocalReplanSummary(result.summary());
+            performanceBaselineService.recordSafely(
+                    PerformanceBaselineService.OP_V5_LOCAL_REPLAN,
+                    detail.getPlan() == null ? null : detail.getPlan().getSemesterId(),
+                    result.planId(),
+                    taskId,
+                    null,
+                    detail.getItems() == null ? null : detail.getItems().size(),
+                    PerformanceBaselineService.elapsedMillis(startedNanos),
+                    true,
+                    null,
+                    null,
+                    null);
             return detail;
         } catch (RuntimeException ex) {
             auditLogService.recordFailure(
@@ -191,6 +231,18 @@ public class V5SimulationService {
                     null,
                     SystemAuditLogService.auditErrorCode(ex),
                     ex.getMessage());
+            performanceBaselineService.recordSafely(
+                    PerformanceBaselineService.OP_V5_LOCAL_REPLAN,
+                    null,
+                    null,
+                    taskId,
+                    null,
+                    null,
+                    PerformanceBaselineService.elapsedMillis(startedNanos),
+                    false,
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage(),
+                    null);
             throw ex;
         }
     }
@@ -370,6 +422,7 @@ public class V5SimulationService {
 
     @Transactional(rollbackFor = Exception.class)
     public ApplyPlanResultVo apply(Long taskId, Long planId) {
+        long startedNanos = System.nanoTime();
         ScheduleRepairTask task = null;
         SchedulePlan plan = null;
         try {
@@ -417,6 +470,18 @@ public class V5SimulationService {
                     plan == null ? null : plan.getSemesterId(),
                     planId,
                     "应用试算方案成功：修复任务 " + taskId + "，方案 " + planId);
+            performanceBaselineService.recordSafely(
+                    PerformanceBaselineService.OP_V5_APPLY_SIMULATION,
+                    result.getSemesterId(),
+                    planId,
+                    taskId,
+                    null,
+                    result.getAppliedCount(),
+                    PerformanceBaselineService.elapsedMillis(startedNanos),
+                    true,
+                    null,
+                    null,
+                    null);
             return result;
         } catch (RuntimeException ex) {
             auditLogService.recordFailure(
@@ -427,6 +492,18 @@ public class V5SimulationService {
                     planId,
                     SystemAuditLogService.auditErrorCode(ex),
                     ex.getMessage());
+            performanceBaselineService.recordSafely(
+                    PerformanceBaselineService.OP_V5_APPLY_SIMULATION,
+                    plan == null ? (task == null ? null : task.getSemesterId()) : plan.getSemesterId(),
+                    planId,
+                    taskId,
+                    null,
+                    null,
+                    PerformanceBaselineService.elapsedMillis(startedNanos),
+                    false,
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage(),
+                    null);
             throw ex;
         }
     }

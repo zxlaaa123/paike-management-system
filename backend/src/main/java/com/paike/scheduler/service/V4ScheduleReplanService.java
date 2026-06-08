@@ -45,11 +45,27 @@ public class V4ScheduleReplanService {
     private final ScheduleScoreService scheduleScoreService;
     private final SchedulePlanExplainService schedulePlanExplainService;
     private final SystemAuditLogService auditLogService;
+    private final PerformanceBaselineService performanceBaselineService;
 
     @Transactional(rollbackFor = Exception.class)
     public ScheduleReplanResultVo createLocalReplanPlan(Long sourcePlanId, V4ScheduleReplanRequest request) {
+        long startedNanos = System.nanoTime();
         try {
-            return createLocalReplanPlanInternal(sourcePlanId, request);
+            ScheduleReplanResultVo result = createLocalReplanPlanInternal(sourcePlanId, request);
+            SchedulePlan newPlan = result.getNewPlanId() == null ? null : schedulePlanMapper.selectById(result.getNewPlanId());
+            performanceBaselineService.recordSafely(
+                    PerformanceBaselineService.OP_V4_LOCAL_REPLAN,
+                    newPlan == null ? null : newPlan.getSemesterId(),
+                    result.getNewPlanId(),
+                    result.getNewPlanId(),
+                    null,
+                    result.getScheduledCount(),
+                    PerformanceBaselineService.elapsedMillis(startedNanos),
+                    true,
+                    null,
+                    null,
+                    null);
+            return result;
         } catch (RuntimeException ex) {
             SchedulePlan sourcePlan = schedulePlanMapper.selectById(sourcePlanId);
             auditLogService.recordFailure(
@@ -60,6 +76,18 @@ public class V4ScheduleReplanService {
                     sourcePlanId,
                     SystemAuditLogService.auditErrorCode(ex),
                     ex.getMessage());
+            performanceBaselineService.recordSafely(
+                    PerformanceBaselineService.OP_V4_LOCAL_REPLAN,
+                    sourcePlan == null ? null : sourcePlan.getSemesterId(),
+                    sourcePlanId,
+                    sourcePlanId,
+                    null,
+                    null,
+                    PerformanceBaselineService.elapsedMillis(startedNanos),
+                    false,
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage(),
+                    null);
             throw ex;
         }
     }

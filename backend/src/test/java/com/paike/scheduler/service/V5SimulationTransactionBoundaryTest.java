@@ -18,7 +18,8 @@ class V5SimulationTransactionBoundaryTest {
                 StandardCharsets.UTF_8);
 
         assertTrue(source.contains("Long simulationPlanId = runInTransaction(() -> generateInTransaction(taskId, suggestionId));"));
-        assertTrue(source.contains("return detail(taskId, simulationPlanId);"));
+        assertTrue(source.contains("V5SimulationPlanDetailVo detail = detail(taskId, simulationPlanId);"));
+        assertTrue(source.contains("return detail;"));
         assertTrue(source.contains("LocalReplanResult result = runInTransaction(() -> localReplanInTransaction(taskId, request));"));
         assertTrue(source.contains("V5SimulationPlanDetailVo detail = detail(taskId, result.planId());"));
         assertTrue(source.contains("return new TransactionTemplate(transactionManager).execute(status -> action.get());"));

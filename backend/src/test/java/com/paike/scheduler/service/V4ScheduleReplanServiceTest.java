@@ -60,7 +60,8 @@ class V4ScheduleReplanServiceTest {
                 schedulePlanService,
                 scheduleScoreService,
                 schedulePlanExplainService,
-                auditLogService);
+                auditLogService,
+                mock(PerformanceBaselineService.class));
     }
 
     @Test

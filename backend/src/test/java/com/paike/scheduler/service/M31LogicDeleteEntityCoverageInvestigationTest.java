@@ -60,6 +60,7 @@ class M31LogicDeleteEntityCoverageInvestigationTest {
 
         assertEquals(Set.of(
                 "AutoScheduleBatch",
+                "PerformanceBaselineRecord",
                 "ScheduleCandidatePosition",
                 "ScheduleConflictReport",
                 "ScheduleConsistencyCheck",
