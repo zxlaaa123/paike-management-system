@@ -188,8 +188,17 @@ onMounted(() => {
       </template>
       <el-table :data="tableData" v-loading="loading" stripe :row-class-name="rowClass">
         <el-table-column prop="name" label="方案名称" min-width="160" />
-        <el-table-column label="策略类型" width="120">
-          <template #default="{ row }">{{ strategyText(row.strategyType) }}</template>
+        <el-table-column label="学期" min-width="150">
+          <template #default="{ row }">
+            <div>{{ row.semesterName || '—' }}</div>
+            <div class="sub-text">ID：{{ row.semesterId }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="策略类型" width="150">
+          <template #default="{ row }">
+            <div>{{ row.strategyName || strategyText(row.strategyType) }}</div>
+            <div class="sub-text">{{ row.strategyType || '—' }}</div>
+          </template>
         </el-table-column>
         <el-table-column label="状态" width="90">
           <template #default="{ row }">
@@ -251,6 +260,12 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.sub-text {
+  margin-top: 2px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.2;
 }
 :deep(.row-conflict) {
   --el-table-tr-bg-color: #fef0f0;

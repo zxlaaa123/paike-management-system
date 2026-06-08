@@ -1,16 +1,19 @@
 package com.paike.scheduler.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.ClassInfo;
 import com.paike.scheduler.entity.Classroom;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
+import com.paike.scheduler.entity.Semester;
 import com.paike.scheduler.entity.Teacher;
 import com.paike.scheduler.entity.TeachingTask;
 import com.paike.scheduler.entity.TimeSlot;
 import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.dto.SchedulePlanItemAdjustRequest;
+import com.paike.scheduler.service.vo.SchedulePlanVo;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -30,10 +33,54 @@ import static org.mockito.Mockito.when;
 class SchedulePlanServiceTest {
 
     @Test
+    void listVo_fillsSemesterNameAndStrategyName() {
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SemesterMapper semesterMapper = mock(SemesterMapper.class);
+        SchedulePlanService service = new SchedulePlanService(
+                planMapper,
+                semesterMapper,
+                mock(SchedulePlanItemMapper.class),
+                mock(ScheduleMapper.class),
+                mock(ScheduleLockedItemMapper.class),
+                mock(ScheduleLockGuardService.class),
+                mock(CourseMapper.class),
+                mock(TeacherMapper.class),
+                mock(ClassInfoMapper.class),
+                mock(ClassroomMapper.class),
+                mock(TimeSlotMapper.class),
+                mock(TeachingTaskMapper.class),
+                mock(TeacherUnavailableTimeService.class),
+                mock(ScheduleScoreService.class),
+                mock(SchedulePlanExplainService.class),
+                mock(SystemAuditLogService.class));
+
+        SchedulePlan plan = new SchedulePlan();
+        plan.setId(10L);
+        plan.setSemesterId(3L);
+        plan.setName("测试方案");
+        plan.setStrategyType("COMPREHENSIVE");
+        Page<SchedulePlan> page = new Page<>(1, 10, 1);
+        page.setRecords(List.of(plan));
+        when(planMapper.selectPage(any(), any())).thenReturn(page);
+
+        Semester semester = new Semester();
+        semester.setId(3L);
+        semester.setName("2025-2026 第一学期");
+        when(semesterMapper.selectBatchIds(any())).thenReturn(List.of(semester));
+
+        Page<SchedulePlanVo> result = service.listVo(3L, null, null, null, 1, 10);
+
+        assertEquals(1, result.getTotal());
+        assertEquals("2025-2026 第一学期", result.getRecords().get(0).getSemesterName());
+        assertEquals("综合最优", result.getRecords().get(0).getStrategyName());
+    }
+
+    @Test
     void adjustPlanItem_rejectsMissingReasonBeforeMutation() {
         SchedulePlanItemMapper planItemMapper = mock(SchedulePlanItemMapper.class);
         SchedulePlanService service = new SchedulePlanService(
                 mock(SchedulePlanMapper.class),
+                mock(SemesterMapper.class),
                 planItemMapper,
                 mock(ScheduleMapper.class),
                 mock(ScheduleLockedItemMapper.class),
@@ -70,6 +117,7 @@ class SchedulePlanServiceTest {
         TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
         SchedulePlanService service = new SchedulePlanService(
                 planMapper,
+                mock(SemesterMapper.class),
                 planItemMapper,
                 mock(ScheduleMapper.class),
                 mock(ScheduleLockedItemMapper.class),
@@ -125,6 +173,7 @@ class SchedulePlanServiceTest {
         TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
         SchedulePlanService service = new SchedulePlanService(
                 planMapper,
+                mock(SemesterMapper.class),
                 planItemMapper,
                 mock(ScheduleMapper.class),
                 mock(ScheduleLockedItemMapper.class),
@@ -175,6 +224,7 @@ class SchedulePlanServiceTest {
         SystemAuditLogService auditLogService = mock(SystemAuditLogService.class);
         SchedulePlanService service = new SchedulePlanService(
                 planMapper,
+                mock(SemesterMapper.class),
                 mock(SchedulePlanItemMapper.class),
                 mock(ScheduleMapper.class),
                 mock(ScheduleLockedItemMapper.class),
