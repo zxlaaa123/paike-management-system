@@ -74,7 +74,8 @@ class M43SimulationDiscardOrderInvestigationTest {
                 consistencyCheckService,
                 new ObjectMapper(),
                 mock(PlatformTransactionManager.class),
-                mock(SystemAuditLogService.class));
+                mock(SystemAuditLogService.class),
+                mock(PerformanceBaselineService.class));
 
         ScheduleRepairTask task = new ScheduleRepairTask();
         task.setId(taskId);

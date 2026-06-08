@@ -160,6 +160,7 @@ class V5SimulationServiceAuditTest {
                 mock(V5ConsistencyCheckService.class),
                 new ObjectMapper(),
                 mock(PlatformTransactionManager.class),
-                auditLogService);
+                auditLogService,
+                mock(PerformanceBaselineService.class));
     }
 }

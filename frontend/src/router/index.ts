@@ -216,6 +216,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/v6/ConsistencyCheckView.vue'),
       },
       {
+        path: 'v6/performance-baselines',
+        name: 'V6PerformanceBaselines',
+        component: () => import('../views/v6/PerformanceBaselineView.vue'),
+      },
+      {
         path: 'v4/schedule-analysis/:planId',
         name: 'V4ScheduleAnalysisDetail',
         component: () => import('../views/v4/ScheduleAnalysisDetail.vue'),

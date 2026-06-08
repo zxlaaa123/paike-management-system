@@ -35,7 +35,8 @@ class AutoScheduleServiceAuditTest {
                 mock(SchedulingReferenceLoader.class),
                 semesterService,
                 mock(ScheduleLockGuardService.class),
-                auditLogService);
+                auditLogService,
+                mock(PerformanceBaselineService.class));
         AutoScheduleRequest request = new AutoScheduleRequest();
 
         assertThrows(BusinessException.class, () -> service.run(request));
@@ -77,7 +78,8 @@ class AutoScheduleServiceAuditTest {
                 referenceLoader,
                 semesterService,
                 mock(ScheduleLockGuardService.class),
-                auditLogService);
+                auditLogService,
+                mock(PerformanceBaselineService.class));
         AutoScheduleRequest request = new AutoScheduleRequest();
 
         assertThrows(BusinessException.class, () -> service.run(request));

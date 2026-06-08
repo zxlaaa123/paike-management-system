@@ -23,7 +23,8 @@ class TransactionBoundaryInvestigationTest {
 
         assertTrue(autoSchedule.contains("@Transactional(rollbackFor = Exception.class)"));
         assertTrue(autoSchedule.contains("public AutoScheduleResult run(AutoScheduleRequest request)"));
-        assertTrue(autoSchedule.contains("return finalizeBatch(batch, targetTasks.size(), stats);"));
+        assertTrue(autoSchedule.contains("AutoScheduleResult result = finalizeBatch(batch, targetTasks.size(), stats);"));
+        assertTrue(autoSchedule.contains("return result;"));
         assertTrue(autoSchedule.contains("saveSchedule(task, attempt.slot(), attempt.room(), batch.getId());"));
         assertFalse(autoSchedule.contains("TransactionTemplate"));
 
