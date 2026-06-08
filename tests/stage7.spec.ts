@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test'
+import { apiHeaders, loginAndGoTo as openAuthenticatedPage, loginAsAdmin, type AuthState } from './helpers/auth'
 
 const API_URL = 'http://127.0.0.1:8090'
 const BASE_URL = 'http://127.0.0.1:5173'
 
-let authToken = ''
+let authState: AuthState | null = null
 let ids: {
   t1?: number; t2?: number; c1?: number; c2?: number;
   rNormal?: number; rLab?: number; rComp?: number; rSmall?: number;
@@ -28,16 +29,18 @@ const SLOT: Record<string, number> = {
   slots: 12,    // 周四1-2节 — scheduledSlots统计
 }
 
-async function loginAndGoTo(page: any, path: string) {
-  if (!authToken) {
-    throw new Error('authToken 未初始化，请先执行登录用例')
+function authHeaders() {
+  if (!authState) {
+    throw new Error('authState 未初始化，请先执行登录用例')
   }
-  await page.addInitScript(
-    ([key, token]) => window.localStorage.setItem(key, token),
-    ['paike_admin_token', authToken],
-  )
-  await page.goto(`${BASE_URL}${path}`)
-  await page.waitForTimeout(1000)
+  return apiHeaders(authState)
+}
+
+async function loginAndGoTo(page: any, path: string) {
+  if (!authState) {
+    throw new Error('authState 未初始化，请先执行登录用例')
+  }
+  await openAuthenticatedPage(page, path, authState, BASE_URL)
 }
 
 test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
@@ -57,17 +60,12 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   // ====== 基础数据准备 ======
 
   test('1. 登录', async ({ request }) => {
-    const res = await request.post(`${API_URL}/api/auth/login`, {
-      data: { username: 'admin', password: '123456' },
-    })
-    const body = await res.json()
-    expect(body.code).toBe(200)
-    authToken = body.data.token
+    authState = await loginAsAdmin(request, API_URL)
   })
 
   test('2. 时间段返回20条', async ({ request }) => {
     const res = await request.get(`${API_URL}/api/time-slots`, {
-      headers: { Authorization: `Bearer ${authToken}` },
+      headers: authHeaders(),
     })
     const body = await res.json()
     expect(body.code).toBe(200)
@@ -75,7 +73,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('3. 准备基础数据', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
 
     const t1 = await (await request.post(`${API_URL}/api/teachers`, { headers: h, data: { teacherNo: T1_NO, name: '张老师', department: '计算机学院', phone: '13800138001' } })).json()
     expect(t1.code).toBe(200); ids.t1 = t1.data.id
@@ -112,7 +110,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('4. 创建教学任务', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
 
     // task1: 张老师 + 计科班(40人) + 普通课 每周4节(需2大节)
     const tk1 = await (await request.post(`${API_URL}/api/teaching-tasks`, { headers: h, data: { courseId: ids.coNormal, teacherId: ids.t1, classId: ids.c1, weeklyHours: 4, needContinuous: 0, status: 1 } })).json()
@@ -130,7 +128,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   // ====== 排课 CRUD ======
 
   test('5. 排课 CRUD', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const slots = (await (await request.get(`${API_URL}/api/time-slots`, { headers: h })).json()).data
     const slot = slots[SLOT.crud].id
 
@@ -168,7 +166,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   // ====== 冲突检测（每个测试用独立时间段）======
 
   test('6. 冲突-教师：同一教师同一时间不能有两门课', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const slots = (await (await request.get(`${API_URL}/api/time-slots`, { headers: h })).json()).data
     const slot = slots[SLOT.teacher].id
 
@@ -192,7 +190,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('7. 冲突-班级：同一班级同一时间不能有两门课', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const slots = (await (await request.get(`${API_URL}/api/time-slots`, { headers: h })).json()).data
     const slot = slots[SLOT.class].id
 
@@ -215,7 +213,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('8. 冲突-教室：同一教室同一时间不能安排两门课', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const slots = (await (await request.get(`${API_URL}/api/time-slots`, { headers: h })).json()).data
     const slot = slots[SLOT.room].id
 
@@ -251,7 +249,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('9. 冲突-容量：班级人数>教室容量', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const slots = (await (await request.get(`${API_URL}/api/time-slots`, { headers: h })).json()).data
     const slot = slots[SLOT.capacity].id
 
@@ -263,7 +261,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('10. 冲突-实验课必须安排实验室', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const slots = (await (await request.get(`${API_URL}/api/time-slots`, { headers: h })).json()).data
     const slot = slots[SLOT.expType].id
 
@@ -274,7 +272,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('11. 冲突-机房课必须安排机房', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const slots = (await (await request.get(`${API_URL}/api/time-slots`, { headers: h })).json()).data
     const slot = slots[SLOT.compType].id
 
@@ -285,7 +283,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('12. 冲突-停用教师不能参与排课', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const slots = (await (await request.get(`${API_URL}/api/time-slots`, { headers: h })).json()).data
     const slot = slots[SLOT.disableT].id
 
@@ -303,7 +301,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('13. 冲突-停用班级不能参与排课', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const slots = (await (await request.get(`${API_URL}/api/time-slots`, { headers: h })).json()).data
     const slot = slots[SLOT.disableC].id
 
@@ -320,7 +318,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('14. 冲突-停用教室不能参与排课', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const slots = (await (await request.get(`${API_URL}/api/time-slots`, { headers: h })).json()).data
     const slot = slots[SLOT.disableR].id
 
@@ -337,7 +335,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('15. 冲突-教学任务不能超过每周课时', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const slots = (await (await request.get(`${API_URL}/api/time-slots`, { headers: h })).json()).data
     const s1 = slots[SLOT.overHours].id
     const s2 = slots[SLOT.overHours + 1].id
@@ -356,7 +354,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('16. 冲突检测预检接口 /check-conflict', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const slots = (await (await request.get(`${API_URL}/api/time-slots`, { headers: h })).json()).data
     const slot = slots[SLOT.check].id
 
@@ -384,7 +382,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('17. 教学任务列表返回正确的 scheduledSlots', async ({ request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const slots = (await (await request.get(`${API_URL}/api/time-slots`, { headers: h })).json()).data
 
     // task1 每周4节 → 需2大节，用不同天避免 ALLOW_SAME_COURSE_SAME_DAY=false 冲突
@@ -433,7 +431,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('20. 前端排课页-列表显示数据', async ({ page, request }) => {
-    const h = { Authorization: `Bearer ${authToken}` }
+    const h = authHeaders()
     const slotsRes = await request.get(`${API_URL}/api/time-slots`, { headers: h })
     const slotsBody = await slotsRes.json()
     expect(slotsBody.code).toBe(200)
@@ -501,3 +499,4 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
     await expect(page.locator('div[aria-label="新增排课"]')).not.toBeVisible({ timeout: 5000 })
   })
 })
+

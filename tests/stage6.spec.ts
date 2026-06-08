@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test'
+import { apiHeaders, loginAndGoTo as openAuthenticatedPage, loginAsAdmin, type AuthState } from './helpers/auth'
 
 const API_URL = 'http://127.0.0.1:8090'
 const BASE_URL = 'http://127.0.0.1:5173'
 
-let authToken = ''
+let authState: AuthState | null = null
 let ids: {
   semesterId?: number
   planId1?: number
@@ -19,19 +20,15 @@ let ids: {
 // ====== 辅助函数 ======
 
 function authHeaders() {
-  return { Authorization: `Bearer ${authToken}` }
+  if (!authState) {
+    throw new Error('authState 未初始化，请先执行登录用例')
+  }
+  return apiHeaders(authState)
 }
 
 async function login(request: any) {
-  const res = await request.post(`${API_URL}/api/auth/login`, {
-    data: { username: 'admin', password: '123456' },
-  })
-  const body = await res.json()
-  if (body.code !== 200) {
-    throw new Error(`登录失败: ${body.message}`)
-  }
-  authToken = body.data.token
-  return body.data
+  authState = await loginAsAdmin(request, API_URL)
+  return authState
 }
 
 async function ensureSemester(request: any): Promise<number> {
@@ -128,14 +125,10 @@ async function generatePlan(request: any, semesterId: number, strategyType: stri
 }
 
 async function loginAndGoTo(page: any, path: string) {
-  if (!authToken) {
-    throw new Error('authToken 未初始化，请先执行登录用例')
+  if (!authState) {
+    throw new Error('authState 未初始化，请先执行登录用例')
   }
-  await page.addInitScript(
-    ([key, token]) => window.localStorage.setItem(key, token),
-    ['paike_admin_token', authToken],
-  )
-  await page.goto(`${BASE_URL}${path}`)
+  await openAuthenticatedPage(page, path, authState, BASE_URL)
   await page.waitForTimeout(2000)
 }
 
@@ -146,8 +139,8 @@ test.describe.serial('V3 阶段 6：方案对比与应用回滚', () => {
 
   test('1. 登录获取 token', async ({ request }) => {
     await login(request)
-    expect(authToken).toBeTruthy()
-    console.log('  [OK] 登录成功，token 已获取')
+    expect(authState?.cookieHeader).toBeTruthy()
+    console.log('  [OK] 登录成功，cookie 已获取')
   })
 
   test('2. 确保学期存在', async ({ request }) => {
