@@ -102,6 +102,12 @@ export interface DashboardStats {
   teacherCount: number
   classCount: number
   classroomCount: number
+  courseCount: number
+  teachingTaskCount: number
+  totalUnassignedTasks: number
+  totalConflicts: number
+  hasAppliedPlan: boolean
+  governanceSummary: string
   v3Overview: PlanOverview
 }
 

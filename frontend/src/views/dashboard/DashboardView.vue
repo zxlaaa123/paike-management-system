@@ -9,24 +9,24 @@
 
       <!-- 基础数据统计 -->
       <div class="cards">
-        <el-card v-for="item in statsCards" :key="item.label" shadow="hover">
+        <div v-for="item in statsCards" :key="item.label" class="metric-card">
           <div class="label">{{ item.label }}</div>
           <div class="value">{{ item.value }}</div>
-        </el-card>
+        </div>
       </div>
 
       <!-- V3 排课概览 -->
       <template v-if="hasCurrentSemester && dashboardStats">
         <el-divider />
-        <div class="section-title">V3 排课概览</div>
+        <div class="section-title">排课治理摘要</div>
         <el-alert :title="`当前学期：${currentSemesterName}`" type="info" show-icon :closable="false" style="margin-bottom: 12px" />
 
         <el-row :gutter="16" style="margin-bottom: 16px">
           <el-col :span="4">
-            <el-statistic title="方案总数" :value="v3Overview.totalPlans" />
+            <el-statistic title="教学任务" :value="dashboardStats.teachingTaskCount" />
           </el-col>
           <el-col :span="4">
-            <el-statistic title="草稿方案" :value="v3Overview.draftPlans" />
+            <el-statistic title="方案总数" :value="v3Overview.totalPlans" />
           </el-col>
           <el-col :span="4">
             <el-statistic title="已应用方案" :value="v3Overview.appliedPlans" />
@@ -35,12 +35,20 @@
             <el-statistic title="正式课表课程" :value="v3Overview.formalScheduleCount" />
           </el-col>
           <el-col :span="4">
-            <el-statistic title="未排任务" :value="v3Overview.totalUnassignedTasks" />
+            <el-statistic title="未排任务" :value="dashboardStats.totalUnassignedTasks" />
           </el-col>
           <el-col :span="4">
-            <el-statistic title="冲突数量" :value="v3Overview.totalConflicts" />
+            <el-statistic title="冲突数量" :value="dashboardStats.totalConflicts" />
           </el-col>
         </el-row>
+
+        <el-alert
+          :type="governanceAlertType"
+          show-icon
+          :closable="false"
+          :title="dashboardStats.governanceSummary"
+          style="margin-bottom: 16px"
+        />
 
         <el-row :gutter="16">
           <el-col :span="12">
@@ -73,22 +81,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { getTeacherList } from '../../api/teacher'
-import { getClassList } from '../../api/classInfo'
-import { getClassroomList } from '../../api/classroom'
-import { getCourseList } from '../../api/course'
+import { computed, onMounted, ref } from 'vue'
 import { getCurrentSemester, type Semester } from '../../api/semester'
 import { getDashboardStats, type DashboardStats } from '../../api/scheduleStatistics'
 
 const loadError = ref('')
-const stats = reactive({
-  teacherCount: 0,
-  classCount: 0,
-  classroomCount: 0,
-  courseCount: 0,
-})
 
 const currentSemester = ref<Semester | null>(null)
 const dashboardStats = ref<DashboardStats | null>(null)
@@ -103,44 +100,32 @@ const v3Overview = computed(() => dashboardStats.value?.v3Overview ?? {
 })
 
 const statsCards = computed(() => [
-  { label: '教师数量', value: stats.teacherCount },
-  { label: '班级数量', value: stats.classCount },
-  { label: '教室数量', value: stats.classroomCount },
-  { label: '课程数量', value: stats.courseCount },
+  { label: '教师数量', value: dashboardStats.value?.teacherCount ?? 0 },
+  { label: '班级数量', value: dashboardStats.value?.classCount ?? 0 },
+  { label: '教室数量', value: dashboardStats.value?.classroomCount ?? 0 },
+  { label: '课程数量', value: dashboardStats.value?.courseCount ?? 0 },
 ])
 
-async function fetchStats() {
-  loadError.value = ''
-  try {
-    const [teacherRes, classRes, classroomRes, courseRes] = await Promise.all([
-      getTeacherList({ page: 1, size: 1 }),
-      getClassList({ page: 1, size: 1 }),
-      getClassroomList({ page: 1, size: 1 }),
-      getCourseList({ page: 1, size: 1 }),
-    ])
-    stats.teacherCount = teacherRes.total
-    stats.classCount = classRes.total
-    stats.classroomCount = classroomRes.total
-    stats.courseCount = courseRes.total
-  } catch {
-    loadError.value = '统计数据加载失败，请稍后重试。'
-    ElMessage.error(loadError.value)
-  }
-}
+const governanceAlertType = computed(() => {
+  if (!dashboardStats.value?.hasAppliedPlan) return 'warning'
+  if ((dashboardStats.value.totalConflicts ?? 0) > 0 || (dashboardStats.value.totalUnassignedTasks ?? 0) > 0) return 'warning'
+  return 'success'
+})
 
 async function fetchDashboard() {
+  loadError.value = ''
   try {
     currentSemester.value = await getCurrentSemester()
     if (currentSemester.value) {
       dashboardStats.value = await getDashboardStats({ semesterId: currentSemester.value.id })
     }
   } catch {
-    // 无当前学期时不报错
+    loadError.value = '首页统计加载失败，请确认当前学期已设置。'
   }
 }
 
 onMounted(async () => {
-  await Promise.all([fetchStats(), fetchDashboard()])
+  await fetchDashboard()
 })
 </script>
 
@@ -165,6 +150,12 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(2, minmax(160px, 1fr));
   gap: 12px;
+}
+
+.metric-card {
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 6px;
+  padding: 16px;
 }
 
 .label {

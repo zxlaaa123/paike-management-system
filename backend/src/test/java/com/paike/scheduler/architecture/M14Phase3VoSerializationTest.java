@@ -207,12 +207,21 @@ class M14Phase3VoSerializationTest {
         overview.setFormalScheduleCount(120L);
         overview.setTotalUnassignedTasks(0);
         overview.setTotalConflicts(0);
-        JsonNode json = toJson(new DashboardStatsVo(50L, 30L, 20L, overview));
+        JsonNode json = toJson(new DashboardStatsVo(
+                50L, 30L, 20L, 10L, 90L, 0, 0, true, "运行正常", overview));
 
-        assertEquals(Set.of("teacherCount", "classCount", "classroomCount", "v3Overview"), fieldNames(json));
+        assertEquals(Set.of("teacherCount", "classCount", "classroomCount", "courseCount",
+                "teachingTaskCount", "totalUnassignedTasks", "totalConflicts",
+                "hasAppliedPlan", "governanceSummary", "v3Overview"), fieldNames(json));
         assertEquals(50L, json.get("teacherCount").asLong());
         assertEquals(30L, json.get("classCount").asLong());
         assertEquals(20L, json.get("classroomCount").asLong());
+        assertEquals(10L, json.get("courseCount").asLong());
+        assertEquals(90L, json.get("teachingTaskCount").asLong());
+        assertEquals(0, json.get("totalUnassignedTasks").asInt());
+        assertEquals(0, json.get("totalConflicts").asInt());
+        assertTrue(json.get("hasAppliedPlan").asBoolean());
+        assertEquals("运行正常", json.get("governanceSummary").asText());
 
         // 嵌套 PlanOverviewVo 17 字段
         JsonNode nested = json.get("v3Overview");

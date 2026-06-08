@@ -28,8 +28,10 @@ public class ScheduleStatisticsService {
     private final SchedulePlanItemMapper planItemMapper;
     private final SchedulePlanMapper planMapper;
     private final ClassroomMapper classroomMapper;
+    private final CourseMapper courseMapper;
     private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
+    private final TeachingTaskMapper teachingTaskMapper;
     private final TimeSlotMapper timeSlotMapper;
     private final ScheduleThresholdProperties thresholds;
 
@@ -261,13 +263,22 @@ public class ScheduleStatisticsService {
         Long teacherCount = teacherMapper.selectCount(new LambdaQueryWrapper<Teacher>());
         Long classCount = classInfoMapper.selectCount(new LambdaQueryWrapper<ClassInfo>());
         Long classroomCount = classroomMapper.selectCount(new LambdaQueryWrapper<Classroom>());
+        Long courseCount = courseMapper.selectCount(new LambdaQueryWrapper<Course>());
+        Long teachingTaskCount = teachingTaskMapper.selectCount(new LambdaQueryWrapper<TeachingTask>()
+                .eq(TeachingTask::getSemesterId, semesterId));
+        PlanOverviewVo overview = planOverview(semesterId);
 
         DashboardStatsVo stats = new DashboardStatsVo();
         stats.setTeacherCount(teacherCount);
         stats.setClassCount(classCount);
         stats.setClassroomCount(classroomCount);
-        // V3 方案概览
-        stats.setV3Overview(planOverview(semesterId));
+        stats.setCourseCount(courseCount);
+        stats.setTeachingTaskCount(teachingTaskCount);
+        stats.setTotalUnassignedTasks(overview.getTotalUnassignedTasks());
+        stats.setTotalConflicts(overview.getTotalConflicts());
+        stats.setHasAppliedPlan(overview.getHasAppliedPlan());
+        stats.setGovernanceSummary(governanceSummary(overview));
+        stats.setV3Overview(overview);
 
         return stats;
     }
@@ -453,6 +464,22 @@ public class ScheduleStatisticsService {
         if (score >= 0.4) return "一般";
         if (score >= 0.2) return "较差";
         return "不均衡";
+    }
+
+    private String governanceSummary(PlanOverviewVo overview) {
+        if (overview == null || overview.getTotalPlans() == 0) {
+            return "暂无排课方案";
+        }
+        if (!Boolean.TRUE.equals(overview.getHasAppliedPlan())) {
+            return "暂无已应用方案";
+        }
+        if (overview.getTotalConflicts() != null && overview.getTotalConflicts() > 0) {
+            return "存在冲突待处理";
+        }
+        if (overview.getTotalUnassignedTasks() != null && overview.getTotalUnassignedTasks() > 0) {
+            return "存在未排任务";
+        }
+        return "运行正常";
     }
 
     /** 教师工作量聚合累加器：替代原 Map&lt;String,Object&gt; 行累加（courseCount/classCount 先以 Set 去重，最后落 size）。 */
