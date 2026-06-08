@@ -40,7 +40,10 @@ export async function loginAsAdmin(request: APIRequestContext, apiUrl: string): 
   const body = await res.json()
   expect(body.code).toBe(200)
 
-  const cookieHeader = cookieHeaderFromSetCookie(res.headers()['set-cookie'])
+  const setCookies = res.headersArray()
+    .filter((header) => header.name.toLowerCase() === 'set-cookie')
+    .map((header) => header.value)
+  const cookieHeader = cookieHeaderFromSetCookie(setCookies.length > 0 ? setCookies : res.headers()['set-cookie'])
   expect(cookieHeader).toContain('paike_token=')
   expect(cookieHeader).toContain('XSRF-TOKEN=')
 
