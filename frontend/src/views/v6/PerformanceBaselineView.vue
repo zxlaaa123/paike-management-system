@@ -3,13 +3,16 @@ import { onMounted, reactive, ref } from 'vue'
 import {
   getPerformanceBaselineList,
   getPerformanceSummary,
+  getPerformanceTrends,
   type PerformanceBaselineRecord,
   type PerformanceSummary,
+  type PerformanceTrend,
 } from '../../api/performanceBaseline'
 
 const loading = ref(false)
 const records = ref<PerformanceBaselineRecord[]>([])
 const summaries = ref<PerformanceSummary[]>([])
+const trends = ref<PerformanceTrend[]>([])
 const total = ref(0)
 
 const operationOptions = [
@@ -56,6 +59,23 @@ function formatDateTime(value?: string | null) {
   return value.replace('T', ' ').slice(0, 19)
 }
 
+function trendText(value?: number | null) {
+  if (value === undefined || value === null) return '无对比'
+  if (value > 0) return `+${formatDuration(value)}`
+  if (value < 0) return `-${formatDuration(Math.abs(value))}`
+  return '持平'
+}
+
+function trendTagType(value?: number | null) {
+  if (value === undefined || value === null || value === 0) return 'info'
+  return value > 0 ? 'warning' : 'success'
+}
+
+function trendPercentText(value?: number | null) {
+  if (value === undefined || value === null) return '-'
+  return `${value > 0 ? '+' : ''}${value}%`
+}
+
 function emptyToUndefined(value?: number) {
   return value === undefined || value === null ? undefined : value
 }
@@ -63,7 +83,7 @@ function emptyToUndefined(value?: number) {
 async function fetchData() {
   loading.value = true
   try {
-    const [list, summary] = await Promise.all([
+    const [list, summary, trend] = await Promise.all([
       getPerformanceBaselineList({
         page: pagination.page,
         size: pagination.size,
@@ -73,14 +93,20 @@ async function fetchData() {
         success: searchForm.success,
       }),
       getPerformanceSummary(),
+      getPerformanceTrends({
+        operationType: searchForm.operationType || undefined,
+        limit: 20,
+      }),
     ])
     records.value = list.records || []
     total.value = list.total || 0
     summaries.value = summary || []
+    trends.value = trend || []
   } catch {
     records.value = []
     total.value = 0
     summaries.value = []
+    trends.value = []
   } finally {
     loading.value = false
   }
@@ -150,6 +176,41 @@ onMounted(fetchData)
         </div>
       </el-card>
     </div>
+
+    <el-card class="trend-card">
+      <div class="table-title">最近趋势与慢操作</div>
+      <el-table v-loading="loading" :data="trends" border stripe size="small">
+        <el-table-column label="操作类型" min-width="170">
+          <template #default="{ row }">{{ operationText(row.operationType) }}</template>
+        </el-table-column>
+        <el-table-column label="本次耗时" width="120">
+          <template #default="{ row }">
+            <span>{{ formatDuration(row.durationMs) }}</span>
+            <el-tag v-if="row.slowOperation" class="slow-tag" type="danger" size="small">慢</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="上次耗时" width="120">
+          <template #default="{ row }">{{ formatDuration(row.previousDurationMs) }}</template>
+        </el-table-column>
+        <el-table-column label="变化" width="140">
+          <template #default="{ row }">
+            <el-tag :type="trendTagType(row.durationDeltaMs)" size="small">
+              {{ trendText(row.durationDeltaMs) }}
+            </el-tag>
+            <span class="trend-percent">{{ trendPercentText(row.durationChangePercent) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="结果" width="90">
+          <template #default="{ row }">
+            <el-tag :type="statusTagType(row.success)" size="small">{{ statusText(row.success) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="记录时间" width="180">
+          <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="trends.length === 0 && !loading" description="暂无趋势数据" />
+    </el-card>
 
     <el-card class="table-card">
       <div class="table-title">性能记录（共 {{ total }} 条）</div>
@@ -262,6 +323,10 @@ onMounted(fetchData)
   min-height: 420px;
 }
 
+.trend-card {
+  min-height: 240px;
+}
+
 .table-title {
   margin-bottom: 12px;
 }
@@ -289,6 +354,16 @@ onMounted(fetchData)
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.slow-tag {
+  margin-left: 6px;
+}
+
+.trend-percent {
+  margin-left: 6px;
+  color: #8c8c8c;
+  font-size: 12px;
 }
 
 .pagination-wrapper {

@@ -26,6 +26,19 @@ export interface PerformanceSummary {
   maxDurationMs: number
 }
 
+export interface PerformanceTrend {
+  id: number
+  operationType: string
+  durationMs: number
+  previousDurationMs: number | null
+  durationDeltaMs: number | null
+  durationChangePercent: number | null
+  slowOperation: boolean
+  slowThresholdMs: number
+  success: number
+  createdAt: string
+}
+
 export interface PerformanceBaselineQuery {
   operationType?: string
   semesterId?: number
@@ -49,3 +62,9 @@ export function getPerformanceSummary() {
   })
 }
 
+export function getPerformanceTrends(params?: { operationType?: string; limit?: number }) {
+  return request.get<ApiResponse<PerformanceTrend[]>>('/v6/performance/trends', { params }).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
+}

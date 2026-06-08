@@ -5,10 +5,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.entity.PerformanceBaselineRecord;
 import com.paike.scheduler.mapper.PerformanceBaselineRecordMapper;
 import com.paike.scheduler.service.vo.PerformanceSummaryVo;
+import com.paike.scheduler.service.vo.PerformanceTrendVo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -87,5 +89,35 @@ class PerformanceBaselineServiceTest {
         assertEquals(200L, result.get(0).getAvgDurationMs());
         assertEquals(300L, result.get(0).getMaxDurationMs());
     }
-}
 
+    @Test
+    void trends_comparesWithPreviousRecordAndMarksSlowOperation() {
+        PerformanceBaselineRecord latest = record(3L, "AUTO_SCHEDULE", 6000L, 1, LocalDateTime.parse("2026-06-08T10:10:00"));
+        PerformanceBaselineRecord previous = record(2L, "AUTO_SCHEDULE", 3000L, 1, LocalDateTime.parse("2026-06-08T10:00:00"));
+        PerformanceBaselineRecord other = record(1L, "V5_LOCAL_REPLAN", 1000L, 1, LocalDateTime.parse("2026-06-08T09:00:00"));
+        when(performanceMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(latest, previous, other));
+
+        List<PerformanceTrendVo> result = service.trends(null, 20);
+
+        assertEquals(3, result.size());
+        PerformanceTrendVo trend = result.get(0);
+        assertEquals(3L, trend.getId());
+        assertEquals("AUTO_SCHEDULE", trend.getOperationType());
+        assertEquals(6000L, trend.getDurationMs());
+        assertEquals(3000L, trend.getPreviousDurationMs());
+        assertEquals(3000L, trend.getDurationDeltaMs());
+        assertEquals(100, trend.getDurationChangePercent());
+        assertEquals(true, trend.getSlowOperation());
+        assertEquals(PerformanceBaselineService.SLOW_OPERATION_THRESHOLD_MS, trend.getSlowThresholdMs());
+    }
+
+    private PerformanceBaselineRecord record(Long id, String operationType, Long durationMs, Integer success, LocalDateTime createdAt) {
+        PerformanceBaselineRecord record = new PerformanceBaselineRecord();
+        record.setId(id);
+        record.setOperationType(operationType);
+        record.setDurationMs(durationMs);
+        record.setSuccess(success);
+        record.setCreatedAt(createdAt);
+        return record;
+    }
+}
