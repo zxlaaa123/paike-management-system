@@ -5,6 +5,7 @@ import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.PerformanceBaselineRecord;
 import com.paike.scheduler.service.PerformanceBaselineService;
 import com.paike.scheduler.service.vo.PerformanceSummaryVo;
+import com.paike.scheduler.service.vo.PerformanceTrendVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -40,5 +41,14 @@ public class PerformanceBaselineController {
     public Result<List<PerformanceSummaryVo>> summary() {
         return Result.success(performanceBaselineService.summary());
     }
-}
 
+    @GetMapping("/trends")
+    public Result<List<PerformanceTrendVo>> trends(
+            @RequestParam(required = false) String operationType,
+            @jakarta.validation.constraints.Min(value = 1, message = "数量必须大于0")
+            @jakarta.validation.constraints.Max(value = 100, message = "数量不能超过100")
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        return Result.success(performanceBaselineService.trends(operationType, limit));
+    }
+}
