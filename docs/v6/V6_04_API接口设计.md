@@ -162,17 +162,36 @@ GET /api/v6/migrations/status
 
 ```json
 {
-  "enabled": true,
-  "currentVersion": "V6_005",
-  "failedCount": 0
+  "migrationTool": "Spring SQL Init",
+  "totalScriptCount": 29,
+  "configuredScriptCount": 29,
+  "missingScriptCount": 0,
+  "unconfiguredScriptCount": 0,
+  "scripts": [
+    {
+      "scriptName": "schema.sql",
+      "resourcePath": "db/schema.sql",
+      "configuredOrder": 1,
+      "configured": true,
+      "existsOnClasspath": true,
+      "status": "CONFIGURED",
+      "riskLevel": "LOW",
+      "idempotentHint": "包含 IF NOT EXISTS 或 INSERT IGNORE，重复执行风险较低。"
+    }
+  ],
+  "initializers": [
+    {
+      "name": "默认管理员初始化",
+      "type": "CommandLineRunner",
+      "className": "com.paike.scheduler.config.AdminUserInitializer",
+      "status": "PRESENT",
+      "description": "启动时确保默认管理员账号存在。"
+    }
+  ]
 }
 ```
 
-### 6.2 查询迁移历史
-
-```http
-GET /api/v6/migrations/history
-```
+当前没有 Flyway/Liquibase，也没有迁移历史表；阶段 5 最小版只提供只读状态接口。
 
 ## 七、错误码接口
 
