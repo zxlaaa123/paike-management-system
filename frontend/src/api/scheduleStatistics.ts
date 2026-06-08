@@ -9,6 +9,7 @@ export interface TeacherWorkloadItem {
   department: string | null
   totalPeriods: number
   maxDailyPeriods: number
+  maxContinuousPeriods: number
   courseCount: number
   classCount: number
   dailyPeriods: Record<number, number>

@@ -17,7 +17,7 @@ import java.util.Map;
  * 说明：
  * - dailyPeriods 为动态键（周几 -> 节次和），保留 Map 弱类型不 VO 化，JSON 序列化为 {"1":3,...}，
  *   前端 Record&lt;number,number&gt;。
- * - maxContinuousPeriods 历史恒为 0（占位、未实现连续节次统计），保留以维持 JSON 逐字节不变。
+ * - maxContinuousPeriods 为同一教师同一天最长连续大节数，字段保留以维持 JSON 契约。
  * - courseCount / classCount 为去重后的数量（原先循环里先放 Set 再替换为 size），VO 直接存 Integer。
  * - 普通 POJO、保留 null 序列化（department 可能为 null），不加 NON_NULL。
  *
@@ -37,7 +37,7 @@ public class TeacherWorkloadVo {
 
     private Integer maxDailyPeriods;
 
-    /** 历史恒为 0（占位字段），保留以维持 JSON 不变。 */
+    /** 同一教师同一天最长连续大节数。 */
     private Integer maxContinuousPeriods;
 
     private Integer courseCount;

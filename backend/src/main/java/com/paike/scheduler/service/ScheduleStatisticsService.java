@@ -58,6 +58,8 @@ public class ScheduleStatisticsService {
             acc.courseIds.add(courseId);
             acc.classIds.add(classId);
             acc.dailyPeriods.merge(weekday, (long) periods, ScheduleStatisticsService::sumLongs);
+            getPeriodRange(obj, timeSlotCache).ifPresent(range ->
+                    acc.periodRangesByDay.computeIfAbsent(weekday, ignored -> new ArrayList<>()).add(range));
         }
 
         // 填充关联信息 + 计算衍生指标
@@ -68,6 +70,7 @@ public class ScheduleStatisticsService {
 
             Teacher teacher = teacherCache.computeIfAbsent(teacherId, id -> teacherMapper.selectById(id));
             int maxDaily = acc.dailyPeriods.values().stream().mapToInt(Long::intValue).max().orElse(0);
+            int maxContinuous = calculateMaxContinuousPeriods(acc.periodRangesByDay);
             String evaluation = evaluateWorkload(acc.totalPeriods, maxDaily);
 
             TeacherWorkloadVo vo = new TeacherWorkloadVo();
@@ -75,7 +78,7 @@ public class ScheduleStatisticsService {
             vo.setTotalPeriods(acc.totalPeriods);
             vo.setDailyPeriods(acc.dailyPeriods);
             vo.setMaxDailyPeriods(maxDaily);
-            vo.setMaxContinuousPeriods(0); // 历史恒为 0（占位字段），保留以维持 JSON 不变
+            vo.setMaxContinuousPeriods(maxContinuous);
             vo.setCourseCount(acc.courseIds.size());
             vo.setClassCount(acc.classIds.size());
             vo.setTeacherName(teacher != null ? teacher.getName() : "未知");
@@ -356,6 +359,57 @@ public class ScheduleStatisticsService {
         return 0;
     }
 
+    private Optional<PeriodRange> getPeriodRange(Object obj, Map<Long, TimeSlot> timeSlotMap) {
+        if (obj instanceof SchedulePlanItem) {
+            SchedulePlanItem item = (SchedulePlanItem) obj;
+            if (item.getStartPeriod() == null || item.getEndPeriod() == null) {
+                return Optional.empty();
+            }
+            int startPeriodNo = (item.getStartPeriod() + 1) / 2;
+            int endPeriodNo = (item.getEndPeriod() + 1) / 2;
+            return Optional.of(new PeriodRange(startPeriodNo, endPeriodNo));
+        }
+        if (obj instanceof Schedule) {
+            Long timeSlotId = ((Schedule) obj).getTimeSlotId();
+            TimeSlot slot = timeSlotId == null ? null : timeSlotMap.get(timeSlotId);
+            if (slot == null || slot.getPeriodNo() == null) {
+                return Optional.empty();
+            }
+            return Optional.of(new PeriodRange(slot.getPeriodNo(), slot.getPeriodNo()));
+        }
+        return Optional.empty();
+    }
+
+    private int calculateMaxContinuousPeriods(Map<Integer, List<PeriodRange>> rangesByDay) {
+        int max = 0;
+        for (List<PeriodRange> ranges : rangesByDay.values()) {
+            List<PeriodRange> sorted = ranges.stream()
+                    .filter(range -> range.start <= range.end)
+                    .sorted(Comparator.comparingInt(PeriodRange::start))
+                    .toList();
+            int currentStart = 0;
+            int currentEnd = 0;
+            for (PeriodRange range : sorted) {
+                if (currentStart == 0) {
+                    currentStart = range.start;
+                    currentEnd = range.end;
+                    continue;
+                }
+                if (range.start <= currentEnd + 1) {
+                    currentEnd = Math.max(currentEnd, range.end);
+                } else {
+                    max = Math.max(max, currentEnd - currentStart + 1);
+                    currentStart = range.start;
+                    currentEnd = range.end;
+                }
+            }
+            if (currentStart != 0) {
+                max = Math.max(max, currentEnd - currentStart + 1);
+            }
+        }
+        return max;
+    }
+
     private String evaluateWorkload(int totalPeriods, int maxDaily) {
         if (totalPeriods >= 20) return "超负荷";
         if (maxDaily >= 6) return "日课时偏高";
@@ -405,8 +459,12 @@ public class ScheduleStatisticsService {
     private static final class TeacherWorkloadAcc {
         private int totalPeriods;
         private final Map<Integer, Long> dailyPeriods = new LinkedHashMap<>();
+        private final Map<Integer, List<PeriodRange>> periodRangesByDay = new LinkedHashMap<>();
         private final Set<Long> courseIds = new HashSet<>();
         private final Set<Long> classIds = new HashSet<>();
+    }
+
+    private record PeriodRange(int start, int end) {
     }
 
     /** 班级均衡度聚合累加器：替代原 Map&lt;String,Object&gt; 行累加。 */
