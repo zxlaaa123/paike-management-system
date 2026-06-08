@@ -123,6 +123,7 @@ onMounted(() => {
           </template>
           <el-menu-item index="/v6/audit-logs">审计日志</el-menu-item>
           <el-menu-item index="/v6/regression-tests">回归测试</el-menu-item>
+          <el-menu-item index="/v6/consistency-checks">一致性检查</el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="analysis">
           <template #title>

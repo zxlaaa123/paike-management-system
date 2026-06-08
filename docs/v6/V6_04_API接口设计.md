@@ -53,33 +53,42 @@ GET /api/v6/regression-tests/{id}
 
 ## 三、数据一致性接口
 
-### 3.1 创建一致性检查
+当前状态校准（2026-06-08）：
+
+1. V6 第三阶段最小可交付版复用 `schedule_consistency_check`。
+2. 不直接新增 `data_consistency_check_run` / `data_consistency_issue`。
+3. 触发检查复用 `V5ConsistencyCheckService`。
+
+### 3.1 触发一致性检查
 
 ```http
-POST /api/v6/consistency/check-runs
+POST /api/v6/consistency-checks/run?taskId=1&planId=2
 ```
 
-请求：
-
-```json
-{
-  "checkScope": "SEMESTER",
-  "semesterId": 1,
-  "planId": 10
-}
-```
-
-### 3.2 查询一致性检查详情
+### 3.2 查询一致性检查列表
 
 ```http
-GET /api/v6/consistency/check-runs/{runId}
+GET /api/v6/consistency-checks
 ```
 
-### 3.3 查询一致性问题
+查询参数：
+
+| 参数 | 说明 |
+|---|---|
+| status | PASS / WARN / FAIL |
+| checkType | 检查类型 |
+| semesterId | 学期 ID |
+| planId | 方案 ID |
+| page | 页码 |
+| size | 每页数量 |
+
+### 3.3 查询一致性检查详情
 
 ```http
-GET /api/v6/consistency/check-runs/{runId}/issues
+GET /api/v6/consistency-checks/{id}
 ```
+
+详情响应包含持久化记录、报告和问题清单。
 
 ## 四、性能基线接口
 

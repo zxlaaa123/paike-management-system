@@ -211,6 +211,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/v6/RegressionTestView.vue'),
       },
       {
+        path: 'v6/consistency-checks',
+        name: 'V6ConsistencyChecks',
+        component: () => import('../views/v6/ConsistencyCheckView.vue'),
+      },
+      {
         path: 'v4/schedule-analysis/:planId',
         name: 'V4ScheduleAnalysisDetail',
         component: () => import('../views/v4/ScheduleAnalysisDetail.vue'),
