@@ -3,7 +3,6 @@ package com.paike.scheduler.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.common.response.Result;
-import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.service.vo.SchedulePlanItemVo;
 import com.paike.scheduler.service.vo.SchedulePlanVo;
 import com.paike.scheduler.entity.ScheduleGenerateLog;
@@ -36,7 +35,7 @@ public class SchedulePlanController {
     private final SchedulePlanExplainService explainService;
 
     @GetMapping
-    public Result<Page<SchedulePlan>> list(
+    public Result<Page<SchedulePlanVo>> list(
             @RequestParam(required = false) Long semesterId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String strategyType,
@@ -56,12 +55,12 @@ public class SchedulePlanController {
                 return Result.success(new Page<>(page, size));
             }
         }
-        return Result.success(planService.list(resolvedSemesterId, status, strategyType, keyword, page, size));
+        return Result.success(planService.listVo(resolvedSemesterId, status, strategyType, keyword, page, size));
     }
 
     @GetMapping("/{id}")
     public Result<SchedulePlanVo> getById(@PathVariable Long id) {
-        return Result.success(SchedulePlanVo.fromEntity(planService.getById(id)));
+        return Result.success(planService.getVoById(id));
     }
 
     @GetMapping("/{planId}/items")

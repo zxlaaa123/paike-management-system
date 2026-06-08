@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 public class SchedulePlanService {
 
     private final SchedulePlanMapper planMapper;
+    private final SemesterMapper semesterMapper;
     private final SchedulePlanItemMapper planItemMapper;
     private final ScheduleMapper scheduleMapper;
     private final ScheduleLockedItemMapper scheduleLockedItemMapper;
@@ -66,12 +67,30 @@ public class SchedulePlanService {
         return planMapper.selectPage(new Page<>(page, size), wrapper);
     }
 
+    public Page<SchedulePlanVo> listVo(Long semesterId, String status, String strategyType, String keyword, int page, int size) {
+        Page<SchedulePlan> source = list(semesterId, status, strategyType, keyword, page, size);
+        List<SchedulePlanVo> records = source.getRecords().stream()
+                .map(SchedulePlanVo::fromEntity)
+                .collect(Collectors.toList());
+        fillPlanDisplayFields(records);
+
+        Page<SchedulePlanVo> result = new Page<>(source.getCurrent(), source.getSize(), source.getTotal());
+        result.setRecords(records);
+        return result;
+    }
+
     public SchedulePlan getById(Long id) {
         SchedulePlan plan = planMapper.selectById(id);
         if (plan == null) {
             throw new BusinessException("排课方案不存在");
         }
         return plan;
+    }
+
+    public SchedulePlanVo getVoById(Long id) {
+        SchedulePlanVo vo = SchedulePlanVo.fromEntity(getById(id));
+        fillPlanDisplayFields(List.of(vo));
+        return vo;
     }
 
     public List<SchedulePlanItemVo> getPlanItems(Long planId) {
@@ -527,6 +546,42 @@ public class SchedulePlanService {
     /** 委托 SchedulePlanItemVo.fromEntity 逐字段拷贝持久化列（view 字段由 fillItemRelations 填充）。 */
     private SchedulePlanItemVo planItemToVo(SchedulePlanItem entity) {
         return SchedulePlanItemVo.fromEntity(entity);
+    }
+
+    private void fillPlanDisplayFields(List<SchedulePlanVo> plans) {
+        if (plans == null || plans.isEmpty()) {
+            return;
+        }
+
+        List<Long> semesterIds = plans.stream()
+                .map(SchedulePlanVo::getSemesterId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, Semester> semesterMap = semesterIds.isEmpty()
+                ? Map.of()
+                : semesterMapper.selectBatchIds(semesterIds)
+                .stream()
+                .collect(Collectors.toMap(Semester::getId, Function.identity(), (a, b) -> a));
+
+        for (SchedulePlanVo plan : plans) {
+            Semester semester = semesterMap.get(plan.getSemesterId());
+            plan.setSemesterName(semester != null ? semester.getName() : null);
+            plan.setStrategyName(strategyName(plan.getStrategyType()));
+        }
+    }
+
+    private String strategyName(String type) {
+        if (type == null) {
+            return null;
+        }
+        return switch (type) {
+            case "TEACHER_PRIORITY" -> "教师优先";
+            case "CLASS_BALANCE" -> "班级均衡";
+            case "CLASSROOM_UTILIZATION" -> "教室利用率";
+            case "COMPREHENSIVE" -> "综合最优";
+            default -> type;
+        };
     }
 
     private List<String> buildConflictReasons(
