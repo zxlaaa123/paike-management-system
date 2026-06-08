@@ -9,7 +9,8 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "smoke:api": "node scripts/api-smoke-test.js"
+    "smoke:api": "node scripts/api-smoke-test.js",
+    "test:v6": "playwright test tests/v6-governance.spec.ts"
   },
   "keywords": [],
   "author": "",
