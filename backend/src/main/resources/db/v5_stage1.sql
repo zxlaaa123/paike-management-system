@@ -3,41 +3,50 @@
 -- =============================================
 
 -- 0) 扩展 schedule_plan：标记试算方案与来源方案
-DROP PROCEDURE IF EXISTS add_v5_stage1_schedule_plan_columns;
 
-DELIMITER //
-CREATE PROCEDURE add_v5_stage1_schedule_plan_columns()
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS
-                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_plan'
-                     AND COLUMN_NAME = 'plan_mode') THEN
-        ALTER TABLE schedule_plan
-            ADD COLUMN plan_mode VARCHAR(20) NOT NULL DEFAULT 'NORMAL' COMMENT '方案模式：NORMAL/SIMULATION' AFTER strategy_type;
-    END IF;
+SET @ddl = (
+    SELECT IF(
+        NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_plan' AND COLUMN_NAME = 'plan_mode'),
+        'ALTER TABLE schedule_plan ADD COLUMN plan_mode VARCHAR(20) NOT NULL DEFAULT ''NORMAL'' COMMENT ''方案模式：NORMAL/SIMULATION'' AFTER strategy_type',
+        'SELECT 1'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS
-                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_plan'
-                     AND COLUMN_NAME = 'source_plan_id') THEN
-        ALTER TABLE schedule_plan
-            ADD COLUMN source_plan_id BIGINT NULL COMMENT '来源方案ID（试算/重排来源）' AFTER id;
-    END IF;
+SET @ddl = (
+    SELECT IF(
+        NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_plan' AND COLUMN_NAME = 'source_plan_id'),
+        'ALTER TABLE schedule_plan ADD COLUMN source_plan_id BIGINT NULL COMMENT ''来源方案ID（试算/重排来源）'' AFTER id',
+        'SELECT 1'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
-                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_plan'
-                     AND INDEX_NAME = 'idx_schedule_plan_mode') THEN
-        CREATE INDEX idx_schedule_plan_mode ON schedule_plan(plan_mode);
-    END IF;
+SET @ddl = (
+    SELECT IF(
+        NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_plan' AND INDEX_NAME = 'idx_schedule_plan_mode'),
+        'CREATE INDEX idx_schedule_plan_mode ON schedule_plan(plan_mode)',
+        'SELECT 1'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
-                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_plan'
-                     AND INDEX_NAME = 'idx_schedule_plan_source_plan') THEN
-        CREATE INDEX idx_schedule_plan_source_plan ON schedule_plan(source_plan_id);
-    END IF;
-END //
-DELIMITER ;
-
-CALL add_v5_stage1_schedule_plan_columns();
-DROP PROCEDURE IF EXISTS add_v5_stage1_schedule_plan_columns;
+SET @ddl = (
+    SELECT IF(
+        NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule_plan' AND INDEX_NAME = 'idx_schedule_plan_source_plan'),
+        'CREATE INDEX idx_schedule_plan_source_plan ON schedule_plan(source_plan_id)',
+        'SELECT 1'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- 1) 修复任务记录
 CREATE TABLE IF NOT EXISTS schedule_repair_task (

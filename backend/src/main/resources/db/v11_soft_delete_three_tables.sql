@@ -11,7 +11,14 @@ SET @col_exists := (
       AND COLUMN_NAME = 'deleted'
 );
 
-SET @ddl := IF(@col_exists = 0,
+SET @table_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'schedule_locked_item'
+);
+
+SET @ddl := IF(@table_exists > 0 AND @col_exists = 0,
                'ALTER TABLE schedule_locked_item ADD COLUMN deleted TINYINT NOT NULL DEFAULT 0 COMMENT ''软删除标记 0=未删 1=已删''',
                'SELECT 1');
 PREPARE stmt FROM @ddl;
@@ -27,7 +34,14 @@ SET @col_exists := (
       AND COLUMN_NAME = 'deleted'
 );
 
-SET @ddl := IF(@col_exists = 0,
+SET @table_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'schedule_adjust_log'
+);
+
+SET @ddl := IF(@table_exists > 0 AND @col_exists = 0,
                'ALTER TABLE schedule_adjust_log ADD COLUMN deleted TINYINT NOT NULL DEFAULT 0 COMMENT ''软删除标记 0=未删 1=已删''',
                'SELECT 1');
 PREPARE stmt FROM @ddl;
@@ -43,7 +57,14 @@ SET @col_exists := (
       AND COLUMN_NAME = 'deleted'
 );
 
-SET @ddl := IF(@col_exists = 0,
+SET @table_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'schedule_unassigned_task'
+);
+
+SET @ddl := IF(@table_exists > 0 AND @col_exists = 0,
                'ALTER TABLE schedule_unassigned_task ADD COLUMN deleted TINYINT NOT NULL DEFAULT 0 COMMENT ''软删除标记 0=未删 1=已删''',
                'SELECT 1');
 PREPARE stmt FROM @ddl;

@@ -78,7 +78,7 @@
 CREATE DATABASE paike CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-后端启动时会执行 `backend/src/main/resources/db/*.sql` 中配置到 `application.yml` 的脚本，`continue-on-error` 已开启，开发环境可重复启动。
+后端启动时会执行 `backend/src/main/resources/db/*.sql` 中配置到 `application.yml` 的脚本；迁移失败会中断启动，新增脚本必须保持幂等。
 
 ## 后端启动
 

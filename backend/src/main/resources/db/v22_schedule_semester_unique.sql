@@ -5,64 +5,69 @@
 -- the same time slot conflict across different semesters. Keep the historical
 -- key names so later code/tests can keep checking the same business constraints.
 
-DROP PROCEDURE IF EXISTS fix_schedule_semester_unique_v22;
+SET @ddl = (
+    SELECT IF(
+        EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule' AND INDEX_NAME = 'uk_schedule_teacher_slot') AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule' AND INDEX_NAME = 'uk_schedule_teacher_slot' AND COLUMN_NAME = 'semester_id'),
+        'ALTER TABLE schedule DROP INDEX uk_schedule_teacher_slot',
+        'SELECT 1'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-DELIMITER //
-CREATE PROCEDURE fix_schedule_semester_unique_v22()
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.STATISTICS
-               WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule'
-                 AND INDEX_NAME = 'uk_schedule_teacher_slot')
-       AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
-                       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule'
-                         AND INDEX_NAME = 'uk_schedule_teacher_slot'
-                         AND COLUMN_NAME = 'semester_id') THEN
-        ALTER TABLE schedule DROP INDEX uk_schedule_teacher_slot;
-    END IF;
+SET @ddl = (
+    SELECT IF(
+        EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule' AND INDEX_NAME = 'uk_schedule_class_slot') AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule' AND INDEX_NAME = 'uk_schedule_class_slot' AND COLUMN_NAME = 'semester_id'),
+        'ALTER TABLE schedule DROP INDEX uk_schedule_class_slot',
+        'SELECT 1'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-    IF EXISTS (SELECT 1 FROM information_schema.STATISTICS
-               WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule'
-                 AND INDEX_NAME = 'uk_schedule_class_slot')
-       AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
-                       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule'
-                         AND INDEX_NAME = 'uk_schedule_class_slot'
-                         AND COLUMN_NAME = 'semester_id') THEN
-        ALTER TABLE schedule DROP INDEX uk_schedule_class_slot;
-    END IF;
+SET @ddl = (
+    SELECT IF(
+        EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule' AND INDEX_NAME = 'uk_schedule_classroom_slot') AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule' AND INDEX_NAME = 'uk_schedule_classroom_slot' AND COLUMN_NAME = 'semester_id'),
+        'ALTER TABLE schedule DROP INDEX uk_schedule_classroom_slot',
+        'SELECT 1'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-    IF EXISTS (SELECT 1 FROM information_schema.STATISTICS
-               WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule'
-                 AND INDEX_NAME = 'uk_schedule_classroom_slot')
-       AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
-                       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule'
-                         AND INDEX_NAME = 'uk_schedule_classroom_slot'
-                         AND COLUMN_NAME = 'semester_id') THEN
-        ALTER TABLE schedule DROP INDEX uk_schedule_classroom_slot;
-    END IF;
+SET @ddl = (
+    SELECT IF(
+        NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule' AND INDEX_NAME = 'uk_schedule_teacher_slot'),
+        'ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_teacher_slot (semester_id, time_slot_id, teacher_id, active_key)',
+        'SELECT 1'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
-                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule'
-                     AND INDEX_NAME = 'uk_schedule_teacher_slot') THEN
-        ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_teacher_slot
-            (semester_id, time_slot_id, teacher_id, active_key);
-    END IF;
+SET @ddl = (
+    SELECT IF(
+        NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule' AND INDEX_NAME = 'uk_schedule_class_slot'),
+        'ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_class_slot (semester_id, time_slot_id, class_id, active_key)',
+        'SELECT 1'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
-                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule'
-                     AND INDEX_NAME = 'uk_schedule_class_slot') THEN
-        ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_class_slot
-            (semester_id, time_slot_id, class_id, active_key);
-    END IF;
-
-    IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
-                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule'
-                     AND INDEX_NAME = 'uk_schedule_classroom_slot') THEN
-        ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_classroom_slot
-            (semester_id, time_slot_id, classroom_id, active_key);
-    END IF;
-END //
-DELIMITER ;
-
-CALL fix_schedule_semester_unique_v22();
-DROP PROCEDURE IF EXISTS fix_schedule_semester_unique_v22;
+SET @ddl = (
+    SELECT IF(
+        NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule' AND INDEX_NAME = 'uk_schedule_classroom_slot'),
+        'ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_classroom_slot (semester_id, time_slot_id, classroom_id, active_key)',
+        'SELECT 1'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 

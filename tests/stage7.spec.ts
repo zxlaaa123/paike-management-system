@@ -450,11 +450,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   })
 
   test('19. 前端排课页-列表', async ({ page }) => {
-    await loginAndGoTo(page, '/dashboard')
-    await page.locator('.el-sub-menu__title').filter({ hasText: '教学管理' }).click()
-    await page.waitForTimeout(500)
-    await page.locator('.el-menu-item').filter({ hasText: '手动排课' }).click()
-    await page.waitForURL('**/schedule', { timeout: 15000 })
+    await loginAndGoTo(page, '/schedule')
     await expect(page.locator('text=排课列表')).toBeVisible()
     await expect(page.locator('button:has-text("新增排课")')).toBeVisible()
   })

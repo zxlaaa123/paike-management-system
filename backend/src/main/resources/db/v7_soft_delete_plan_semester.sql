@@ -1,6 +1,6 @@
 -- =============================================
 -- V7 soft delete for schedule_plan / schedule_plan_item / semester
--- Spring sql.init 不支持 DELIMITER / PROCEDURE 语法，改用 information_schema + PREPARE 做幂等 ALTER。
+-- Spring sql.init 直接执行分号分隔语句，改用 information_schema + PREPARE 做幂等 ALTER。
 -- =============================================
 
 SET @ddl = (

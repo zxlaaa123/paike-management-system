@@ -197,7 +197,7 @@ test.describe.serial('V3 阶段 6：方案对比与应用回滚', () => {
     await loginAndGoTo(page, '/v3/schedule-compare')
 
     // 验证页面加载 - 应有当前学期信息（用 .first() 避免 strict mode）
-    const semesterAlert = page.locator('.el-alert__title:has-text("当前学期")')
+    const semesterAlert = page.getByRole('alert').filter({ hasText: '当前学期' })
     await expect(semesterAlert.first()).toBeVisible({ timeout: 10000 })
     console.log('  [OK] 当前学期信息已显示')
 

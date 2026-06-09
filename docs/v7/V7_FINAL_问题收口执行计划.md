@@ -8,6 +8,27 @@
 4. 全部审查结果合并到 `reports/v7-final-deep-bug-audit-2026-06-09.md`。
 5. 审查完成后，再按 P1 -> P2 -> P3 顺序修复。
 
+## 2026-06-09 最终实机验收补充收口
+
+### 补充问题
+
+1. 旧迁移脚本仍使用 MySQL 客户端专用 `DELIMITER + CREATE PROCEDURE`，在 `spring.sql.init.continue-on-error=false` 下启动失败。
+2. 新库初始化顺序中，`v6_bugfix_constraints.sql` / `v11_soft_delete_three_tables.sql` 早于 `v14_missing_v4_v5_tables_and_schedule_keys.sql`，引用晚建表时缺少表存在保护。
+3. E2E 中两处前端断言依赖内部 DOM 类或菜单动画，导致页面实际可用但验收误判。
+
+### 补充修复
+
+1. 将注册迁移中的旧 PROCEDURE 风格统一改写为 `information_schema + SET @ddl + PREPARE + EXECUTE`。
+2. 对早期迁移引用的晚建表增加 `information_schema.TABLES` 判断。
+3. 调整 `tests/stage6.spec.ts` 和 `tests/stage7.spec.ts`，改用用户可见文本/直接页面入口验证。
+
+### 补充验证
+
+1. 新建隔离库 `paike_v7_acceptance_20260609_2025`。
+2. 后端 `8090` 健康检查通过，`admin/123456` 登录通过。
+3. `cd D:\paike; npm test`：通过，`52 passed (3.8m)`。
+4. 验收后已停止后端和前端进程树，`8090` / `5173` 无监听残留。
+
 ## 剩余审查范围
 
 | 顺序 | 范围 | 执行方式 | 状态 |

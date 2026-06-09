@@ -32,7 +32,7 @@ Spring Boot 启动时依次执行：
 | 文件 | 内容 |
 |---|---|
 | `v2_schema.sql` | 新增 7 张表：`teacher_unavailable_time` / `schedule_rule_config` / `auto_schedule_batch` / `unscheduled_task` / `schedule_conflict_report` / `schedule_score_report` + 默认规则初始化 |
-| `v2_alter_schedule.sql` | 给 `schedule` 表加 `source_type` / `batch_id`（DROP PROCEDURE 幂等模式）|
+| `v2_alter_schedule.sql` | 给 `schedule` 表加 `source_type` / `batch_id`（information_schema + PREPARE 幂等模式）|
 | `v2_alter_score_report.sql` | 给 `schedule_score_report` 加 `grade_name` |
 
 ### v3_*.sql — 学期管理与排课方案
@@ -56,9 +56,9 @@ Spring Boot 启动时依次执行：
 
 | 文件 | 内容 | 备注 |
 |---|---|---|
-| `v6_bugfix_constraints.sql` | `teacher_unavailable_time.active_key` 生成列 + `uk_teacher_timeslot` 唯一索引；`schedule_plan_item.uk_plan_task_slot`；`schedule_locked_item.active_key` + `uk_locked_plan_item` / `uk_locked_schedule` 唯一索引 | **用了 `DELIMITER + CREATE PROCEDURE`，Spring `ScriptUtils` 不正式支持**，但本机已确认生效。**不改写为 v7 风格**（DDL 已持久化）|
-| `v6_schedule_index.sql` | `schedule` 表的业务索引和唯一约束（TOCTOU 防护）| PROCEDURE 风格 |
-| `v6_semester_current_unique.sql` | `semester.is_current=1` 至多一行的并发兜底（虚拟生成列 + UNIQUE）| PROCEDURE 风格 |
+| `v6_bugfix_constraints.sql` | `teacher_unavailable_time.active_key` 生成列 + `uk_teacher_timeslot` 唯一索引；`schedule_plan_item.uk_plan_task_slot`；`schedule_locked_item.active_key` + `uk_locked_plan_item` / `uk_locked_schedule` 唯一索引 | information_schema + PREPARE 幂等 DDL |
+| `v6_schedule_index.sql` | `schedule` 表的业务索引和唯一约束（TOCTOU 防护）| information_schema + PREPARE 幂等 DDL |
+| `v6_semester_current_unique.sql` | `semester.is_current=1` 至多一行的并发兜底（虚拟生成列 + UNIQUE）| information_schema + PREPARE 幂等 DDL |
 
 ### v7_*.sql — 软删除收尾
 
@@ -103,7 +103,7 @@ Spring Boot 启动时依次执行：
 ## 4. 新增 schema 改动时的约定
 
 1. **新文件命名**：使用下一个可用序号；当前最后一项以 `application.yml` 的 `schema-locations` 为准。
-2. **幂等写法**：DDL 必须先查 `information_schema.COLUMNS` / `information_schema.STATISTICS` 再执行；允许使用现有脚本已验证的 `DELIMITER + CREATE PROCEDURE` 模式。
+2. **幂等写法**：DDL 必须先查 `information_schema.COLUMNS` / `information_schema.STATISTICS`，再通过 `SET @ddl` + `PREPARE` + `EXECUTE` 执行；不要使用 MySQL 客户端专用的 `DELIMITER + CREATE PROCEDURE` 模式。
 3. **注册到 `application.yml`**：把新文件加到 `spring.sql.init.schema-locations` 末尾。
 4. **不要扩 `SemesterSchemaInitializer`**：能写在 SQL 文件的就不写 Java。Initializer 只为兜底极老库。
 5. **新表慎在 Initializer 里建**：`ensureStage7/9Tables` 是历史遗留，新表应该写在 v\*.sql 文件里。
