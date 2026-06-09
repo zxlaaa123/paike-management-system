@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
@@ -22,37 +23,46 @@ public class TimetableController {
 
     /** 班级课表 */
     @GetMapping("/classes/{classId}")
-    public Result<List<TimetableVo>> classTimetable(@PathVariable Long classId) {
-        return Result.success(timetableService.listClassTimetable(classId));
+    public Result<List<TimetableVo>> classTimetable(@PathVariable Long classId,
+                                                    @RequestParam(required = false) Long semesterId) {
+        return Result.success(timetableService.listClassTimetable(classId, semesterId));
     }
 
     /** 教师课表 */
     @GetMapping("/teachers/{teacherId}")
-    public Result<List<TimetableVo>> teacherTimetable(@PathVariable Long teacherId) {
-        return Result.success(timetableService.listTeacherTimetable(teacherId));
+    public Result<List<TimetableVo>> teacherTimetable(@PathVariable Long teacherId,
+                                                      @RequestParam(required = false) Long semesterId) {
+        return Result.success(timetableService.listTeacherTimetable(teacherId, semesterId));
     }
 
     /** 教室课表 */
     @GetMapping("/classrooms/{classroomId}")
-    public Result<List<TimetableVo>> classroomTimetable(@PathVariable Long classroomId) {
-        return Result.success(timetableService.listClassroomTimetable(classroomId));
+    public Result<List<TimetableVo>> classroomTimetable(@PathVariable Long classroomId,
+                                                        @RequestParam(required = false) Long semesterId) {
+        return Result.success(timetableService.listClassroomTimetable(classroomId, semesterId));
     }
 
     /** 导出班级课表 */
     @GetMapping("/classes/{classId}/export")
-    public void exportClassTimetable(@PathVariable Long classId, HttpServletResponse response) throws IOException {
-        timetableService.exportClassTimetable(classId, response);
+    public void exportClassTimetable(@PathVariable Long classId,
+                                     @RequestParam(required = false) Long semesterId,
+                                     HttpServletResponse response) throws IOException {
+        timetableService.exportClassTimetable(classId, semesterId, response);
     }
 
     /** 导出教师课表 */
     @GetMapping("/teachers/{teacherId}/export")
-    public void exportTeacherTimetable(@PathVariable Long teacherId, HttpServletResponse response) throws IOException {
-        timetableService.exportTeacherTimetable(teacherId, response);
+    public void exportTeacherTimetable(@PathVariable Long teacherId,
+                                       @RequestParam(required = false) Long semesterId,
+                                       HttpServletResponse response) throws IOException {
+        timetableService.exportTeacherTimetable(teacherId, semesterId, response);
     }
 
     /** 导出教室占用表 */
     @GetMapping("/classrooms/{classroomId}/export")
-    public void exportClassroomTimetable(@PathVariable Long classroomId, HttpServletResponse response) throws IOException {
-        timetableService.exportClassroomTimetable(classroomId, response);
+    public void exportClassroomTimetable(@PathVariable Long classroomId,
+                                         @RequestParam(required = false) Long semesterId,
+                                         HttpServletResponse response) throws IOException {
+        timetableService.exportClassroomTimetable(classroomId, semesterId, response);
     }
 }

@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getAllClassrooms, type Classroom } from '../../api/classroom'
+import { getCurrentSemester, type Semester } from '../../api/semester'
 import { exportClassroomTimetable, getClassroomTimetable, type TimetableItem } from '../../api/timetable'
 import TimetableGrid from '../../components/TimetableGrid.vue'
 
@@ -10,15 +11,23 @@ const selectedRoomId = ref<number | undefined>()
 const timetable = ref<TimetableItem[]>([])
 const loading = ref(false)
 const exportLoading = ref(false)
+const currentSemester = ref<Semester | null>(null)
 
 const selectedRoomName = computed(() => {
   const r = roomList.value.find((x) => x.id === selectedRoomId.value)
   return r?.roomName || ''
 })
 
+const currentSemesterName = computed(() => currentSemester.value?.name || '当前学期')
+
 onMounted(async () => {
   try {
-    roomList.value = await getAllClassrooms()
+    const [rooms, semester] = await Promise.all([
+      getAllClassrooms(),
+      getCurrentSemester().catch(() => null),
+    ])
+    roomList.value = rooms
+    currentSemester.value = semester
   } catch (_e) {
     console.error(_e)
     ElMessage.error('加载教室列表失败')
@@ -27,9 +36,13 @@ onMounted(async () => {
 
 async function handleChange(roomId: number) {
   if (!roomId) return
+  if (!currentSemester.value?.id) {
+    ElMessage.warning('当前学期未设置，无法查看课表')
+    return
+  }
   loading.value = true
   try {
-    timetable.value = await getClassroomTimetable(roomId)
+    timetable.value = await getClassroomTimetable(roomId, { semesterId: currentSemester.value.id })
   } catch (_e) {
     console.error(_e)
     ElMessage.error('加载课表失败')
@@ -43,9 +56,13 @@ async function handleExport() {
     ElMessage.warning('请先选择教室')
     return
   }
+  if (!currentSemester.value?.id) {
+    ElMessage.warning('当前学期未设置，无法导出课表')
+    return
+  }
   exportLoading.value = true
   try {
-    await exportClassroomTimetable(selectedRoomId.value)
+    await exportClassroomTimetable(selectedRoomId.value, { semesterId: currentSemester.value.id })
   } catch (_e) {
     console.error(_e)
     ElMessage.error('导出教室占用表失败')
@@ -59,6 +76,9 @@ async function handleExport() {
   <div class="page-container">
     <el-card shadow="never">
       <el-form :inline="true">
+        <el-form-item label="学期">
+          <el-tag type="info">{{ currentSemesterName }}</el-tag>
+        </el-form-item>
         <el-form-item label="选择教室">
           <el-select
             v-model="selectedRoomId"

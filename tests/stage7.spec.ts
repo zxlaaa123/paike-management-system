@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { apiHeaders, loginAndGoTo as openAuthenticatedPage, loginAsAdmin, type AuthState } from './helpers/auth'
+import { deleteResourceIds, deleteSchedulesForClass } from './helpers/e2e-cleanup'
 
 const API_URL = 'http://127.0.0.1:8090'
 const BASE_URL = 'http://127.0.0.1:5173'
@@ -43,7 +44,16 @@ async function loginAndGoTo(page: any, path: string) {
   await openAuthenticatedPage(page, path, authState, BASE_URL)
 }
 
+function scheduleRow(page: any, ...texts: string[]) {
+  let row = page.locator('.el-table__body tr')
+  for (const text of texts) {
+    row = row.filter({ hasText: text })
+  }
+  return row.first()
+}
+
 test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
+  const createdTaskIds: number[] = []
   const ts = Date.now().toString().slice(-6)
   const T1_NO = `T${ts}`
   const T2_NO = `T2${ts}`
@@ -61,6 +71,21 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
 
   test('1. 登录', async ({ request }) => {
     authState = await loginAsAdmin(request, API_URL)
+  })
+
+  test.afterAll(async ({ request }) => {
+    if (!authState) {
+      return
+    }
+    const h = authHeaders()
+    await deleteSchedulesForClass(request, API_URL, h, ids.c1)
+    await deleteSchedulesForClass(request, API_URL, h, ids.c2)
+    await deleteResourceIds(request, API_URL, h, '/api/teaching-tasks', [ids.task1, ids.task2, ids.task3, ...createdTaskIds])
+    await deleteResourceIds(request, API_URL, h, '/api/courses', [ids.coNormal, ids.coExp, ids.coComp])
+    await deleteResourceIds(request, API_URL, h, '/api/classrooms', [ids.rNormal, ids.rLab, ids.rComp, ids.rSmall])
+    await deleteResourceIds(request, API_URL, h, '/api/classes', [ids.c1, ids.c2])
+    await deleteResourceIds(request, API_URL, h, '/api/teachers', [ids.t1, ids.t2])
+    ids = {}
   })
 
   test('2. 时间段返回20条', async ({ request }) => {
@@ -178,6 +203,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
     // 创建另一个张老师的任务（张老师+计科班+普通课 每周2节）
     const nt = await (await request.post(`${API_URL}/api/teaching-tasks`, { headers: h, data: { courseId: ids.coNormal, teacherId: ids.t1, classId: ids.c1, weeklyHours: 2, needContinuous: 0, status: 1 } })).json()
     expect(nt.code).toBe(200)
+    createdTaskIds.push(nt.data.id)
 
     // 同教师同时间不同教室 → 冲突
     const c2 = await (await request.post(`${API_URL}/api/schedules`, { headers: h, data: { teachingTaskId: nt.data.id, timeSlotId: slot, classroomId: ids.rComp } })).json()
@@ -202,6 +228,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
     // 创建新任务：李老师 + 计科班(同班级40人) + 普通课
     const nt = await (await request.post(`${API_URL}/api/teaching-tasks`, { headers: h, data: { courseId: ids.coNormal, teacherId: ids.t2, classId: ids.c1, weeklyHours: 2, needContinuous: 0, status: 1 } })).json()
     expect(nt.code).toBe(200)
+    createdTaskIds.push(nt.data.id)
 
     // 同班级同时间不同教室 → 冲突
     const c2 = await (await request.post(`${API_URL}/api/schedules`, { headers: h, data: { teachingTaskId: nt.data.id, timeSlotId: slot, classroomId: ids.rComp } })).json()
@@ -225,6 +252,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
     // 创建新任务：李老师 + 计科B班(60人) + 普通课 — 不同班级，避免班级冲突
     const nt = await (await request.post(`${API_URL}/api/teaching-tasks`, { headers: h, data: { courseId: ids.coNormal, teacherId: ids.t2, classId: ids.c2, weeklyHours: 2, needContinuous: 0, status: 1 } })).json()
     expect(nt.code).toBe(200)
+    createdTaskIds.push(nt.data.id)
 
     // 同教室(rLab容量50,够计科B班60人? 不够! 换rNormal容量60)
     // 先改为 c1 用 rComp(机房50,够40人), nt 用 rComp → 教室冲突
@@ -366,6 +394,7 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
     // 创建新任务：张老师+计科班(40人)+普通课 每周2节, 用rComp(机房50,够40人)
     const nt2 = await (await request.post(`${API_URL}/api/teaching-tasks`, { headers: h, data: { courseId: ids.coNormal, teacherId: ids.t1, classId: ids.c1, weeklyHours: 2, needContinuous: 0, status: 1 } })).json()
     expect(nt2.code).toBe(200)
+    createdTaskIds.push(nt2.data.id)
     const ck1 = await (await request.post(`${API_URL}/api/schedules/check-conflict`, { headers: h, data: { teachingTaskId: nt2.data.id, timeSlotId: slot, classroomId: ids.rComp } })).json()
     expect(ck1.code).toBe(200)
     if (!ck1.data.hasConflict) { console.log('ck1 no conflict, expected teacher conflict'); console.log('ck1:', ck1.data) }
@@ -449,9 +478,8 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
     await page.locator('.el-menu-item').filter({ hasText: '手动排课' }).click()
     await page.waitForURL('**/schedule', { timeout: 15000 })
 
-    const tc = page.locator('.table-card')
-    await expect(tc.locator('td:has-text("数据结构")').first()).toBeVisible({ timeout: 10000 })
-    await expect(tc.locator('td:has-text("张老师")').first()).toBeVisible()
+    const row = scheduleRow(page, '程序设计实践', R_COMP)
+    await expect(row).toBeVisible({ timeout: 10000 })
   })
 
   test('21. 前端排课页-删除排课', async ({ page }) => {
@@ -462,10 +490,10 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
     await page.waitForURL('**/schedule', { timeout: 15000 })
     await page.waitForTimeout(1000)
 
-    const tc = page.locator('.table-card')
-    await expect(tc.locator('td:has-text("程序设计实践")').first()).toBeVisible({ timeout: 10000 })
+    const row = scheduleRow(page, '程序设计实践', R_COMP)
+    await expect(row).toBeVisible({ timeout: 10000 })
 
-    await page.locator('button:has-text("删除")').first().click()
+    await row.locator('button:has-text("删除")').click()
     await page.waitForTimeout(500)
     // Element Plus 确认弹窗按钮可能是 "OK"/"Cancel" (英文) 或 "确定"/"取消" (中文)
     const okBtn = page.locator('.el-message-box__btns button:has-text("OK"), .el-message-box__btns button:has-text("确定")')
@@ -499,4 +527,3 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
     await expect(page.locator('div[aria-label="新增排课"]')).not.toBeVisible({ timeout: 5000 })
   })
 })
-

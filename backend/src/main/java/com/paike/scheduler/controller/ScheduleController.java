@@ -66,20 +66,23 @@ public class ScheduleController {
 
     /** 按班级查询排课列表 */
     @GetMapping("/class/{classId}")
-    public Result<List<ScheduleVo>> listByClass(@PathVariable Long classId) {
-        return Result.success(scheduleService.listByClass(classId));
+    public Result<List<ScheduleVo>> listByClass(@PathVariable Long classId,
+                                                @RequestParam(required = false) Long semesterId) {
+        return Result.success(scheduleService.listByClass(classId, semesterId));
     }
 
     /** 按教师查询排课列表 */
     @GetMapping("/teacher/{teacherId}")
-    public Result<List<ScheduleVo>> listByTeacher(@PathVariable Long teacherId) {
-        return Result.success(scheduleService.listByTeacher(teacherId));
+    public Result<List<ScheduleVo>> listByTeacher(@PathVariable Long teacherId,
+                                                  @RequestParam(required = false) Long semesterId) {
+        return Result.success(scheduleService.listByTeacher(teacherId, semesterId));
     }
 
     /** 按教室查询排课列表 */
     @GetMapping("/classroom/{classroomId}")
-    public Result<List<ScheduleVo>> listByClassroom(@PathVariable Long classroomId) {
-        return Result.success(scheduleService.listByClassroom(classroomId));
+    public Result<List<ScheduleVo>> listByClassroom(@PathVariable Long classroomId,
+                                                    @RequestParam(required = false) Long semesterId) {
+        return Result.success(scheduleService.listByClassroom(classroomId, semesterId));
     }
 
     /** 冲突检测接口（前端预检用，保存时仍会再次检测） */

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { House, DataLine, Calendar, Reading, PieChart, School, ArrowDown, Warning, Loading, Collection, Tickets } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -13,6 +13,10 @@ const authStore = useAuthStore()
 const currentSemester = ref<Semester | null>(null)
 const allSemesterList = ref<Semester[]>([])
 const semesterLoading = ref(false)
+const displayUserName = computed(() => {
+  const user = authStore.userInfo
+  return user?.realName || user?.username || '未登录用户'
+})
 
 async function fetchCurrentSemester() {
   semesterLoading.value = true
@@ -152,7 +156,7 @@ onMounted(() => {
     <el-container>
       <el-header class="app-header">
         <div class="header-left">
-          <span>当前登录：{{ authStore.userInfo?.realName || '管理员' }}</span>
+          <span>当前登录：{{ displayUserName }}</span>
           <span class="header-divider">|</span>
           <span v-if="semesterLoading" class="semester-info">
             <el-icon class="is-loading"><Loading /></el-icon>

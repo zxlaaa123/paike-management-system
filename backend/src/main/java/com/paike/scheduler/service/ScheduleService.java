@@ -173,10 +173,15 @@ public class ScheduleService {
     }
 
     /** 按班级查询排课列表 */
-    public List<ScheduleVo> listByClass(Long classId) {
+    public List<ScheduleVo> listByClass(Long classId, Long semesterId) {
+        Long resolvedSemesterId = resolveSemesterIdOrNull(semesterId);
+        if (resolvedSemesterId == null) {
+            return List.of();
+        }
         List<TeachingTask> tasks = teachingTaskMapper.selectList(
             new LambdaQueryWrapper<TeachingTask>()
                 .eq(TeachingTask::getClassId, classId)
+                .eq(TeachingTask::getSemesterId, resolvedSemesterId)
         );
         if (tasks.isEmpty()) {
             return List.of();
@@ -184,6 +189,7 @@ public class ScheduleService {
         List<Long> taskIds = tasks.stream().map(TeachingTask::getId).collect(Collectors.toList());
         List<Schedule> list = scheduleMapper.selectList(
             new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getSemesterId, resolvedSemesterId)
                 .in(Schedule::getTeachingTaskId, taskIds)
         );
         List<ScheduleVo> vos = list.stream().map(ScheduleVo::fromEntity).collect(Collectors.toList());
@@ -192,10 +198,15 @@ public class ScheduleService {
     }
 
     /** 按教师查询排课列表 */
-    public List<ScheduleVo> listByTeacher(Long teacherId) {
+    public List<ScheduleVo> listByTeacher(Long teacherId, Long semesterId) {
+        Long resolvedSemesterId = resolveSemesterIdOrNull(semesterId);
+        if (resolvedSemesterId == null) {
+            return List.of();
+        }
         List<TeachingTask> tasks = teachingTaskMapper.selectList(
             new LambdaQueryWrapper<TeachingTask>()
                 .eq(TeachingTask::getTeacherId, teacherId)
+                .eq(TeachingTask::getSemesterId, resolvedSemesterId)
         );
         if (tasks.isEmpty()) {
             return List.of();
@@ -203,6 +214,7 @@ public class ScheduleService {
         List<Long> taskIds = tasks.stream().map(TeachingTask::getId).collect(Collectors.toList());
         List<Schedule> list = scheduleMapper.selectList(
             new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getSemesterId, resolvedSemesterId)
                 .in(Schedule::getTeachingTaskId, taskIds)
         );
         List<ScheduleVo> vos = list.stream().map(ScheduleVo::fromEntity).collect(Collectors.toList());
@@ -211,14 +223,31 @@ public class ScheduleService {
     }
 
     /** 按教室查询排课列表 */
-    public List<ScheduleVo> listByClassroom(Long classroomId) {
+    public List<ScheduleVo> listByClassroom(Long classroomId, Long semesterId) {
+        Long resolvedSemesterId = resolveSemesterIdOrNull(semesterId);
+        if (resolvedSemesterId == null) {
+            return List.of();
+        }
         List<Schedule> list = scheduleMapper.selectList(
             new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getSemesterId, resolvedSemesterId)
                 .eq(Schedule::getClassroomId, classroomId)
         );
         List<ScheduleVo> vos = list.stream().map(ScheduleVo::fromEntity).collect(Collectors.toList());
         fillRelations(vos);
         return vos;
+    }
+
+    private Long resolveSemesterIdOrNull(Long semesterId) {
+        if (semesterId != null) {
+            return semesterId;
+        }
+        try {
+            return semesterService.getCurrentSemester().getId();
+        } catch (BusinessException e) {
+            log.warn("未找到当前学期，按对象查询排课返回空列表", e);
+            return null;
+        }
     }
 
     public String checkConflict(Long teachingTaskId, Long timeSlotId, Long classroomId) {

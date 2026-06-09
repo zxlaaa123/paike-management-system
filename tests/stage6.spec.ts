@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { apiHeaders, loginAndGoTo as openAuthenticatedPage, loginAsAdmin, type AuthState } from './helpers/auth'
+import { deleteResourceIds, deleteSchedulesForClass } from './helpers/e2e-cleanup'
 
 const API_URL = 'http://127.0.0.1:8090'
 const BASE_URL = 'http://127.0.0.1:5173'
@@ -132,6 +133,21 @@ async function loginAndGoTo(page: any, path: string) {
   await page.waitForTimeout(2000)
 }
 
+async function cleanupStageData(request: any) {
+  if (!authState) {
+    return
+  }
+  const h = authHeaders()
+  await deleteSchedulesForClass(request, API_URL, h, ids.classId)
+  await deleteResourceIds(request, API_URL, h, '/api/v3/schedule-plans', [ids.planId1, ids.planId2, ids.planId3])
+  await deleteResourceIds(request, API_URL, h, '/api/teaching-tasks', [ids.taskId])
+  await deleteResourceIds(request, API_URL, h, '/api/courses', [ids.courseId])
+  await deleteResourceIds(request, API_URL, h, '/api/classrooms', [ids.roomId])
+  await deleteResourceIds(request, API_URL, h, '/api/classes', [ids.classId])
+  await deleteResourceIds(request, API_URL, h, '/api/teachers', [ids.teacherId])
+  ids = {}
+}
+
 // ====== 测试套件 ======
 
 test.describe.serial('V3 阶段 6：方案对比与应用回滚', () => {
@@ -141,6 +157,10 @@ test.describe.serial('V3 阶段 6：方案对比与应用回滚', () => {
     await login(request)
     expect(authState?.cookieHeader).toBeTruthy()
     console.log('  [OK] 登录成功，cookie 已获取')
+  })
+
+  test.afterAll(async ({ request }) => {
+    await cleanupStageData(request)
   })
 
   test('2. 确保学期存在', async ({ request }) => {
@@ -702,25 +722,7 @@ test.describe.serial('V3 阶段 6：方案对比与应用回滚', () => {
   // ====== 清理 ======
 
   test('20. 清理 - 删除测试数据', async ({ request }) => {
-    // 删除方案（通过 API）
-    if (ids.planId1) {
-      await request.delete(`${API_URL}/api/v3/schedule-plans/${ids.planId1}`, {
-        headers: authHeaders(),
-      }).catch(() => {})
-    }
-    if (ids.planId2) {
-      await request.delete(`${API_URL}/api/v3/schedule-plans/${ids.planId2}`, {
-        headers: authHeaders(),
-      }).catch(() => {})
-    }
-
-    // 删除教学任务
-    if (ids.taskId) {
-      await request.delete(`${API_URL}/api/teaching-tasks/${ids.taskId}`, {
-        headers: authHeaders(),
-      }).catch(() => {})
-    }
-
+    await cleanupStageData(request)
     console.log('  [OK] 测试数据清理完成')
   })
 })

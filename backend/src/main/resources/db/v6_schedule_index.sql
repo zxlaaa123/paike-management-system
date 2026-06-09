@@ -1,7 +1,7 @@
 -- =============================================
 -- V6 schedule 表业务索引和唯一约束（幂等版本）
 -- 修复 P0: TOCTOU 竞态 + schedule 表零索引（#1 + A4）
--- 唯一约束使用 active_key：active rows 固定为 0，soft-deleted rows 为 NULL。
+-- 唯一约束使用 semester_id + active_key：active rows 固定为 0，soft-deleted rows 为 NULL。
 -- MySQL UNIQUE 允许多个 NULL，支持同位置多次软删后重建。
 -- =============================================
 
@@ -64,7 +64,7 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule'
                      AND INDEX_NAME = 'uk_schedule_teacher_slot') THEN
-        ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_teacher_slot (time_slot_id, teacher_id, active_key);
+        ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_teacher_slot (semester_id, time_slot_id, teacher_id, active_key);
     END IF;
 
     IF EXISTS (SELECT 1 FROM information_schema.STATISTICS
@@ -76,7 +76,7 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule'
                      AND INDEX_NAME = 'uk_schedule_class_slot') THEN
-        ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_class_slot (time_slot_id, class_id, active_key);
+        ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_class_slot (semester_id, time_slot_id, class_id, active_key);
     END IF;
 
     IF EXISTS (SELECT 1 FROM information_schema.STATISTICS
@@ -88,7 +88,7 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schedule'
                      AND INDEX_NAME = 'uk_schedule_classroom_slot') THEN
-        ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_classroom_slot (time_slot_id, classroom_id, active_key);
+        ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_classroom_slot (semester_id, time_slot_id, classroom_id, active_key);
     END IF;
 END //
 DELIMITER ;
