@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { apiHeaders, loginAndGoTo as openAuthenticatedPage, loginAsAdmin, type AuthState } from './helpers/auth'
+import { deleteResourceIds, deleteSchedulesForClass } from './helpers/e2e-cleanup'
 
 const API_URL = 'http://127.0.0.1:8090'
 const BASE_URL = 'http://127.0.0.1:5173'
@@ -24,6 +25,20 @@ async function loginAndGoTo(page: any, path: string) {
   await openAuthenticatedPage(page, path, authState, BASE_URL)
 }
 
+async function cleanupStageData(request: any) {
+  if (!authState) {
+    return
+  }
+  const h = authHeaders()
+  await deleteSchedulesForClass(request, API_URL, h, ids.class)
+  await deleteResourceIds(request, API_URL, h, '/api/teaching-tasks', [ids.task])
+  await deleteResourceIds(request, API_URL, h, '/api/courses', [ids.course])
+  await deleteResourceIds(request, API_URL, h, '/api/classrooms', [ids.room])
+  await deleteResourceIds(request, API_URL, h, '/api/classes', [ids.class])
+  await deleteResourceIds(request, API_URL, h, '/api/teachers', [ids.teacher])
+  ids = {}
+}
+
 test.describe.serial('阶段 9：课表查询', () => {
   const ts = Date.now().toString().slice(-6)
   const T_NO = `T${ts}`
@@ -33,6 +48,10 @@ test.describe.serial('阶段 9：课表查询', () => {
 
   test('1. 登录', async ({ request }) => {
     authState = await loginAsAdmin(request, API_URL)
+  })
+
+  test.afterAll(async ({ request }) => {
+    await cleanupStageData(request)
   })
 
   test('2. 准备基础数据并创建排课', async ({ request }) => {

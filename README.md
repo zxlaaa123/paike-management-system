@@ -199,7 +199,7 @@ Playwright E2E：
 
 ```powershell
 cd D:\paike
-npx playwright test
+npm test
 ```
 
 如果本机尚未安装 Playwright 浏览器：
@@ -225,10 +225,12 @@ npx vite build
 
 cd D:\paike
 npm run test:v6
-npx playwright test tests/stage9.spec.ts --reporter=line
+npm run test:stage6
+npm run test:stage7
+npm run test:stage9
 ```
 
-说明：E2E 页面用例统一使用 API 登录后拿到的 `paike_token` 与 `XSRF-TOKEN` Cookie，不再向 `localStorage` 注入旧 token。运行 Playwright 前需按本文启动后端 `8090` 和前端 `5173`。
+说明：`npm test` 等价于 `npm run test:acceptance`，会串行运行 V6 governance、stage6、stage7、stage9。E2E 页面用例统一使用 API 登录后拿到的 `paike_token` 与 `XSRF-TOKEN` Cookie，不再向 `localStorage` 注入旧 token。运行 Playwright 前需按本文启动后端 `8090` 和前端 `5173`。
 
 ## 安全与部署注意
 

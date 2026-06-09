@@ -131,7 +131,7 @@
 
 ### 阶段 1：学期边界与正式课表正确性
 
-状态：已完成，待提交。
+状态：已完成，已提交 `17def3a`。
 
 完成修复：
 
@@ -148,3 +148,25 @@
 2. `cd D:\paike\backend; mvn -q "-Dtest=DatabaseSchemaScriptTest,SchedulePlanServiceTest,ScheduleServiceAuditTest,TimetableServiceSemesterBoundaryTest" test`：通过，exit code 0。
 3. `cd D:\paike\frontend; npx vue-tsc -b --pretty false`：通过，exit code 0。
 4. 未启动长期运行的前端/后端服务；测试后确认无残留 Java/Maven 测试进程。
+
+### 阶段 2：E2E 数据隔离与验收入口
+
+状态：已完成，待提交。
+
+完成修复：
+
+1. 新增 `tests/helpers/e2e-cleanup.ts`，提供按班级反查排课和按资源 ID 幂等删除的清理工具。
+2. `tests/stage6.spec.ts` 增加 `afterAll` 兜底清理，原清理测试改为复用完整清理流程，覆盖方案、排课、教学任务、课程、教室、班级、教师。
+3. `tests/stage7.spec.ts` 增加 `afterAll` 兜底清理，记录临时教学任务，删除 UI 排课时限定到包含目标课程和教室的表格行，不再点击全局第一个“删除”按钮。
+4. `tests/stage9.spec.ts` 增加 `afterAll` 清理，清理课表、教学任务、课程、教室、班级、教师。
+5. 根目录 `npm test` 和 `npm run test:acceptance` 改为统一 Playwright 验收入口；保留 `test:v6` 并新增 `test:stage6`、`test:stage7`、`test:stage9`。
+6. `playwright.config.ts` 的 `baseURL` 改为 `http://127.0.0.1:5173`，与 README 和测试常量一致。
+7. README 验证命令更新为真实可复现的 V7 验收入口。
+
+验证记录：
+
+1. `cd D:\paike; npx playwright test tests/v6-governance.spec.ts tests/stage6.spec.ts tests/stage7.spec.ts tests/stage9.spec.ts --reporter=line --list`：通过，列出 52 个测试。
+2. `cd D:\paike; npm test -- --list`：通过，列出 52 个测试，验证根 `npm test` 不再是失败占位。
+3. `cd D:\paike; npm run test:acceptance -- --list`：通过，验证统一验收别名可用。
+4. `git diff --check`：通过。
+5. 未启动长期运行的前端/后端服务；误触发的一次 E2E 因后端未启动仅产生本地 `test-results`，已删除并确认无残留输出目录。

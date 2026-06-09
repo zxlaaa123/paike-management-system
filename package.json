@@ -8,9 +8,13 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "playwright test tests/v6-governance.spec.ts tests/stage6.spec.ts tests/stage7.spec.ts tests/stage9.spec.ts --reporter=line",
     "smoke:api": "node scripts/api-smoke-test.js",
-    "test:v6": "playwright test tests/v6-governance.spec.ts"
+    "test:v6": "playwright test tests/v6-governance.spec.ts",
+    "test:stage6": "playwright test tests/stage6.spec.ts --reporter=line",
+    "test:stage7": "playwright test tests/stage7.spec.ts --reporter=line",
+    "test:stage9": "playwright test tests/stage9.spec.ts --reporter=line",
+    "test:acceptance": "playwright test tests/v6-governance.spec.ts tests/stage6.spec.ts tests/stage7.spec.ts tests/stage9.spec.ts --reporter=line"
   },
   "keywords": [],
   "author": "",
