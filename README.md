@@ -237,6 +237,9 @@ npm run test:stage9
 - JWT 使用 httpOnly Cookie；浏览器鉴权以 `paike_token` Cookie 为准，不再依赖 `localStorage` token。
 - Cookie 登录下，POST、PUT、DELETE、PATCH 请求需要 `X-CSRF-Token`。
 - CORS origin 通过 `CORS_ALLOWED_ORIGINS` 配置，不要在生产中使用不受控的通配配置。
+- 生产 HTTPS 部署应设置 `COOKIE_SECURE=true`，并确保反向代理保留 `Set-Cookie`。
+- 登录 IP 限流默认只使用 `remoteAddr`。只有受信任反向代理已清洗 `X-Forwarded-For` / `X-Real-IP` 时，才设置 `TRUST_FORWARDED_HEADERS=true`。
+- JSON 请求体由 `MAX_REQUEST_BODY_SIZE` 做应用层限制，含无 `Content-Length` 的 chunked 请求；生产 nginx 仍应同步设置 `client_max_body_size`。
 - 正式课表写入路径已事务化，冲突检测仍以前端预检 + 后端保存时二次校验 + 数据库唯一约束兜底。
 - `semester.is_current` 已增加数据库唯一性兜底，避免多个当前学期。
 

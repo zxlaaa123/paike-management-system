@@ -50,6 +50,12 @@ class DatabaseSchemaScriptTest {
         String all = v6 + "\n" + v14 + "\n" + v22;
 
         assertTrue(all.contains("COLUMN_NAME = 'active_key'"));
+        assertTrue(v6.contains("(semester_id, time_slot_id, teacher_id, active_key)"));
+        assertTrue(v6.contains("(semester_id, time_slot_id, class_id, active_key)"));
+        assertTrue(v6.contains("(semester_id, time_slot_id, classroom_id, active_key)"));
+        assertTrue(v14.contains("(semester_id, time_slot_id, teacher_id, active_key)"));
+        assertTrue(v14.contains("(semester_id, time_slot_id, class_id, active_key)"));
+        assertTrue(v14.contains("(semester_id, time_slot_id, classroom_id, active_key)"));
         assertTrue(v22.contains("uk_schedule_teacher_slot"));
         assertTrue(v22.contains("(semester_id, time_slot_id, teacher_id, active_key)"));
         assertTrue(v22.contains("uk_schedule_class_slot"));
@@ -58,6 +64,9 @@ class DatabaseSchemaScriptTest {
         assertTrue(v22.contains("(semester_id, time_slot_id, classroom_id, active_key)"));
         assertTrue(count(v14, "COLUMN_NAME = 'active_key'") >= 7,
                 "v14 must keep old unique keys unless active_key exists");
+        assertFalse(all.contains("ADD UNIQUE KEY uk_schedule_teacher_slot (time_slot_id, teacher_id, active_key)"));
+        assertFalse(all.contains("ADD UNIQUE KEY uk_schedule_class_slot (time_slot_id, class_id, active_key)"));
+        assertFalse(all.contains("ADD UNIQUE KEY uk_schedule_classroom_slot (time_slot_id, classroom_id, active_key)"));
         assertFalse(all.contains("ADD UNIQUE KEY uk_schedule_teacher_slot (time_slot_id, teacher_id, deleted)"));
         assertFalse(all.contains("ADD UNIQUE KEY uk_schedule_class_slot (time_slot_id, class_id, deleted)"));
         assertFalse(all.contains("ADD UNIQUE KEY uk_schedule_classroom_slot (time_slot_id, classroom_id, deleted)"));
@@ -120,6 +129,33 @@ class DatabaseSchemaScriptTest {
         assertTrue(migration.contains("idx_schedule_semester_deleted_created"));
         assertTrue(migration.contains("(semester_id, deleted, create_time, id)"));
         assertTrue(application.contains("classpath:db/v16_schedule_search_order_index.sql"));
+    }
+
+    @Test
+    void sqlInitializerFailsFastInsteadOfSwallowingMigrationErrors() throws IOException {
+        String application = resource("application.yml");
+
+        assertTrue(application.contains("continue-on-error: false"));
+        assertFalse(application.contains("continue-on-error: true"));
+    }
+
+    @Test
+    void v5ColumnMigrationsAreIdempotent() throws IOException {
+        String v5Stage1 = resource("db/v5_stage1.sql");
+        String v5Stage3 = resource("db/v5_stage3.sql");
+        String v5Stage6 = resource("db/v5_stage6.sql");
+
+        assertTrue(v5Stage1.contains("CREATE PROCEDURE add_v5_stage1_schedule_plan_columns()"));
+        assertTrue(v5Stage1.contains("COLUMN_NAME = 'plan_mode'"));
+        assertTrue(v5Stage1.contains("INDEX_NAME = 'idx_schedule_plan_mode'"));
+
+        assertTrue(v5Stage3.contains("CREATE PROCEDURE add_v5_stage3_repair_task_columns()"));
+        assertTrue(v5Stage3.contains("COLUMN_NAME = 'cancel_reason'"));
+        assertTrue(v5Stage3.contains("INDEX_NAME = 'idx_repair_task_result_plan'"));
+
+        assertTrue(v5Stage6.contains("CREATE PROCEDURE add_v5_stage6_schedule_plan_columns()"));
+        assertTrue(v5Stage6.contains("COLUMN_NAME = 'source_schedule_id'"));
+        assertTrue(v5Stage6.contains("INDEX_NAME = 'idx_plan_repair_task'"));
     }
 
     @Test

@@ -151,7 +151,7 @@
 
 ### 阶段 2：E2E 数据隔离与验收入口
 
-状态：已完成，待提交。
+状态：已完成，已提交 `c432038`。
 
 完成修复：
 
@@ -170,3 +170,23 @@
 3. `cd D:\paike; npm run test:acceptance -- --list`：通过，验证统一验收别名可用。
 4. `git diff --check`：通过。
 5. 未启动长期运行的前端/后端服务；误触发的一次 E2E 因后端未启动仅产生本地 `test-results`，已删除并确认无残留输出目录。
+
+### 阶段 3：迁移可靠性与安全交付边界
+
+状态：已完成，待提交。
+
+完成修复：
+
+1. `spring.sql.init.continue-on-error` 改为 `false`，迁移失败会中断启动。
+2. `v5_stage1.sql`、`v5_stage3.sql`、`v5_stage6.sql` 改为 `information_schema` 条件判断 + 存储过程幂等 DDL。
+3. `v6_schedule_index.sql`、`v14_missing_v4_v5_tables_and_schedule_keys.sql` 新建 schedule 唯一键时纳入 `semester_id`；`v22` 继续负责修复老库已有旧索引。
+4. 登录 IP 限流默认只使用 `remoteAddr`，仅在 `TRUST_FORWARDED_HEADERS=true` 时信任 `X-Forwarded-For` / `X-Real-IP`。
+5. `RequestBodySizeLimitFilter` 对无 `Content-Length` 的请求先限量缓存 body，超过上限直接返回统一 413。
+6. README 和 `db/README.md` 更新迁移失败策略、可信代理、Cookie secure、nginx body-size 等交付边界说明。
+
+验证记录：
+
+1. `cd D:\paike\backend; mvn -q "-Dtest=DatabaseSchemaScriptTest,RequestBodySizeLimitFilterTest,AuthControllerClientIpTest" test`：通过，exit code 0。
+2. 静态扫描：`continue-on-error: false` 存在，`continue-on-error: true` 不存在；v5_stage1/3/6 无未保护裸 DDL；v6/v14 schedule 唯一键均包含 `semester_id`。
+3. `git diff --check`：通过。
+4. 未启动长期运行的前端/后端服务；测试后无需要保留的后台进程。

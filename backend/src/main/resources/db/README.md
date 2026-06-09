@@ -13,11 +13,11 @@ Spring Boot 启动时依次执行：
 | 阶段 | 入口 | 触发点 | 备注 |
 |---|---|---|---|
 | ① | `db/schema.sql` | `spring.sql.init` | 全新库建表基线 |
-| ② | `db/v2_*.sql` → `v12_*.sql`（按 `application.yml` 列出的顺序） | `spring.sql.init` | 增量演进 ALTER/CREATE，全部幂等 |
+| ② | `db/v2_*.sql` → 当前最新 `v*.sql`（按 `application.yml` 列出的顺序） | `spring.sql.init` | 增量演进 ALTER/CREATE，全部幂等 |
 | ③ | `SemesterSchemaInitializer.run()` | `CommandLineRunner`，在 sql.init 之后 | 运行时兜底（含 Java 代码内嵌的 CREATE TABLE / ALTER） |
 | ④ | `AdminUserInitializer.run()` | `CommandLineRunner` | 创建默认 admin 账号 |
 
-`spring.sql.init.continue-on-error: true`：单个 SQL 失败不中断启动，由后续阶段或 ③ 的兜底补齐。**这是有意设计**，因为 v2/v6 早期文件用 `DROP PROCEDURE` 包 DDL，对老库重跑可能局部报错，但语义已经满足，不应阻塞启动。
+`spring.sql.init.continue-on-error: false`：迁移脚本失败会中断启动。所有追加脚本必须保持幂等，避免真实 schema 错误被吞掉。
 
 ---
 
@@ -102,8 +102,8 @@ Spring Boot 启动时依次执行：
 
 ## 4. 新增 schema 改动时的约定
 
-1. **新文件命名**：使用下一个可用序号；当前最后一项为 `v12_system_audit_log.sql`。
-2. **幂等写法**：优先 `SET @ddl + PREPARE/EXECUTE`（参见 `v7_soft_delete_plan_semester.sql`），避开 `DELIMITER + CREATE PROCEDURE`（Spring ScriptUtils 不正式支持）。
+1. **新文件命名**：使用下一个可用序号；当前最后一项以 `application.yml` 的 `schema-locations` 为准。
+2. **幂等写法**：DDL 必须先查 `information_schema.COLUMNS` / `information_schema.STATISTICS` 再执行；允许使用现有脚本已验证的 `DELIMITER + CREATE PROCEDURE` 模式。
 3. **注册到 `application.yml`**：把新文件加到 `spring.sql.init.schema-locations` 末尾。
 4. **不要扩 `SemesterSchemaInitializer`**：能写在 SQL 文件的就不写 Java。Initializer 只为兜底极老库。
 5. **新表慎在 Initializer 里建**：`ensureStage7/9Tables` 是历史遗留，新表应该写在 v\*.sql 文件里。
@@ -112,7 +112,7 @@ Spring Boot 启动时依次执行：
 
 ## 5. 部署到新环境的人工 checklist
 
-`continue-on-error: true` 会吞掉真实失败，部署到新机器后请人工核查关键约束已生效：
+部署到新机器后请核查关键约束已生效；如果任一迁移失败，`continue-on-error: false` 会直接中断启动：
 
 ```sql
 -- 1) schedule_locked_item 的唯一约束（避免重复锁）

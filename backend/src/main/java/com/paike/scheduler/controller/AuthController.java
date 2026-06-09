@@ -34,11 +34,14 @@ public class AuthController {
     @Value("${app.security.cookie-secure:false}")
     private boolean cookieSecure;
 
+    @Value("${app.security.trust-forwarded-headers:false}")
+    private boolean trustForwardedHeaders;
+
     @PostMapping("/login")
     public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request,
-                                       HttpServletRequest httpRequest,
-                                       HttpServletResponse response) {
-        LoginResponse loginResponse = authService.login(request, resolveClientIp(httpRequest));
+                                        HttpServletRequest httpRequest,
+                                        HttpServletResponse response) {
+        LoginResponse loginResponse = authService.login(request, resolveClientIp(httpRequest, trustForwardedHeaders));
 
         // 设置 httpOnly JWT Cookie（防 XSS 窃取）。secure 由 app.security.cookie-secure 控制：
         // 本地 HTTP 留 false，生产 HTTPS 通过 COOKIE_SECURE=true 切换。
@@ -95,17 +98,19 @@ public class AuthController {
 
     /**
      * 从请求头里解析真实客户端 IP，用于登录限流的 IP 维度（A1）。
-     * 优先级：X-Forwarded-For 首项 > X-Real-IP > remoteAddr。
+     * 默认不信任客户端可伪造的转发头；仅当受信任反向代理已清洗这些头时启用。
      */
-    private static String resolveClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            int comma = forwarded.indexOf(',');
-            return (comma > 0 ? forwarded.substring(0, comma) : forwarded).trim();
-        }
-        String realIp = request.getHeader("X-Real-IP");
-        if (realIp != null && !realIp.isBlank()) {
-            return realIp.trim();
+    static String resolveClientIp(HttpServletRequest request, boolean trustForwardedHeaders) {
+        if (trustForwardedHeaders) {
+            String forwarded = request.getHeader("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isBlank()) {
+                int comma = forwarded.indexOf(',');
+                return (comma > 0 ? forwarded.substring(0, comma) : forwarded).trim();
+            }
+            String realIp = request.getHeader("X-Real-IP");
+            if (realIp != null && !realIp.isBlank()) {
+                return realIp.trim();
+            }
         }
         return request.getRemoteAddr();
     }

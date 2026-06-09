@@ -29,9 +29,8 @@ spring:
       # 新增 schema 改动请追加新的 v*.sql 到 schema-locations 末尾，并保持幂等。
       mode: always
       schema-locations: classpath:db/schema.sql,classpath:db/v2_schema.sql,classpath:db/v2_alter_schedule.sql,classpath:db/v2_alter_score_report.sql,classpath:db/v3_semester.sql,classpath:db/v3_semester_data_bind.sql,classpath:db/v3_schedule_plan.sql,classpath:db/v3_score.sql,classpath:db/v5_stage1.sql,classpath:db/v5_stage3.sql,classpath:db/v5_stage6.sql,classpath:db/v6_bugfix_constraints.sql,classpath:db/v6_schedule_index.sql,classpath:db/v6_semester_current_unique.sql,classpath:db/v7_soft_delete_plan_semester.sql,classpath:db/v8_unscheduled_task_semester.sql,classpath:db/v9_auto_schedule_batch_update_time.sql,classpath:db/v10_teaching_task_index.sql,classpath:db/v11_soft_delete_three_tables.sql,classpath:db/v12_system_audit_log.sql,classpath:db/v13_score_report_semester.sql,classpath:db/v14_missing_v4_v5_tables_and_schedule_keys.sql,classpath:db/v15_sys_user_role.sql,classpath:db/v16_schedule_search_order_index.sql,classpath:db/v17_report_batch_semester.sql,classpath:db/v18_schedule_report_semester_deleted.sql,classpath:db/v19_score_detail_deleted.sql,classpath:db/v20_schedule_conflict_related_ids_text.sql,classpath:db/v21_performance_baseline_record.sql,classpath:db/v22_schedule_semester_unique.sql
-      # continue-on-error 必须保留为 true：v2/v6 早期文件用 DROP PROCEDURE 风格，对老库重跑可能局部报错但语义已满足；
-      # 后续兜底由 SemesterSchemaInitializer 补齐。部署新环境时必须按 db/README.md 第 5 节人工核查关键约束。
-      continue-on-error: true
+      # 迁移脚本必须幂等；失败应中断启动，避免真实 schema 错误被吞掉。
+      continue-on-error: false
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -55,8 +54,10 @@ app:
   security:
     # 生产环境（HTTPS）请把 COOKIE_SECURE 设为 true，让 JWT / CSRF cookie 仅允许在 HTTPS 上携带
     cookie-secure: ${COOKIE_SECURE:false}
-    # JSON 请求体大小上限（字节），由 RequestBodySizeLimitFilter 按 Content-Length 兜底，默认 2MB。
-    # 当前端点均为小体量 JSON；如未来出现大批量导入类端点再调高。生产入口另有 nginx client_max_body_size。
+    # 仅在受信任反向代理已清洗 X-Forwarded-For / X-Real-IP 时开启。
+    trust-forwarded-headers: ${TRUST_FORWARDED_HEADERS:false}
+    # JSON 请求体大小上限（字节），由 RequestBodySizeLimitFilter 按 Content-Length 和读取流量兜底，默认 2MB。
+    # 生产入口仍建议同步配置 nginx client_max_body_size。
     max-request-body-size: ${MAX_REQUEST_BODY_SIZE:2097152}
   cors:
     # 允许跨域的来源；多个用逗号分隔。同源部署（nginx 反代）下 CORS 不参与，留空即可

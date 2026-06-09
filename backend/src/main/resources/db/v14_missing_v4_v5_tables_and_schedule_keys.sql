@@ -200,7 +200,7 @@ SET @ddl = (
               AND INDEX_NAME = 'uk_schedule_teacher_slot'
         ),
         'SELECT 1',
-        'ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_teacher_slot (time_slot_id, teacher_id, active_key)'
+        'ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_teacher_slot (semester_id, time_slot_id, teacher_id, active_key)'
     )
 );
 PREPARE stmt FROM @ddl;
@@ -222,7 +222,7 @@ SET @ddl = (
               AND INDEX_NAME = 'uk_schedule_class_slot'
         ),
         'SELECT 1',
-        'ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_class_slot (time_slot_id, class_id, active_key)'
+        'ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_class_slot (semester_id, time_slot_id, class_id, active_key)'
     )
 );
 PREPARE stmt FROM @ddl;
@@ -244,7 +244,7 @@ SET @ddl = (
               AND INDEX_NAME = 'uk_schedule_classroom_slot'
         ),
         'SELECT 1',
-        'ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_classroom_slot (time_slot_id, classroom_id, active_key)'
+        'ALTER TABLE schedule ADD UNIQUE KEY uk_schedule_classroom_slot (semester_id, time_slot_id, classroom_id, active_key)'
     )
 );
 PREPARE stmt FROM @ddl;
