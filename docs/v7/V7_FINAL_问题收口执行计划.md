@@ -173,7 +173,7 @@
 
 ### 阶段 3：迁移可靠性与安全交付边界
 
-状态：已完成，待提交。
+状态：已完成，已提交 `59e1ad9`。
 
 完成修复：
 
@@ -190,3 +190,22 @@
 2. 静态扫描：`continue-on-error: false` 存在，`continue-on-error: true` 不存在；v5_stage1/3/6 无未保护裸 DDL；v6/v14 schedule 唯一键均包含 `semester_id`。
 3. `git diff --check`：通过。
 4. 未启动长期运行的前端/后端服务；测试后无需要保留的后台进程。
+
+### 阶段 4：最终交付材料与轻量清理
+
+状态：已完成，已随本提交记录。
+
+完成修复：
+
+1. 新增 `docs/v7/V7_FINAL_最终验收记录.md`，记录阶段提交、验证命令和当前验收状态。
+2. 新增 `reports/README.md`，标明历史报告与 V7 final 当前判断来源，避免旧失败报告干扰最终判断。
+3. `frontend/src/components/ErrorBoundary.vue` 移除监控 TODO，改为将最近一次错误轻量记录到 `sessionStorage`。
+4. `frontend/src/layout/BaseLayout.vue` 修复当前登录用户 fallback，不再把缺少真实姓名的用户显示为“管理员”。
+5. README 已在阶段 2/3 更新为真实验收入口和生产安全边界。
+
+验证记录：
+
+1. `cd D:\paike\backend; mvn -q "-Dtest=DatabaseSchemaScriptTest,SchedulePlanServiceTest,ScheduleServiceAuditTest,TimetableServiceSemesterBoundaryTest,RequestBodySizeLimitFilterTest,AuthControllerClientIpTest" test`：通过，exit code 0。
+2. `cd D:\paike\frontend; npx vue-tsc -b --pretty false`：通过，exit code 0。
+3. `cd D:\paike; npm test -- --list`：通过，列出 52 个测试。
+4. 未启动长期运行的前端/后端服务；当前无需清理后台服务。

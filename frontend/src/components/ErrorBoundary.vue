@@ -18,7 +18,7 @@ const router = useRouter()
 onErrorCaptured((err) => {
   error.value = err
   errorMessage.value = err.message || '未知错误'
-  // TODO: 接入前端监控（Sentry / 自建 errorLogApi）
+  recordLocalError(err)
   console.error('[ErrorBoundary]', err)
   return false
 })
@@ -27,6 +27,21 @@ function reset() {
   error.value = null
   errorMessage.value = ''
   router.push('/dashboard')
+}
+
+function recordLocalError(err: Error) {
+  try {
+    const item = {
+      message: err.message || '未知错误',
+      stack: err.stack || '',
+      path: router.currentRoute.value.fullPath,
+      time: new Date().toISOString(),
+    }
+    const key = 'paike:error-boundary:last'
+    sessionStorage.setItem(key, JSON.stringify(item))
+  } catch {
+    // local storage may be unavailable in restricted browser modes.
+  }
 }
 </script>
 
