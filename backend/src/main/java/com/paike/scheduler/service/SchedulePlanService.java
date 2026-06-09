@@ -388,10 +388,10 @@ public class SchedulePlanService {
                         .eq(SchedulePlan::getSemesterId, semesterId)
                         .eq(SchedulePlan::getStatus, SchedulePlanStatus.APPLIED.getCode()));
         ensurePlansUnlocked(oldAppliedPlans, "存在已锁定课程，不能被新方案覆盖，请先解锁");
+        ensureSemesterSchedulesUnlocked(semesterId, "存在已锁定课程，不能被新方案覆盖，请先解锁");
+        scheduleMapper.delete(new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getSemesterId, semesterId));
         for (SchedulePlan oldPlan : oldAppliedPlans) {
-            scheduleMapper.delete(new LambdaQueryWrapper<Schedule>()
-                    .eq(Schedule::getSemesterId, semesterId)
-                    .eq(Schedule::getPlanId, oldPlan.getId()));
             oldPlan.setStatus(SchedulePlanStatus.DRAFT.getCode());
             oldPlan.setUpdatedAt(LocalDateTime.now());
             planMapper.updateById(oldPlan);
@@ -490,6 +490,25 @@ public class SchedulePlanService {
         }
         Long count = scheduleLockedItemMapper.selectCount(new LambdaQueryWrapper<ScheduleLockedItem>()
                 .in(ScheduleLockedItem::getPlanId, planIds)
+                .eq(ScheduleLockedItem::getActiveFlag, 1));
+        if (count != null && count > 0) {
+            throw new BusinessException(message);
+        }
+    }
+
+    private void ensureSemesterSchedulesUnlocked(Long semesterId, String message) {
+        List<Schedule> schedules = scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getSemesterId, semesterId));
+        List<Long> scheduleIds = schedules.stream()
+                .map(Schedule::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (scheduleIds.isEmpty()) {
+            return;
+        }
+        Long count = scheduleLockedItemMapper.selectCount(new LambdaQueryWrapper<ScheduleLockedItem>()
+                .in(ScheduleLockedItem::getScheduleId, scheduleIds)
                 .eq(ScheduleLockedItem::getActiveFlag, 1));
         if (count != null && count > 0) {
             throw new BusinessException(message);
@@ -715,6 +734,7 @@ public class SchedulePlanService {
             throw new BusinessException("无法定位调整前的正式课表时间段");
         }
         List<Schedule> schedules = scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getSemesterId, plan.getSemesterId())
                 .eq(Schedule::getPlanId, plan.getId())
                 .eq(Schedule::getTeachingTaskId, before.getTeachingTaskId())
                 .eq(Schedule::getTimeSlotId, oldSlot.getId()));

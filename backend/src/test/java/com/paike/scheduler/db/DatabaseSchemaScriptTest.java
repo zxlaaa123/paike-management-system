@@ -46,12 +46,16 @@ class DatabaseSchemaScriptTest {
     void scheduleUniqueKeysUseActiveKeyInsteadOfDeleted() throws IOException {
         String v6 = resource("db/v6_schedule_index.sql");
         String v14 = resource("db/v14_missing_v4_v5_tables_and_schedule_keys.sql");
-        String all = v6 + "\n" + v14;
+        String v22 = resource("db/v22_schedule_semester_unique.sql");
+        String all = v6 + "\n" + v14 + "\n" + v22;
 
         assertTrue(all.contains("COLUMN_NAME = 'active_key'"));
-        assertTrue(all.contains("uk_schedule_teacher_slot (time_slot_id, teacher_id, active_key)"));
-        assertTrue(all.contains("uk_schedule_class_slot (time_slot_id, class_id, active_key)"));
-        assertTrue(all.contains("uk_schedule_classroom_slot (time_slot_id, classroom_id, active_key)"));
+        assertTrue(v22.contains("uk_schedule_teacher_slot"));
+        assertTrue(v22.contains("(semester_id, time_slot_id, teacher_id, active_key)"));
+        assertTrue(v22.contains("uk_schedule_class_slot"));
+        assertTrue(v22.contains("(semester_id, time_slot_id, class_id, active_key)"));
+        assertTrue(v22.contains("uk_schedule_classroom_slot"));
+        assertTrue(v22.contains("(semester_id, time_slot_id, classroom_id, active_key)"));
         assertTrue(count(v14, "COLUMN_NAME = 'active_key'") >= 7,
                 "v14 must keep old unique keys unless active_key exists");
         assertFalse(all.contains("ADD UNIQUE KEY uk_schedule_teacher_slot (time_slot_id, teacher_id, deleted)"));
@@ -116,6 +120,20 @@ class DatabaseSchemaScriptTest {
         assertTrue(migration.contains("idx_schedule_semester_deleted_created"));
         assertTrue(migration.contains("(semester_id, deleted, create_time, id)"));
         assertTrue(application.contains("classpath:db/v16_schedule_search_order_index.sql"));
+    }
+
+    @Test
+    void scheduleSemesterUniqueMigrationIsRegistered() throws IOException {
+        String migration = resource("db/v22_schedule_semester_unique.sql");
+        String application = resource("application.yml");
+
+        assertTrue(migration.contains("DROP INDEX uk_schedule_teacher_slot"));
+        assertTrue(migration.contains("DROP INDEX uk_schedule_class_slot"));
+        assertTrue(migration.contains("DROP INDEX uk_schedule_classroom_slot"));
+        assertTrue(migration.contains("(semester_id, time_slot_id, teacher_id, active_key)"));
+        assertTrue(migration.contains("(semester_id, time_slot_id, class_id, active_key)"));
+        assertTrue(migration.contains("(semester_id, time_slot_id, classroom_id, active_key)"));
+        assertTrue(application.contains("classpath:db/v22_schedule_semester_unique.sql"));
     }
 
     @Test

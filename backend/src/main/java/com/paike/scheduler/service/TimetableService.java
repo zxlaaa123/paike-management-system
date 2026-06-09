@@ -69,45 +69,49 @@ public class TimetableService {
     private final CourseMapper courseMapper;
     private final TeacherMapper teacherMapper;
     private final ClassInfoMapper classInfoMapper;
+    private final SemesterService semesterService;
 
-    public List<TimetableVo> listClassTimetable(Long classId) {
-        return toTimetableVos(queryByClassId(classId));
+    public List<TimetableVo> listClassTimetable(Long classId, Long semesterId) {
+        Long resolvedSemesterId = resolveSemesterIdOrNull(semesterId);
+        return resolvedSemesterId == null ? List.of() : toTimetableVos(queryByClassId(classId, resolvedSemesterId));
     }
 
-    public List<TimetableVo> listTeacherTimetable(Long teacherId) {
-        return toTimetableVos(queryByTeacherId(teacherId));
+    public List<TimetableVo> listTeacherTimetable(Long teacherId, Long semesterId) {
+        Long resolvedSemesterId = resolveSemesterIdOrNull(semesterId);
+        return resolvedSemesterId == null ? List.of() : toTimetableVos(queryByTeacherId(teacherId, resolvedSemesterId));
     }
 
-    public List<TimetableVo> listClassroomTimetable(Long classroomId) {
-        return toTimetableVos(queryByClassroomId(classroomId));
+    public List<TimetableVo> listClassroomTimetable(Long classroomId, Long semesterId) {
+        Long resolvedSemesterId = resolveSemesterIdOrNull(semesterId);
+        return resolvedSemesterId == null ? List.of() : toTimetableVos(queryByClassroomId(classroomId, resolvedSemesterId));
     }
 
-    public void exportClassTimetable(Long classId, HttpServletResponse response) throws IOException {
+    public void exportClassTimetable(Long classId, Long semesterId, HttpServletResponse response) throws IOException {
         ClassInfo classInfo = classInfoMapper.selectById(classId);
         if (classInfo == null || Integer.valueOf(1).equals(classInfo.getDeleted())) {
             throw new BusinessException(404, "班级不存在");
         }
-        List<TimetableVo> items = listClassTimetable(classId);
+        List<TimetableVo> items = listClassTimetable(classId, semesterId);
         exportWorkbook(response, buildFileName(classInfo.getClassName(), "班级课表"), classInfo.getClassName() + "课表",
             items, TimetableViewType.CLASS);
     }
 
-    public void exportTeacherTimetable(Long teacherId, HttpServletResponse response) throws IOException {
+    public void exportTeacherTimetable(Long teacherId, Long semesterId, HttpServletResponse response) throws IOException {
         Teacher teacher = teacherMapper.selectById(teacherId);
         if (teacher == null || Integer.valueOf(1).equals(teacher.getDeleted())) {
             throw new BusinessException(404, "教师不存在");
         }
-        List<TimetableVo> items = listTeacherTimetable(teacherId);
+        List<TimetableVo> items = listTeacherTimetable(teacherId, semesterId);
         exportWorkbook(response, buildFileName(teacher.getName(), "教师课表"), teacher.getName() + "课表",
             items, TimetableViewType.TEACHER);
     }
 
-    public void exportClassroomTimetable(Long classroomId, HttpServletResponse response) throws IOException {
+    public void exportClassroomTimetable(Long classroomId, Long semesterId, HttpServletResponse response) throws IOException {
         Classroom classroom = classroomMapper.selectById(classroomId);
         if (classroom == null || Integer.valueOf(1).equals(classroom.getDeleted())) {
             throw new BusinessException(404, "教室不存在");
         }
-        List<TimetableVo> items = listClassroomTimetable(classroomId);
+        List<TimetableVo> items = listClassroomTimetable(classroomId, semesterId);
         exportWorkbook(response, buildFileName(classroom.getRoomName(), "教室占用表"), classroom.getRoomName() + "占用表",
             items, TimetableViewType.CLASSROOM);
     }
@@ -116,7 +120,7 @@ public class TimetableService {
      * 通用查询：先按 schedule 表字段查，再通过 teaching_task 关联查，合并去重
      */
     private List<Schedule> querySchedulesByTaskField(
-            String taskField, Long fieldValue,
+            String taskField, Long fieldValue, Long semesterId,
             Function<LambdaQueryWrapper<Schedule>, LambdaQueryWrapper<Schedule>> scheduleFilter) {
         // 通过 teaching_task 关联查询
         LambdaQueryWrapper<TeachingTask> taskWrapper = new LambdaQueryWrapper<TeachingTask>();
@@ -124,18 +128,21 @@ public class TimetableService {
             case "classId" -> taskWrapper.eq(TeachingTask::getClassId, fieldValue);
             case "teacherId" -> taskWrapper.eq(TeachingTask::getTeacherId, fieldValue);
         }
+        taskWrapper.eq(TeachingTask::getSemesterId, semesterId);
         List<TeachingTask> tasks = teachingTaskMapper.selectList(taskWrapper);
         List<Long> taskIds = tasks.stream().map(TeachingTask::getId).collect(Collectors.toList());
 
         // 直接按 schedule 表字段查
         LambdaQueryWrapper<Schedule> scheduleWrapper = new LambdaQueryWrapper<Schedule>();
         scheduleFilter.apply(scheduleWrapper);
+        scheduleWrapper.eq(Schedule::getSemesterId, semesterId);
         List<Schedule> schedules = scheduleMapper.selectList(scheduleWrapper);
 
         // 合并去重
         if (!taskIds.isEmpty()) {
             List<Schedule> taskSchedules = scheduleMapper.selectList(
                 new LambdaQueryWrapper<Schedule>()
+                    .eq(Schedule::getSemesterId, semesterId)
                     .in(Schedule::getTeachingTaskId, taskIds)
             );
             Set<Long> existingIds = schedules.stream().map(Schedule::getId).collect(Collectors.toSet());
@@ -148,21 +155,33 @@ public class TimetableService {
         return schedules;
     }
 
-    private List<Schedule> queryByClassId(Long classId) {
-        return querySchedulesByTaskField("classId", classId,
+    private List<Schedule> queryByClassId(Long classId, Long semesterId) {
+        return querySchedulesByTaskField("classId", classId, semesterId,
             wrapper -> wrapper.eq(Schedule::getClassId, classId));
     }
 
-    private List<Schedule> queryByTeacherId(Long teacherId) {
-        return querySchedulesByTaskField("teacherId", teacherId,
+    private List<Schedule> queryByTeacherId(Long teacherId, Long semesterId) {
+        return querySchedulesByTaskField("teacherId", teacherId, semesterId,
             wrapper -> wrapper.eq(Schedule::getTeacherId, teacherId));
     }
 
-    private List<Schedule> queryByClassroomId(Long classroomId) {
+    private List<Schedule> queryByClassroomId(Long classroomId, Long semesterId) {
         return scheduleMapper.selectList(
             new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getSemesterId, semesterId)
                 .eq(Schedule::getClassroomId, classroomId)
         );
+    }
+
+    private Long resolveSemesterIdOrNull(Long semesterId) {
+        if (semesterId != null) {
+            return semesterId;
+        }
+        try {
+            return semesterService.getCurrentSemester().getId();
+        } catch (BusinessException e) {
+            return null;
+        }
     }
 
     private List<TimetableVo> toTimetableVos(List<Schedule> schedules) {

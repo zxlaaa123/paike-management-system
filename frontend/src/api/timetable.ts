@@ -16,14 +16,18 @@ export interface TimetableItem {
   building: string
 }
 
-async function exportTimetable(url: string) {
-  const response = await request.get<Blob>(url, { responseType: 'blob' })
+interface TimetableParams {
+  semesterId?: number
+}
+
+async function exportTimetable(url: string, params?: TimetableParams) {
+  const response = await request.get<Blob>(url, { params, responseType: 'blob' })
   const fileName = resolveDownloadFileName(response.headers['content-disposition'], 'timetable.xlsx')
   triggerBrowserDownload(response.data, fileName)
 }
 
-export function getClassTimetable(classId: number) {
-  return request.get<ApiResponse<TimetableItem[]>>(`/timetables/classes/${classId}`).then((r) => {
+export function getClassTimetable(classId: number, params?: TimetableParams) {
+  return request.get<ApiResponse<TimetableItem[]>>(`/timetables/classes/${classId}`, { params }).then((r) => {
     if (!r.data) {
       throw new Error('响应数据为空')
     }
@@ -31,8 +35,8 @@ export function getClassTimetable(classId: number) {
   })
 }
 
-export function getTeacherTimetable(teacherId: number) {
-  return request.get<ApiResponse<TimetableItem[]>>(`/timetables/teachers/${teacherId}`).then((r) => {
+export function getTeacherTimetable(teacherId: number, params?: TimetableParams) {
+  return request.get<ApiResponse<TimetableItem[]>>(`/timetables/teachers/${teacherId}`, { params }).then((r) => {
     if (!r.data) {
       throw new Error('响应数据为空')
     }
@@ -40,8 +44,8 @@ export function getTeacherTimetable(teacherId: number) {
   })
 }
 
-export function getClassroomTimetable(classroomId: number) {
-  return request.get<ApiResponse<TimetableItem[]>>(`/timetables/classrooms/${classroomId}`).then((r) => {
+export function getClassroomTimetable(classroomId: number, params?: TimetableParams) {
+  return request.get<ApiResponse<TimetableItem[]>>(`/timetables/classrooms/${classroomId}`, { params }).then((r) => {
     if (!r.data) {
       throw new Error('响应数据为空')
     }
@@ -49,14 +53,14 @@ export function getClassroomTimetable(classroomId: number) {
   })
 }
 
-export function exportClassTimetable(classId: number) {
-  return exportTimetable(`/timetables/classes/${classId}/export`)
+export function exportClassTimetable(classId: number, params?: TimetableParams) {
+  return exportTimetable(`/timetables/classes/${classId}/export`, params)
 }
 
-export function exportTeacherTimetable(teacherId: number) {
-  return exportTimetable(`/timetables/teachers/${teacherId}/export`)
+export function exportTeacherTimetable(teacherId: number, params?: TimetableParams) {
+  return exportTimetable(`/timetables/teachers/${teacherId}/export`, params)
 }
 
-export function exportClassroomTimetable(classroomId: number) {
-  return exportTimetable(`/timetables/classrooms/${classroomId}/export`)
+export function exportClassroomTimetable(classroomId: number, params?: TimetableParams) {
+  return exportTimetable(`/timetables/classrooms/${classroomId}/export`, params)
 }

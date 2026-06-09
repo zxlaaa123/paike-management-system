@@ -1,10 +1,15 @@
 package com.paike.scheduler.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.ClassInfo;
 import com.paike.scheduler.entity.Classroom;
+import com.paike.scheduler.entity.Course;
+import com.paike.scheduler.entity.Schedule;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
 import com.paike.scheduler.entity.Semester;
@@ -15,14 +20,19 @@ import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.dto.SchedulePlanItemAdjustRequest;
 import com.paike.scheduler.service.vo.SchedulePlanVo;
 import org.junit.jupiter.api.Test;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -256,6 +266,104 @@ class SchedulePlanServiceTest {
                 eq(10L),
                 eq("400"),
                 eq("已废弃方案不能应用"));
+    }
+
+    @Test
+    void applyPlan_clearsTargetSemesterSchedulesBeforeInsertingPlanSchedules() {
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SchedulePlanItemMapper planItemMapper = mock(SchedulePlanItemMapper.class);
+        ScheduleMapper scheduleMapper = mock(ScheduleMapper.class);
+        ScheduleLockedItemMapper scheduleLockedItemMapper = mock(ScheduleLockedItemMapper.class);
+        CourseMapper courseMapper = mock(CourseMapper.class);
+        TeacherMapper teacherMapper = mock(TeacherMapper.class);
+        ClassInfoMapper classInfoMapper = mock(ClassInfoMapper.class);
+        ClassroomMapper classroomMapper = mock(ClassroomMapper.class);
+        TimeSlotMapper timeSlotMapper = mock(TimeSlotMapper.class);
+        TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
+        TeacherUnavailableTimeService unavailableTimeService = mock(TeacherUnavailableTimeService.class);
+        SystemAuditLogService auditLogService = mock(SystemAuditLogService.class);
+        SchedulePlanService service = new SchedulePlanService(
+                planMapper,
+                mock(SemesterMapper.class),
+                planItemMapper,
+                scheduleMapper,
+                scheduleLockedItemMapper,
+                mock(ScheduleLockGuardService.class),
+                courseMapper,
+                teacherMapper,
+                classInfoMapper,
+                classroomMapper,
+                timeSlotMapper,
+                teachingTaskMapper,
+                unavailableTimeService,
+                mock(ScheduleScoreService.class),
+                mock(SchedulePlanExplainService.class),
+                auditLogService);
+        SchedulePlan plan = new SchedulePlan();
+        plan.setId(10L);
+        plan.setSemesterId(3L);
+        plan.setStatus(SchedulePlanStatus.DRAFT.getCode());
+        plan.setScheduledCount(1);
+        when(planMapper.selectById(10L)).thenReturn(plan);
+        when(planMapper.selectList(any())).thenReturn(List.of());
+        when(planMapper.updateById(any(SchedulePlan.class))).thenReturn(1);
+
+        SchedulePlanItem item = planItem(101L, 201L, 301L, 401L, 501L, 1, 1, 2);
+        item.setCourseId(601L);
+        when(planItemMapper.selectList(any())).thenReturn(List.of(item));
+        when(planItemMapper.updateById(any(SchedulePlanItem.class))).thenReturn(1);
+
+        TeachingTask task = teachingTask(201L, 301L, 401L, 601L);
+        when(teachingTaskMapper.selectBatchIds(any())).thenReturn(List.of(task));
+        when(courseMapper.selectBatchIds(any())).thenReturn(List.of(new Course()));
+        when(teacherMapper.selectBatchIds(any())).thenReturn(List.of(teacher(301L, "教师A")));
+        when(classInfoMapper.selectBatchIds(any())).thenReturn(List.of(classInfo(401L, "班级A")));
+        when(classroomMapper.selectBatchIds(any())).thenReturn(List.of(classroom(501L, "教室A")));
+
+        TimeSlot slot = timeSlot(701L, 1, 1);
+        when(timeSlotMapper.selectList(any())).thenReturn(List.of(slot));
+        when(unavailableTimeService.isUnavailable(301L, 701L)).thenReturn(false);
+
+        Schedule existingSchedule = new Schedule();
+        existingSchedule.setId(88L);
+        existingSchedule.setSemesterId(3L);
+        when(scheduleMapper.selectList(any())).thenReturn(List.of(existingSchedule));
+        when(scheduleLockedItemMapper.selectCount(any())).thenReturn(0L);
+        when(scheduleMapper.delete(any())).thenReturn(1);
+        when(scheduleMapper.insert(any(Schedule.class))).thenReturn(1);
+
+        service.applyPlan(10L);
+
+        ArgumentCaptor<LambdaQueryWrapper<Schedule>> deleteCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        ArgumentCaptor<Schedule> insertCaptor = ArgumentCaptor.forClass(Schedule.class);
+        InOrder order = inOrder(scheduleMapper);
+        order.verify(scheduleMapper).selectList(any());
+        order.verify(scheduleMapper).delete(deleteCaptor.capture());
+        order.verify(scheduleMapper).insert(insertCaptor.capture());
+
+        assertWrapperContains(deleteCaptor.getValue(), Schedule.class, "semester_id", 3L);
+        assertEquals(3L, insertCaptor.getValue().getSemesterId());
+        assertEquals(10L, insertCaptor.getValue().getPlanId());
+        verify(auditLogService).recordSuccess(
+                eq(SystemAuditLogService.ACTION_APPLY_PLAN),
+                eq(SystemAuditLogService.TARGET_SCHEDULE_PLAN),
+                eq(10L),
+                eq(3L),
+                eq(10L),
+                eq("正式课表已应用，排课数=1"));
+    }
+
+    private void assertWrapperContains(LambdaQueryWrapper<?> wrapper, Class<?> entityType, String column, Object value) {
+        ensureTableInfo(entityType);
+        assertTrue(wrapper.getSqlSegment().contains(column), wrapper.getSqlSegment());
+        assertTrue(wrapper.getParamNameValuePairs().containsValue(value),
+                column + " value missing from " + wrapper.getParamNameValuePairs());
+    }
+
+    private void ensureTableInfo(Class<?> entityType) {
+        if (TableInfoHelper.getTableInfo(entityType) == null) {
+            TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), entityType);
+        }
     }
 
     private SchedulePlanItem planItem(Long id, Long taskId, Long teacherId, Long classId, Long classroomId,
