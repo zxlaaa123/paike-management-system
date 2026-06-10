@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { House, DataLine, Calendar, Reading, PieChart, School, ArrowDown, Warning, Loading, Collection, Tickets } from '@element-plus/icons-vue'
+import { House, DataLine, Calendar, Reading, PieChart, School, ArrowDown, Warning, Loading, Collection, Tickets, Monitor } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
@@ -69,6 +69,10 @@ onMounted(() => {
         <el-menu-item index="/dashboard">
           <el-icon><House /></el-icon>
           <span>首页</span>
+        </el-menu-item>
+        <el-menu-item index="/project-showcase">
+          <el-icon><Monitor /></el-icon>
+          <span>项目展示</span>
         </el-menu-item>
         <el-menu-item index="/semesters">
           <el-icon><School /></el-icon>

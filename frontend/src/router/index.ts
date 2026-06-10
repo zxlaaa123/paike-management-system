@@ -70,6 +70,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/login/LoginView.vue'),
   },
   {
+    path: '/project-showcase',
+    name: 'ProjectShowcase',
+    component: () => import('../views/showcase/ProjectShowcaseView.vue'),
+  },
+  {
     path: '/',
     component: BaseLayout,
     redirect: '/dashboard',
