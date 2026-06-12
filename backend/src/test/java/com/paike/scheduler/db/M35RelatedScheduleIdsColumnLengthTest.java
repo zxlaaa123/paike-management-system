@@ -31,7 +31,7 @@ class M35RelatedScheduleIdsColumnLengthTest {
         assertTrue(migration.contains("TABLE_NAME = 'schedule_conflict_report'"));
         assertTrue(migration.contains("COLUMN_NAME = 'related_schedule_ids'"));
         assertTrue(migration.contains("DATA_TYPE <> 'text'"));
-        assertTrue(migration.contains("MODIFY COLUMN related_schedule_ids TEXT NULL COMMENT '相关排课记录ID'"));
+        assertTrue(migration.contains("MODIFY COLUMN related_schedule_ids TEXT NULL COMMENT ''相关排课记录ID''"));
         assertTrue(application.contains("classpath:db/v20_schedule_conflict_related_ids_text.sql"));
     }
 

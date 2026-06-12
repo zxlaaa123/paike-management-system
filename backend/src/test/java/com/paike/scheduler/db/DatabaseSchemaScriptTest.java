@@ -96,17 +96,17 @@ class DatabaseSchemaScriptTest {
         String semesterDataBind = resource("db/v3_semester_data_bind.sql");
         String scoreReport = resource("db/v2_alter_score_report.sql");
 
-        assertTrue(semesterDataBind.contains("CREATE PROCEDURE add_semester_data_bind_columns_if_not_exists()"));
+        assertTrue(semesterDataBind.contains("PREPARE stmt FROM @ddl"));
         assertTrue(semesterDataBind.contains("TABLE_NAME = 'teaching_task'"));
         assertTrue(semesterDataBind.contains("COLUMN_NAME = 'semester_id'"));
         assertTrue(semesterDataBind.contains("TABLE_NAME = 'schedule'"));
         assertTrue(semesterDataBind.contains("COLUMN_NAME = 'plan_id'"));
-        assertTrue(semesterDataBind.contains("CALL add_semester_data_bind_columns_if_not_exists();"));
+        assertTrue(semesterDataBind.contains("EXECUTE stmt"));
 
-        assertTrue(scoreReport.contains("CREATE PROCEDURE add_score_report_grade_name_if_not_exists()"));
+        assertTrue(scoreReport.contains("PREPARE stmt FROM @ddl"));
         assertTrue(scoreReport.contains("TABLE_NAME = 'schedule_score_report'"));
         assertTrue(scoreReport.contains("COLUMN_NAME = 'grade_name'"));
-        assertTrue(scoreReport.contains("CALL add_score_report_grade_name_if_not_exists();"));
+        assertTrue(scoreReport.contains("EXECUTE stmt"));
     }
 
     @Test
@@ -145,15 +145,15 @@ class DatabaseSchemaScriptTest {
         String v5Stage3 = resource("db/v5_stage3.sql");
         String v5Stage6 = resource("db/v5_stage6.sql");
 
-        assertTrue(v5Stage1.contains("CREATE PROCEDURE add_v5_stage1_schedule_plan_columns()"));
+        assertTrue(v5Stage1.contains("PREPARE stmt FROM @ddl"));
         assertTrue(v5Stage1.contains("COLUMN_NAME = 'plan_mode'"));
         assertTrue(v5Stage1.contains("INDEX_NAME = 'idx_schedule_plan_mode'"));
 
-        assertTrue(v5Stage3.contains("CREATE PROCEDURE add_v5_stage3_repair_task_columns()"));
+        assertTrue(v5Stage3.contains("PREPARE stmt FROM @ddl"));
         assertTrue(v5Stage3.contains("COLUMN_NAME = 'cancel_reason'"));
         assertTrue(v5Stage3.contains("INDEX_NAME = 'idx_repair_task_result_plan'"));
 
-        assertTrue(v5Stage6.contains("CREATE PROCEDURE add_v5_stage6_schedule_plan_columns()"));
+        assertTrue(v5Stage6.contains("PREPARE stmt FROM @ddl"));
         assertTrue(v5Stage6.contains("COLUMN_NAME = 'source_schedule_id'"));
         assertTrue(v5Stage6.contains("INDEX_NAME = 'idx_plan_repair_task'"));
     }
@@ -198,8 +198,8 @@ class DatabaseSchemaScriptTest {
         assertTrue(v14.contains("semester_id BIGINT NULL COMMENT '所属学期ID'"));
         assertTrue(v14.contains("deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除'"));
         assertTrue(migration.contains("TABLE_NAME = 'schedule_report'"));
-        assertTrue(migration.contains("ADD COLUMN semester_id BIGINT NULL COMMENT '所属学期ID'"));
-        assertTrue(migration.contains("ADD COLUMN deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除'"));
+        assertTrue(migration.contains("ADD COLUMN semester_id BIGINT NULL COMMENT ''所属学期ID''"));
+        assertTrue(migration.contains("ADD COLUMN deleted TINYINT NOT NULL DEFAULT 0 COMMENT ''逻辑删除：0未删除，1已删除''"));
         assertTrue(migration.contains("idx_schedule_report_plan_deleted"));
         assertTrue(migration.contains("idx_schedule_report_semester_deleted_created"));
         assertTrue(migration.contains("JOIN schedule_plan p ON p.id = r.plan_id"));
@@ -217,7 +217,7 @@ class DatabaseSchemaScriptTest {
         assertTrue(schema.contains("idx_score_detail_plan_deleted"));
         assertTrue(schema.contains("idx_score_detail_semester_deleted"));
         assertTrue(migration.contains("TABLE_NAME = 'schedule_score_detail'"));
-        assertTrue(migration.contains("ADD COLUMN deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除'"));
+        assertTrue(migration.contains("ADD COLUMN deleted TINYINT NOT NULL DEFAULT 0 COMMENT ''逻辑删除：0未删除，1已删除''"));
         assertTrue(migration.contains("idx_score_detail_plan_deleted"));
         assertTrue(migration.contains("idx_score_detail_semester_deleted"));
         assertTrue(application.contains("classpath:db/v19_score_detail_deleted.sql"));
