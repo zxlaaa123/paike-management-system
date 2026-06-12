@@ -13,15 +13,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class InMemoryConflictDetectorTest {
 
-    // Layout:
-    //   slot0=(day1,p1), slot1=(day1,p2), slot2=(day2,p1), slot3=(day2,p2)
-    //   room0=NORMAL/60, room1=LAB/30, room2=COMPUTER/40
-    //   teacher0, teacher1; class0/50人, class1/25人
-    //
-    //   task0: teacher=0, class=0, NORMAL,  required=2, rooms=[0]
-    //   task1: teacher=1, class=1, EXPERIMENT, required=1, rooms=[1]
-    //   task2: teacher=0, class=1, COMPUTER, required=1, rooms=[2]
-    //   task3: teacher=1, class=0, NORMAL,  required=1, rooms=[0]
+    // 5 tasks:
+    //   task0: teacher=0, class=0, course=0, NORMAL,  required=2, rooms=[0]
+    //   task1: teacher=1, class=1, course=1, EXPERIMENT, required=1, rooms=[1]
+    //   task2: teacher=0, class=1, course=2, COMPUTER, required=1, rooms=[2]
+    //   task3: teacher=1, class=1, course=0, NORMAL,  required=1, rooms=[0]
+    //   task4: teacher=1, class=0, course=0, NORMAL,  required=1, rooms=[0]
 
     private List<EngineTask> tasks;
     private List<EngineContext.TimeSlotData> timeSlots;
@@ -60,14 +57,16 @@ class InMemoryConflictDetectorTest {
             new EngineTask(0, 1L, 0, 0, 0, 2, "NORMAL", 50, List.of(0)),
             new EngineTask(1, 2L, 1, 1, 1, 1, "EXPERIMENT", 25, List.of(1)),
             new EngineTask(2, 3L, 0, 1, 2, 1, "COMPUTER", 25, List.of(2)),
-            new EngineTask(3, 4L, 1, 0, 0, 1, "NORMAL", 50, List.of(0))
+            new EngineTask(3, 4L, 1, 1, 0, 1, "NORMAL", 25, List.of(0)),
+            new EngineTask(4, 5L, 1, 0, 0, 1, "NORMAL", 50, List.of(0))
         );
     }
 
     private EngineContext buildCtx(int teacherMax, int classMax, boolean allowSameCourseSameDay,
                                    boolean[][] unavailable, List<Assignment> locked) {
         return new EngineContext(tasks, timeSlots, classrooms, teachers, classes, courses,
-                unavailable, teacherMax, classMax, allowSameCourseSameDay, Map.of(), locked);
+                unavailable, new boolean[2], new boolean[2], new boolean[3],
+                teacherMax, classMax, allowSameCourseSameDay, Map.of(), locked, List.of(), new int[5]);
     }
 
     private EngineContext defaultCtx() {
@@ -78,15 +77,69 @@ class InMemoryConflictDetectorTest {
     void testTeacherUnavailable() {
         boolean[][] unavail = new boolean[2][4];
         unavail[0][0] = true;
-        EngineContext ctx = buildCtx(3, 4, false, unavail, List.of());
-        InMemoryConflictDetector det = new InMemoryConflictDetector(ctx);
+        InMemoryConflictDetector det = new InMemoryConflictDetector(buildCtx(3, 4, false, unavail, List.of()));
         assertEquals("TEACHER_UNAVAILABLE", det.check(new Assignment(0, 0, 0, 0)));
+    }
+
+    @Test
+    void testTeacherDisabled() {
+        boolean[] td = {true, false};
+        EngineContext ctx = new EngineContext(tasks, timeSlots, classrooms, teachers, classes, courses,
+                new boolean[2][4], td, new boolean[2], new boolean[3],
+                3, 4, false, Map.of(), List.of(), List.of(), new int[5]);
+        assertEquals("TEACHER_DISABLED", new InMemoryConflictDetector(ctx).check(new Assignment(0, 0, 0, 0)));
+    }
+
+    @Test
+    void testClassDisabled() {
+        boolean[] cd = {true, false};
+        EngineContext ctx = new EngineContext(tasks, timeSlots, classrooms, teachers, classes, courses,
+                new boolean[2][4], new boolean[2], cd, new boolean[3],
+                3, 4, false, Map.of(), List.of(), List.of(), new int[5]);
+        assertEquals("CLASS_DISABLED", new InMemoryConflictDetector(ctx).check(new Assignment(0, 0, 0, 0)));
+    }
+
+    @Test
+    void testClassroomDisabled() {
+        boolean[] rd = {true, false, false};
+        EngineContext ctx = new EngineContext(tasks, timeSlots, classrooms, teachers, classes, courses,
+                new boolean[2][4], new boolean[2], new boolean[2], rd,
+                3, 4, false, Map.of(), List.of(), List.of(), new int[5]);
+        assertEquals("CLASSROOM_DISABLED", new InMemoryConflictDetector(ctx).check(new Assignment(0, 0, 0, 0)));
+    }
+
+    @Test
+    void testClassroomCapacityNotEnough() {
+        // task0 studentCount=50, room1 capacity=30
+        assertEquals("CLASSROOM_CAPACITY_NOT_ENOUGH", new InMemoryConflictDetector(defaultCtx()).check(new Assignment(0, 0, 0, 1)));
+    }
+
+    @Test
+    void testNullStudentCountRejects() {
+        List<EngineTask> t = List.of(new EngineTask(0, 1L, 0, 0, 0, 2, "NORMAL", -1, List.of(0)));
+        EngineContext ctx = new EngineContext(t, timeSlots, classrooms, teachers, classes, courses,
+                new boolean[2][4], new boolean[2], new boolean[2], new boolean[3],
+                3, 4, false, Map.of(), List.of(), List.of(), new int[1]);
+        assertEquals("CLASSROOM_CAPACITY_NOT_ENOUGH", new InMemoryConflictDetector(ctx).check(new Assignment(0, 0, 0, 0)));
+    }
+
+    @Test
+    void testRoomTypeMismatchExperiment() {
+        // task1 EXPERIMENT vs room0 NORMAL
+        assertEquals("ROOM_TYPE_MISMATCH", new InMemoryConflictDetector(defaultCtx()).check(new Assignment(1, 0, 0, 0)));
+    }
+
+    @Test
+    void testRoomTypeMismatchComputer() {
+        // task2 COMPUTER vs room0 NORMAL
+        assertEquals("ROOM_TYPE_MISMATCH", new InMemoryConflictDetector(defaultCtx()).check(new Assignment(2, 0, 0, 0)));
     }
 
     @Test
     void testTeacherConflict() {
         InMemoryConflictDetector det = new InMemoryConflictDetector(defaultCtx());
         det.place(new Assignment(0, 0, 0, 0));
+        // task2 also teacher=0, same slot
         assertEquals("TEACHER_CONFLICT", det.check(new Assignment(2, 0, 0, 2)));
     }
 
@@ -94,32 +147,16 @@ class InMemoryConflictDetectorTest {
     void testClassConflict() {
         InMemoryConflictDetector det = new InMemoryConflictDetector(defaultCtx());
         det.place(new Assignment(0, 0, 0, 0));
-        assertEquals("CLASS_CONFLICT", det.check(new Assignment(3, 0, 0, 0)));
+        // task4: class=0 (same), teacher=1 (different), same slot, room0
+        assertEquals("CLASS_CONFLICT", det.check(new Assignment(4, 0, 0, 0)));
     }
 
     @Test
     void testRoomConflict() {
         InMemoryConflictDetector det = new InMemoryConflictDetector(defaultCtx());
         det.place(new Assignment(0, 0, 0, 0));
-        assertEquals("ROOM_CONFLICT", det.check(new Assignment(1, 0, 0, 0)));
-    }
-
-    @Test
-    void testClassroomCapacityNotEnough() {
-        InMemoryConflictDetector det = new InMemoryConflictDetector(defaultCtx());
-        assertEquals("CLASSROOM_CAPACITY_NOT_ENOUGH", det.check(new Assignment(0, 0, 0, 1)));
-    }
-
-    @Test
-    void testRoomTypeMismatchExperiment() {
-        InMemoryConflictDetector det = new InMemoryConflictDetector(defaultCtx());
-        assertEquals("ROOM_TYPE_MISMATCH", det.check(new Assignment(1, 0, 0, 0)));
-    }
-
-    @Test
-    void testRoomTypeMismatchComputer() {
-        InMemoryConflictDetector det = new InMemoryConflictDetector(defaultCtx());
-        assertEquals("ROOM_TYPE_MISMATCH", det.check(new Assignment(2, 0, 0, 0)));
+        // task3: class=1, teacher=1, NORMAL, same slot, room0 (occupied)
+        assertEquals("ROOM_CONFLICT", det.check(new Assignment(3, 0, 0, 0)));
     }
 
     @Test
@@ -135,6 +172,7 @@ class InMemoryConflictDetectorTest {
         EngineContext ctx = buildCtx(1, 4, false, new boolean[2][4], List.of());
         InMemoryConflictDetector det = new InMemoryConflictDetector(ctx);
         det.place(new Assignment(0, 0, 0, 0));
+        // task2 teacher=0, slot1 (day1) → daily limit
         assertEquals("TEACHER_DAILY_LIMIT", det.check(new Assignment(2, 0, 1, 2)));
     }
 
@@ -143,7 +181,24 @@ class InMemoryConflictDetectorTest {
         EngineContext ctx = buildCtx(3, 1, false, new boolean[2][4], List.of());
         InMemoryConflictDetector det = new InMemoryConflictDetector(ctx);
         det.place(new Assignment(0, 0, 0, 0));
-        assertEquals("CLASS_DAILY_LIMIT", det.check(new Assignment(3, 0, 1, 0)));
+        // task4 class=0, slot1 (day1) → daily limit
+        assertEquals("CLASS_DAILY_LIMIT", det.check(new Assignment(4, 0, 1, 0)));
+    }
+
+    @Test
+    void testSameCourseSameDayBlocked() {
+        InMemoryConflictDetector det = new InMemoryConflictDetector(defaultCtx());
+        det.place(new Assignment(0, 0, 0, 0));
+        // task4: class=0, course=0, slot1 (same day1) → SAME_COURSE_SAME_DAY
+        assertEquals("SAME_COURSE_SAME_DAY", det.check(new Assignment(4, 0, 1, 0)));
+    }
+
+    @Test
+    void testSameCourseSameDayAllowed() {
+        EngineContext ctx = buildCtx(3, 4, true, new boolean[2][4], List.of());
+        InMemoryConflictDetector det = new InMemoryConflictDetector(ctx);
+        det.place(new Assignment(0, 0, 0, 0));
+        assertNull(det.check(new Assignment(4, 0, 1, 0)));
     }
 
     @Test
@@ -157,8 +212,7 @@ class InMemoryConflictDetectorTest {
 
     @Test
     void testValidAssignment() {
-        InMemoryConflictDetector det = new InMemoryConflictDetector(defaultCtx());
-        assertNull(det.check(new Assignment(0, 0, 0, 0)));
+        assertNull(new InMemoryConflictDetector(defaultCtx()).check(new Assignment(0, 0, 0, 0)));
     }
 
     @Test
@@ -166,6 +220,18 @@ class InMemoryConflictDetectorTest {
         Assignment locked = new Assignment(0, 0, 0, 0);
         EngineContext ctx = buildCtx(3, 4, false, new boolean[2][4], List.of(locked));
         InMemoryConflictDetector det = new InMemoryConflictDetector(ctx);
-        assertEquals("ROOM_CONFLICT", det.check(new Assignment(1, 0, 0, 0)));
+        // task3: class=1, teacher=1, NORMAL, same slot, room0 (locked)
+        assertEquals("ROOM_CONFLICT", det.check(new Assignment(3, 0, 0, 0)));
+    }
+
+    @Test
+    void testExistingScheduleAsInitialOccupancy() {
+        List<Assignment> existing = List.of(new Assignment(0, 0, 0, 0));
+        int[] existingCount = {1, 0, 0, 0, 0};
+        EngineContext ctx = new EngineContext(tasks, timeSlots, classrooms, teachers, classes, courses,
+                new boolean[2][4], new boolean[2], new boolean[2], new boolean[3],
+                3, 4, false, Map.of(), List.of(), existing, existingCount);
+        InMemoryConflictDetector det = new InMemoryConflictDetector(ctx);
+        assertEquals("ROOM_CONFLICT", det.check(new Assignment(3, 0, 0, 0)));
     }
 }

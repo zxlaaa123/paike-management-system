@@ -15,19 +15,24 @@ public record EngineContext(
     List<ClassData> classes,
     List<CourseData> courses,
     boolean[][] teacherUnavailable,
+    boolean[] teacherDisabled,
+    boolean[] classDisabled,
+    boolean[] classroomDisabled,
     int teacherMaxDailySlots,
     int classMaxDailySlots,
     boolean allowSameCourseSameDay,
     Map<String, Double> ruleWeights,
-    List<Assignment> lockedAssignments
+    List<Assignment> lockedAssignments,
+    List<Assignment> existingScheduleAssignments,
+    int[] existingTaskScheduledCount
 ) {
     public record TimeSlotData(int index, long originalId, int dayOfWeek, int periodNo) {}
 
-    public record ClassroomData(int index, long originalId, int capacity, String roomType) {}
+    public record ClassroomData(int index, long originalId, Integer capacity, String roomType) {}
 
     public record TeacherData(int index, long originalId, String name, int status) {}
 
-    public record ClassData(int index, long originalId, int studentCount, int status) {}
+    public record ClassData(int index, long originalId, Integer studentCount, int status) {}
 
     public record CourseData(int index, long originalId, String courseType) {}
 
