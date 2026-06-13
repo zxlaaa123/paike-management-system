@@ -180,7 +180,8 @@ public class EngineContextLoader {
                 }
             }
 
-            engineTasks.add(new EngineTask(i, t.getId(), tIdx, cIdx, coIdx, requiredSlots,
+            int engineTaskIndex = engineTasks.size();
+            engineTasks.add(new EngineTask(engineTaskIndex, t.getId(), tIdx, cIdx, coIdx, requiredSlots,
                 courseType, studentCount, candidateRooms));
         }
 

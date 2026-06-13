@@ -18,6 +18,8 @@ const singleForm = reactive({
   strategyType: 'COMPREHENSIVE',
   planName: '',
   overwriteDraft: false,
+  solverSeed: undefined as number | undefined,
+  solverTimeBudgetMs: 15000,
 })
 
 const multipleForm = reactive({
@@ -31,7 +33,10 @@ const strategyOptions = [
   { label: '班级均衡', value: 'CLASS_BALANCE' },
   { label: '教室利用率', value: 'CLASSROOM_UTILIZATION' },
   { label: '综合最优', value: 'COMPREHENSIVE' },
+  { label: '智能求解', value: 'SOLVER_V8' },
 ]
+
+const isSolverV8 = computed(() => singleForm.strategyType === 'SOLVER_V8')
 
 const currentSemesterName = computed(() => {
   const semesterId = singleForm.semesterId ?? multipleForm.semesterId
@@ -65,6 +70,8 @@ async function handleGenerateSingle() {
       strategyType: singleForm.strategyType,
       planName: singleForm.planName || undefined,
       overwriteDraft: singleForm.overwriteDraft,
+      solverSeed: isSolverV8.value ? singleForm.solverSeed : undefined,
+      solverTimeBudgetMs: isSolverV8.value ? singleForm.solverTimeBudgetMs : undefined,
     })
     latestResults.value = [result]
     ElMessage.success('单方案生成成功')
@@ -135,6 +142,14 @@ onMounted(fetchSemesters)
         <el-form-item label="方案名称">
           <el-input v-model="singleForm.planName" placeholder="不填则自动生成方案名称" style="width: 420px" />
         </el-form-item>
+        <template v-if="isSolverV8">
+          <el-form-item label="随机种子">
+            <el-input-number v-model="singleForm.solverSeed" :controls="false" style="width: 220px" />
+          </el-form-item>
+          <el-form-item label="时间预算">
+            <el-input-number v-model="singleForm.solverTimeBudgetMs" :min="1000" :max="60000" :step="1000" style="width: 220px" />
+          </el-form-item>
+        </template>
         <el-form-item label="覆盖草稿">
           <el-switch v-model="singleForm.overwriteDraft" />
         </el-form-item>

@@ -17,4 +17,8 @@ public class ScheduleGenerateRequest {
     private String planName;
 
     private Boolean overwriteDraft;
+
+    private Long solverSeed;
+
+    private Long solverTimeBudgetMs;
 }

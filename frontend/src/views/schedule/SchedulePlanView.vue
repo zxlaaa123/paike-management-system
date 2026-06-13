@@ -165,11 +165,12 @@ onMounted(() => {
         <el-form-item label="策略">
           <el-select v-model="searchForm.strategyType" placeholder="全部" clearable>
             <el-option label="教师优先" value="TEACHER_PRIORITY" />
-            <el-option label="班级均衡" value="CLASS_BALANCE" />
-            <el-option label="教室利用率" value="CLASSROOM_UTILIZATION" />
-            <el-option label="综合最优" value="COMPREHENSIVE" />
-          </el-select>
-        </el-form-item>
+          <el-option label="班级均衡" value="CLASS_BALANCE" />
+          <el-option label="教室利用率" value="CLASSROOM_UTILIZATION" />
+          <el-option label="综合最优" value="COMPREHENSIVE" />
+          <el-option label="智能求解" value="SOLVER_V8" />
+        </el-select>
+      </el-form-item>
         <el-form-item label="关键词">
           <el-input v-model="searchForm.keyword" placeholder="方案名称" clearable />
         </el-form-item>

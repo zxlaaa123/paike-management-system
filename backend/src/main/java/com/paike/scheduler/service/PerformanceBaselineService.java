@@ -27,6 +27,7 @@ public class PerformanceBaselineService {
     public static final String OP_V5_GENERATE_SIMULATION = "V5_GENERATE_SIMULATION";
     public static final String OP_V5_LOCAL_REPLAN = "V5_LOCAL_REPLAN";
     public static final String OP_V5_APPLY_SIMULATION = "V5_APPLY_SIMULATION";
+    public static final String OP_V8_SOLVER_GENERATE = "V8_SOLVER_GENERATE";
     public static final long SLOW_OPERATION_THRESHOLD_MS = 5000L;
 
     private final PerformanceBaselineRecordMapper performanceMapper;

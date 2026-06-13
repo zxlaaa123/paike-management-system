@@ -4,6 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.config.ScheduleThresholdProperties;
+import com.paike.scheduler.engine.model.Assignment;
+import com.paike.scheduler.engine.model.EngineContext;
+import com.paike.scheduler.engine.model.EngineSolution;
+import com.paike.scheduler.engine.model.EngineTask;
+import com.paike.scheduler.engine.solver.EngineFacade;
+import com.paike.scheduler.engine.solver.SolverConfig;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.dto.MultipleScheduleGenerateRequest;
@@ -29,6 +35,10 @@ import java.util.*;
 public class V3ScheduleGenerateService {
 
     private static final String DEFAULT_STRATEGY = "COMPREHENSIVE";
+    private static final String STRATEGY_SOLVER_V8 = "SOLVER_V8";
+    private static final long DEFAULT_SOLVER_TIME_BUDGET_MS = 15_000L;
+    private static final long MIN_SOLVER_TIME_BUDGET_MS = 1_000L;
+    private static final long MAX_SOLVER_TIME_BUDGET_MS = 60_000L;
     private static final DateTimeFormatter PLAN_NAME_SUFFIX = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final SemesterService semesterService;
@@ -40,83 +50,111 @@ public class V3ScheduleGenerateService {
     private final SchedulingReferenceLoader referenceLoader;
     private final SchedulePlanExplainService explainService;
     private final ScheduleThresholdProperties thresholdProperties;
+    private final EngineContextLoader engineContextLoader;
+    private final PerformanceBaselineService performanceBaselineService;
 
     @Transactional(rollbackFor = Exception.class)
     public ScheduleGenerateResult generate(ScheduleGenerateRequest request) {
-        Long semesterId = resolveSemesterId(request.getSemesterId());
-        String strategyType = normalizeStrategyType(request.getStrategyType());
-        String planName = resolvePlanName(request.getPlanName(), strategyType);
-        boolean overwriteDraft = Boolean.TRUE.equals(request.getOverwriteDraft());
+        long startedNanos = System.nanoTime();
+        String strategyType = null;
+        Long semesterId = null;
+        Long planId = null;
+        Integer taskCount = null;
+        try {
+            semesterId = resolveSemesterId(request.getSemesterId());
+            strategyType = normalizeStrategyType(request.getStrategyType());
+            String planName = resolvePlanName(request.getPlanName(), strategyType);
+            boolean overwriteDraft = Boolean.TRUE.equals(request.getOverwriteDraft());
 
-        prepareDraftTarget(semesterId, planName, overwriteDraft);
+            prepareDraftTarget(semesterId, planName, overwriteDraft);
 
-        List<TeachingTask> tasks = loadTeachingTasks(semesterId);
-        if (tasks.isEmpty()) {
-            throw new BusinessException("当前学期没有可排课的教学任务");
+            List<TeachingTask> tasks = loadTeachingTasks(semesterId);
+            taskCount = tasks.size();
+            if (tasks.isEmpty()) {
+                throw new BusinessException("当前学期没有可排课的教学任务");
+            }
+
+            SchedulePlan plan = new SchedulePlan();
+            plan.setSemesterId(semesterId);
+            plan.setName(planName);
+            plan.setStrategyType(strategyType);
+            plan.setStatus(SchedulePlanStatus.DRAFT.getCode());
+            plan.setScheduledCount(0);
+            plan.setUnscheduledCount(0);
+            plan.setConflictCount(0);
+            plan.setDescription("V3 自动排课生成方案");
+            plan.setGeneratedBy("V3_GENERATE");
+            plan.setGeneratedAt(LocalDateTime.now());
+            plan.setCreatedAt(LocalDateTime.now());
+            plan.setUpdatedAt(LocalDateTime.now());
+            planMapper.insert(plan);
+            planId = plan.getId();
+            explainService.clearPlanArtifacts(plan.getId());
+
+            StepCounter stepCounter = new StepCounter();
+            explainService.appendGenerateLog(
+                    plan.getId(),
+                    semesterId,
+                    null,
+                    "INFO",
+                    "START_GENERATE",
+                    "开始生成" + plan.getName(),
+                    stepCounter.next());
+            explainService.appendGenerateLog(
+                    plan.getId(),
+                    semesterId,
+                    null,
+                    "INFO",
+                    "LOAD_TASK",
+                    "读取当前学期教学任务，共 " + tasks.size() + " 条",
+                    stepCounter.next());
+
+            List<SchedulePlanItem> generatedItems;
+            SolverRunMeta solverRunMeta = null;
+            if (STRATEGY_SOLVER_V8.equals(strategyType)) {
+                SolverPlanItems solverResult = generateSolverV8PlanItems(plan, request, stepCounter);
+                generatedItems = solverResult.items();
+                solverRunMeta = solverResult.meta();
+            } else {
+                SchedulingReferenceData refData = referenceLoader.loadForV3Generate(semesterId, strategyType);
+                RuleConfig rules = loadRuleConfig();
+                generatedItems = generatePlanItems(plan, tasks, refData, rules);
+            }
+            for (SchedulePlanItem item : generatedItems) {
+                planItemMapper.insert(item);
+            }
+
+            plan.setScheduledCount(generatedItems.size());
+            explainService.appendGenerateLog(
+                    plan.getId(),
+                    semesterId,
+                    null,
+                    "INFO",
+                    "GENERATE_SCORE",
+                    "开始生成评分，当前已排 " + plan.getScheduledCount() + " 条，未排 " + plan.getUnscheduledCount() + " 条",
+                    stepCounter.next());
+            scoreService.rescore(plan);
+            explainService.appendGenerateLog(
+                    plan.getId(),
+                    semesterId,
+                    null,
+                    "INFO",
+                    "FINISH_GENERATE",
+                    "方案生成完成，总分 " + plan.getTotalScore() + "，冲突数 " + plan.getConflictCount(),
+                    stepCounter.next());
+
+            if (STRATEGY_SOLVER_V8.equals(strategyType)) {
+                recordSolverPerformance(semesterId, plan.getId(), taskCount, generatedItems.size(),
+                        startedNanos, true, null, null, solverRunMeta);
+            }
+            return toResult(plan);
+        } catch (RuntimeException ex) {
+            if (STRATEGY_SOLVER_V8.equals(strategyType)) {
+                recordSolverPerformance(semesterId, planId, taskCount, null,
+                        startedNanos, false, ex.getClass().getSimpleName(), truncate(ex.getMessage()), null);
+            }
+            throw ex;
         }
-
-        SchedulingReferenceData refData = referenceLoader.loadForV3Generate(semesterId, strategyType);
-        RuleConfig rules = loadRuleConfig();
-
-        SchedulePlan plan = new SchedulePlan();
-        plan.setSemesterId(semesterId);
-        plan.setName(planName);
-        plan.setStrategyType(strategyType);
-        plan.setStatus(SchedulePlanStatus.DRAFT.getCode());
-        plan.setScheduledCount(0);
-        plan.setUnscheduledCount(0);
-        plan.setConflictCount(0);
-        plan.setDescription("V3 自动排课生成方案");
-        plan.setGeneratedBy("V3_GENERATE");
-        plan.setGeneratedAt(LocalDateTime.now());
-        plan.setCreatedAt(LocalDateTime.now());
-        plan.setUpdatedAt(LocalDateTime.now());
-        planMapper.insert(plan);
-        explainService.clearPlanArtifacts(plan.getId());
-
-        StepCounter stepCounter = new StepCounter();
-        explainService.appendGenerateLog(
-                plan.getId(),
-                semesterId,
-                null,
-                "INFO",
-                "START_GENERATE",
-                "开始生成" + plan.getName(),
-                stepCounter.next());
-        explainService.appendGenerateLog(
-                plan.getId(),
-                semesterId,
-                null,
-                "INFO",
-                "LOAD_TASK",
-                "读取当前学期教学任务，共 " + tasks.size() + " 条",
-                stepCounter.next());
-
-        List<SchedulePlanItem> generatedItems = generatePlanItems(plan, tasks, refData, rules);
-        for (SchedulePlanItem item : generatedItems) {
-            planItemMapper.insert(item);
-        }
-
-        plan.setScheduledCount(generatedItems.size());
-        explainService.appendGenerateLog(
-                plan.getId(),
-                semesterId,
-                null,
-                "INFO",
-                "GENERATE_SCORE",
-                "开始生成评分，当前已排 " + plan.getScheduledCount() + " 条，未排 " + plan.getUnscheduledCount() + " 条",
-                stepCounter.next());
-        scoreService.rescore(plan);
-        explainService.appendGenerateLog(
-                plan.getId(),
-                semesterId,
-                null,
-                "INFO",
-                "FINISH_GENERATE",
-                "方案生成完成，总分 " + plan.getTotalScore() + "，冲突数 " + plan.getConflictCount(),
-                stepCounter.next());
-
-        return toResult(plan);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -167,6 +205,7 @@ public class V3ScheduleGenerateService {
             case "TEACHER_PRIORITY" -> "教师优先";
             case "CLASS_BALANCE" -> "班级均衡";
             case "CLASSROOM_UTILIZATION" -> "教室利用率";
+            case STRATEGY_SOLVER_V8 -> "智能求解";
             default -> "综合最优";
         };
     }
@@ -473,6 +512,153 @@ public class V3ScheduleGenerateService {
         return ScoringFunctions.slotToStartPeriod(slot) + 1;
     }
 
+    private SolverPlanItems generateSolverV8PlanItems(SchedulePlan plan, ScheduleGenerateRequest request, StepCounter stepCounter) {
+        SolverRunMeta meta = resolveSolverRunMeta(request);
+        explainService.appendGenerateLog(
+                plan.getId(),
+                plan.getSemesterId(),
+                null,
+                "INFO",
+                "SOLVER_V8_CONFIG",
+                "智能求解参数：seed=" + meta.seed() + "，timeBudgetMs=" + meta.timeBudgetMs(),
+                stepCounter.next());
+
+        EngineContext ctx = engineContextLoader.load(plan.getSemesterId());
+        SolverConfig config = new SolverConfig(meta.seed(), SolverConfig.DEFAULT_MAX_BACKTRACKS, meta.timeBudgetMs(), true);
+        EngineSolution solution = EngineFacade.solve(ctx, config);
+
+        List<SchedulePlanItem> items = new ArrayList<>();
+        for (Assignment assignment : solution.assignments()) {
+            items.add(toPlanItem(plan.getId(), plan.getSemesterId(), ctx, assignment));
+        }
+        for (EngineSolution.UnassignedSlot unassigned : solution.unassignedSlots()) {
+            saveSolverUnassigned(plan, ctx, unassigned, stepCounter);
+        }
+
+        plan.setScheduledCount(items.size());
+        plan.setUnscheduledCount(solution.unassignedSlots().size());
+        plan.setConflictCount(0);
+        plan.setUpdatedAt(LocalDateTime.now());
+        planMapper.updateById(plan);
+
+        explainService.appendGenerateLog(
+                plan.getId(),
+                plan.getSemesterId(),
+                null,
+                solution.unassignedSlots().isEmpty() ? "INFO" : "WARN",
+                "SOLVER_V8_FINISH",
+                "智能求解完成，已排 " + items.size() + " 个大节，未排 " + solution.unassignedSlots().size() + " 个大节",
+                stepCounter.next());
+        return new SolverPlanItems(items, meta.withCounts(items.size(), solution.unassignedSlots().size()));
+    }
+
+    private SchedulePlanItem toPlanItem(Long planId, Long semesterId, EngineContext ctx, Assignment assignment) {
+        EngineTask task = ctx.tasks().get(assignment.taskIndex());
+        EngineContext.TimeSlotData slot = ctx.timeSlots().get(assignment.timeSlotIndex());
+        EngineContext.ClassroomData room = ctx.classrooms().get(assignment.classroomIndex());
+
+        SchedulePlanItem item = new SchedulePlanItem();
+        item.setPlanId(planId);
+        item.setSemesterId(semesterId);
+        item.setTeachingTaskId(task.originalId());
+        item.setTeacherId(ctx.teachers().get((int) task.teacherIndex()).originalId());
+        item.setClassId(ctx.classes().get((int) task.classIndex()).originalId());
+        item.setCourseId(ctx.courses().get((int) task.courseIndex()).originalId());
+        item.setClassroomId(room.originalId());
+        item.setWeekday(slot.dayOfWeek());
+        item.setStartPeriod(slotToStartPeriod(slot));
+        item.setEndPeriod(slotToStartPeriod(slot) + 1);
+        item.setWeekType("ALL");
+        item.setScore(null);
+        item.setConflictFlag(0);
+        item.setConflictReason(null);
+        item.setSourceType("AUTO");
+        item.setCreatedAt(LocalDateTime.now());
+        item.setUpdatedAt(LocalDateTime.now());
+        return item;
+    }
+
+    private int slotToStartPeriod(EngineContext.TimeSlotData slot) {
+        return Math.max(1, slot.periodNo() * 2 - 1);
+    }
+
+    private void saveSolverUnassigned(
+            SchedulePlan plan,
+            EngineContext ctx,
+            EngineSolution.UnassignedSlot unassigned,
+            StepCounter stepCounter
+    ) {
+        EngineTask task = ctx.tasks().get(unassigned.taskIndex());
+        UnassignedReason reason = solverUnassignedReason(unassigned.reasonType());
+        explainService.saveUnassignedTask(plan.getId(), plan.getSemesterId(), task.originalId(),
+                reason.reasonCode(), reason.reasonMessage(), reason.suggestion());
+        explainService.appendGenerateLog(
+                plan.getId(),
+                plan.getSemesterId(),
+                task.originalId(),
+                "ERROR",
+                "ASSIGN_FAILED",
+                "智能求解未排任务 " + task.originalId() + " 第 " + (unassigned.slotIndex() + 1)
+                        + " 个大节，原因：" + reason.reasonMessage(),
+                stepCounter.next());
+    }
+
+    private UnassignedReason solverUnassignedReason(String reasonType) {
+        if ("BACKTRACK_BUDGET_EXCEEDED".equals(reasonType)) {
+            return new UnassignedReason(
+                    "BACKTRACK_BUDGET_EXCEEDED",
+                    "求解时间或回溯预算已耗尽",
+                    "可提高求解时间预算，或减少教师禁排、每日上限、教室容量等硬约束");
+        }
+        return new UnassignedReason(
+                "NO_AVAILABLE_SLOT",
+                "没有满足所有硬约束的可用时段和教室",
+                "请检查教师禁排、班级/教师每日上限、教室类型和容量配置");
+    }
+
+    private SolverRunMeta resolveSolverRunMeta(ScheduleGenerateRequest request) {
+        long seed = request.getSolverSeed() != null ? request.getSolverSeed() : UUID.randomUUID().getMostSignificantBits();
+        long budget = clampSolverTimeBudget(request.getSolverTimeBudgetMs());
+        return new SolverRunMeta(seed, budget, null, null);
+    }
+
+    private long clampSolverTimeBudget(Long requested) {
+        long value = requested == null ? DEFAULT_SOLVER_TIME_BUDGET_MS : requested;
+        return Math.max(MIN_SOLVER_TIME_BUDGET_MS, Math.min(MAX_SOLVER_TIME_BUDGET_MS, value));
+    }
+
+    private void recordSolverPerformance(
+            Long semesterId,
+            Long planId,
+            Integer taskCount,
+            Integer scheduleCount,
+            long startedNanos,
+            boolean success,
+            String errorCode,
+            String errorMessage,
+            SolverRunMeta meta
+    ) {
+        performanceBaselineService.recordSafely(
+                PerformanceBaselineService.OP_V8_SOLVER_GENERATE,
+                semesterId,
+                planId,
+                null,
+                taskCount,
+                scheduleCount,
+                PerformanceBaselineService.elapsedMillis(startedNanos),
+                success,
+                errorCode,
+                errorMessage,
+                meta == null ? null : meta.toExtraJson());
+    }
+
+    private String truncate(String value) {
+        if (value == null || value.length() <= 500) {
+            return value;
+        }
+        return value.substring(0, 500);
+    }
+
     private ScheduleGenerateResult toResult(SchedulePlan plan) {
         ScheduleGenerateResult result = new ScheduleGenerateResult();
         result.setPlanId(plan.getId());
@@ -489,6 +675,24 @@ public class V3ScheduleGenerateService {
     }
 
     private record UnassignedReason(String reasonCode, String reasonMessage, String suggestion) {
+    }
+
+    private record SolverPlanItems(List<SchedulePlanItem> items, SolverRunMeta meta) {
+    }
+
+    private record SolverRunMeta(long seed, long timeBudgetMs, Integer scheduledCount, Integer unassignedCount) {
+
+        private SolverRunMeta withCounts(int scheduledCount, int unassignedCount) {
+            return new SolverRunMeta(seed, timeBudgetMs, scheduledCount, unassignedCount);
+        }
+
+        private String toExtraJson() {
+            return "{\"seed\":" + seed
+                    + ",\"timeBudgetMs\":" + timeBudgetMs
+                    + ",\"scheduledCount\":" + scheduledCount
+                    + ",\"unassignedCount\":" + unassignedCount
+                    + "}";
+        }
     }
 
     private static final class StepCounter {

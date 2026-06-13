@@ -37,6 +37,7 @@ export function strategyText(strategy: string): string {
     CLASS_BALANCE: '班级均衡',
     CLASSROOM_UTILIZATION: '教室利用率',
     COMPREHENSIVE: '综合最优',
+    SOLVER_V8: '智能求解',
     CUSTOM: '自定义',
   }
   return map[strategy] || strategy
