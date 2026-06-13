@@ -117,16 +117,17 @@ class V8BenchmarkComparisonTest {
         StringBuilder table = new StringBuilder();
         table.append("\n================ V8 阶段4 质量/性能对比 ================\n");
         table.append("[同权重(COMPREHENSIVE)总分 / 未排数 / 引擎ms / 端到端ms]\n");
-        table.append(String.format("%-4s %-22s %-12s %-8s %-10s %-10s%n",
-                "规模", "策略", "同权重分", "未排", "引擎ms", "端到端ms"));
+        table.append(String.format("%-4s %-22s %-12s %-8s %-10s %-10s %-12s%n",
+                "规模", "策略", "同权重分", "未排", "引擎ms", "端到端ms", "退火步数"));
         for (ScaleResult sr : results) {
             for (StrategyRun run : sr.runs) {
-                table.append(String.format("%-4s %-22s %-12s %-8s %-10s %-10s%n",
+                table.append(String.format("%-4s %-22s %-12s %-8s %-10s %-10s %-12s%n",
                         sr.label, run.strategyType,
                         run.sameWeightScore.toPlainString(),
                         run.unscheduledCount,
                         run.engineMs < 0 ? "-" : String.valueOf(run.engineMs),
-                        run.endToEndMs));
+                        run.endToEndMs,
+                        run.annealingSteps < 0 ? "-" : String.valueOf(run.annealingSteps)));
             }
             table.append(String.format("%-4s 同权重: V8(%s)≥旧最高(%s) %s | 未排: V8(%d)≤旧最少(%d) %s%n",
                     sr.label,
@@ -219,7 +220,7 @@ class V8BenchmarkComparisonTest {
 
         // V8 rescore 用 SOLVER_V8 权重 = COMPREHENSIVE default，故自身总分即同权重分。
         BigDecimal sameWeightScore = result.getTotalScore() == null ? BigDecimal.ZERO : result.getTotalScore();
-        return new StrategyRun("SOLVER_V8", sameWeightScore, result.getUnscheduledCount(), engineMs, endToEndMs);
+        return new StrategyRun("SOLVER_V8", sameWeightScore, result.getUnscheduledCount(), engineMs, endToEndMs, readV8AnnealingSteps(result.getPlanId()));
     }
 
     private StrategyRun runOldStrategy(String strategyType, Long semesterId, String suffix, List<Long> planIds) {
@@ -238,7 +239,7 @@ class V8BenchmarkComparisonTest {
                 new LambdaQueryWrapper<SchedulePlanItem>().eq(SchedulePlanItem::getPlanId, result.getPlanId()));
         BigDecimal sameWeightScore = comprehensiveWeightedScore(items);
 
-        return new StrategyRun(strategyType, sameWeightScore, result.getUnscheduledCount(), -1L, endToEndMs);
+        return new StrategyRun(strategyType, sameWeightScore, result.getUnscheduledCount(), -1L, endToEndMs, -1);
     }
 
     private long readV8EndToEndMs(Long planId) {
@@ -251,6 +252,34 @@ class V8BenchmarkComparisonTest {
             return records.get(0).getDurationMs();
         }
         return -1L;
+    }
+
+    private int readV8AnnealingSteps(Long planId) {
+        List<PerformanceBaselineRecord> records = performanceMapper.selectList(
+                new LambdaQueryWrapper<PerformanceBaselineRecord>()
+                        .eq(PerformanceBaselineRecord::getPlanId, planId)
+                        .eq(PerformanceBaselineRecord::getOperationType,
+                                PerformanceBaselineService.OP_V8_SOLVER_GENERATE));
+        if (records.isEmpty() || records.get(0).getExtraJson() == null) {
+            return -1;
+        }
+        // extraJson: {"seed":...,"timeBudgetMs":...,"optimizeTimeBudgetMs":...,"scheduledCount":...,
+        //             "unassignedCount":...,"backtracks":...,"annealingSteps":12345,"initialScore":...,"finalScore":...}
+        String extra = records.get(0).getExtraJson();
+        int idx = extra.indexOf("\"annealingSteps\":");
+        if (idx < 0) {
+            return -1;
+        }
+        int start = idx + "\"annealingSteps\":".length();
+        int end = extra.indexOf(',', start);
+        if (end < 0) {
+            end = extra.indexOf('}', start);
+        }
+        try {
+            return Integer.parseInt(extra.substring(start, end).trim());
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     /** 直接调 EngineFacade 打点，得到纯引擎求解耗时（回溯+退火，无 DB）。 */
@@ -494,7 +523,8 @@ class V8BenchmarkComparisonTest {
     }
 
     private record StrategyRun(String strategyType, BigDecimal sameWeightScore,
-                               int unscheduledCount, long engineMs, long endToEndMs) {}
+                               int unscheduledCount, long engineMs, long endToEndMs,
+                               int annealingSteps) {}
 
     private record ScaleResult(String label, List<StrategyRun> runs) {
         StrategyRun v8Run() {

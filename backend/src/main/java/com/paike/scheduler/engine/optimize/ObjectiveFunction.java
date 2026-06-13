@@ -55,6 +55,32 @@ public final class ObjectiveFunction {
                 .toList();
     }
 
+    /** 包内供 IncrementalPenaltyState 复用：从单个 Assignment 构 SchedulePlanItem（与 toPlanItems 一致）。 */
+    static SchedulePlanItem assignmentToItem(EngineContext ctx, Assignment assignment) {
+        EngineTask task = ctx.tasks().get(assignment.taskIndex());
+        EngineContext.TimeSlotData slot = ctx.timeSlots().get(assignment.timeSlotIndex());
+        EngineContext.ClassroomData room = ctx.classrooms().get(assignment.classroomIndex());
+
+        SchedulePlanItem item = new SchedulePlanItem();
+        item.setTeachingTaskId(task.originalId());
+        item.setTeacherId(ctx.teachers().get((int) task.teacherIndex()).originalId());
+        item.setClassId(ctx.classes().get((int) task.classIndex()).originalId());
+        item.setCourseId(ctx.courses().get((int) task.courseIndex()).originalId());
+        item.setClassroomId(room.originalId());
+        item.setWeekday(slot.dayOfWeek());
+        item.setStartPeriod(slotToStartPeriod(slot));
+        item.setEndPeriod(slotToStartPeriod(slot) + 1);
+        item.setWeekType("ALL");
+        item.setConflictFlag(0);
+        item.setSourceType("AUTO");
+        return item;
+    }
+
+    /** 包内供 IncrementalPenaltyState 复用：从 ctx 取规则权重（与 private weight 同一映射）。 */
+    BigDecimal weightFor(String ruleCode) {
+        return weight(ruleCode);
+    }
+
     private SchedulePlanItem toPlanItem(Assignment assignment) {
         EngineTask task = ctx.tasks().get(assignment.taskIndex());
         EngineContext.TimeSlotData slot = ctx.timeSlots().get(assignment.timeSlotIndex());
