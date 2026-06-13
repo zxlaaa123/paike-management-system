@@ -39,6 +39,9 @@ public class V3ScheduleGenerateService {
     private static final long DEFAULT_SOLVER_TIME_BUDGET_MS = 15_000L;
     private static final long MIN_SOLVER_TIME_BUDGET_MS = 1_000L;
     private static final long MAX_SOLVER_TIME_BUDGET_MS = 60_000L;
+    private static final long DEFAULT_SOLVER_OPTIMIZE_TIME_BUDGET_MS = SolverConfig.DEFAULT_OPTIMIZE_TIME_BUDGET_MS;
+    private static final long MIN_SOLVER_OPTIMIZE_TIME_BUDGET_MS = 0L;
+    private static final long MAX_SOLVER_OPTIMIZE_TIME_BUDGET_MS = 60_000L;
     private static final DateTimeFormatter PLAN_NAME_SUFFIX = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final SemesterService semesterService;
@@ -120,8 +123,8 @@ public class V3ScheduleGenerateService {
                 RuleConfig rules = loadRuleConfig();
                 generatedItems = generatePlanItems(plan, tasks, refData, rules);
             }
-            for (SchedulePlanItem item : generatedItems) {
-                planItemMapper.insert(item);
+            if (!generatedItems.isEmpty()) {
+                planItemMapper.insertBatch(generatedItems);
             }
 
             plan.setScheduledCount(generatedItems.size());
@@ -520,11 +523,15 @@ public class V3ScheduleGenerateService {
                 null,
                 "INFO",
                 "SOLVER_V8_CONFIG",
-                "智能求解参数：seed=" + meta.seed() + "，timeBudgetMs=" + meta.timeBudgetMs(),
+                "智能求解参数：seed=" + meta.seed()
+                        + "，回溯时间预算=" + meta.timeBudgetMs() + "ms"
+                        + "，退火时间预算=" + meta.optimizeTimeBudgetMs() + "ms"
+                        + (meta.optimizeTimeBudgetMs() == 0 ? "（跳过退火）" : ""),
                 stepCounter.next());
 
         EngineContext ctx = engineContextLoader.load(plan.getSemesterId());
-        SolverConfig config = new SolverConfig(meta.seed(), SolverConfig.DEFAULT_MAX_BACKTRACKS, meta.timeBudgetMs(), true);
+        SolverConfig config = new SolverConfig(meta.seed(), SolverConfig.DEFAULT_MAX_BACKTRACKS,
+                meta.timeBudgetMs(), meta.optimizeTimeBudgetMs(), true);
         EngineSolution solution = EngineFacade.solve(ctx, config);
 
         List<SchedulePlanItem> items = new ArrayList<>();
@@ -622,12 +629,18 @@ public class V3ScheduleGenerateService {
     private SolverRunMeta resolveSolverRunMeta(ScheduleGenerateRequest request) {
         long seed = request.getSolverSeed() != null ? request.getSolverSeed() : UUID.randomUUID().getMostSignificantBits();
         long budget = clampSolverTimeBudget(request.getSolverTimeBudgetMs());
-        return new SolverRunMeta(seed, budget, null, null, null, null, null, null);
+        long optimizeBudget = clampSolverOptimizeTimeBudget(request.getSolverOptimizeTimeBudgetMs());
+        return new SolverRunMeta(seed, budget, optimizeBudget, null, null, null, null, null, null);
     }
 
     private long clampSolverTimeBudget(Long requested) {
         long value = requested == null ? DEFAULT_SOLVER_TIME_BUDGET_MS : requested;
         return Math.max(MIN_SOLVER_TIME_BUDGET_MS, Math.min(MAX_SOLVER_TIME_BUDGET_MS, value));
+    }
+
+    private long clampSolverOptimizeTimeBudget(Long requested) {
+        long value = requested == null ? DEFAULT_SOLVER_OPTIMIZE_TIME_BUDGET_MS : requested;
+        return Math.max(MIN_SOLVER_OPTIMIZE_TIME_BUDGET_MS, Math.min(MAX_SOLVER_OPTIMIZE_TIME_BUDGET_MS, value));
     }
 
     private void recordSolverPerformance(
@@ -686,6 +699,7 @@ public class V3ScheduleGenerateService {
     private record SolverRunMeta(
             long seed,
             long timeBudgetMs,
+            long optimizeTimeBudgetMs,
             Integer scheduledCount,
             Integer unassignedCount,
             Integer backtracks,
@@ -702,6 +716,7 @@ public class V3ScheduleGenerateService {
             return new SolverRunMeta(
                     seed,
                     timeBudgetMs,
+                    optimizeTimeBudgetMs,
                     scheduledCount,
                     unassignedCount,
                     stats == null ? null : stats.backtracks(),
@@ -713,6 +728,7 @@ public class V3ScheduleGenerateService {
         private String toExtraJson() {
             return "{\"seed\":" + seed
                     + ",\"timeBudgetMs\":" + timeBudgetMs
+                    + ",\"optimizeTimeBudgetMs\":" + optimizeTimeBudgetMs
                     + ",\"scheduledCount\":" + scheduledCount
                     + ",\"unassignedCount\":" + unassignedCount
                     + ",\"backtracks\":" + backtracks

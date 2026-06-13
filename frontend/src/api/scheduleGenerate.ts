@@ -18,6 +18,7 @@ export function generateSchedulePlan(data: {
   overwriteDraft?: boolean
   solverSeed?: number
   solverTimeBudgetMs?: number
+  solverOptimizeTimeBudgetMs?: number
 }) {
   return request.post<ApiResponse<ScheduleGenerateResult>>('/v3/schedule-generate', data, { timeout: 120_000 }).then((r) => {
     if (!r.data) {

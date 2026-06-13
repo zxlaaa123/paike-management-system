@@ -19,7 +19,8 @@ const singleForm = reactive({
   planName: '',
   overwriteDraft: false,
   solverSeed: undefined as number | undefined,
-  solverTimeBudgetMs: 15000,
+  solverTimeBudgetMs: 5000,
+  solverOptimizeTimeBudgetMs: 10000,
 })
 
 const multipleForm = reactive({
@@ -72,6 +73,7 @@ async function handleGenerateSingle() {
       overwriteDraft: singleForm.overwriteDraft,
       solverSeed: isSolverV8.value ? singleForm.solverSeed : undefined,
       solverTimeBudgetMs: isSolverV8.value ? singleForm.solverTimeBudgetMs : undefined,
+      solverOptimizeTimeBudgetMs: isSolverV8.value ? singleForm.solverOptimizeTimeBudgetMs : undefined,
     })
     latestResults.value = [result]
     ElMessage.success('单方案生成成功')
@@ -145,9 +147,15 @@ onMounted(fetchSemesters)
         <template v-if="isSolverV8">
           <el-form-item label="随机种子">
             <el-input-number v-model="singleForm.solverSeed" :controls="false" style="width: 220px" />
+            <span class="solver-hint">不填则随机生成；同种子同数据可复现</span>
           </el-form-item>
-          <el-form-item label="时间预算">
+          <el-form-item label="回溯时间预算">
             <el-input-number v-model="singleForm.solverTimeBudgetMs" :min="1000" :max="60000" :step="1000" style="width: 220px" />
+            <span class="solver-hint">毫秒，回溯求可行解的预算</span>
+          </el-form-item>
+          <el-form-item label="退火时间预算">
+            <el-input-number v-model="singleForm.solverOptimizeTimeBudgetMs" :min="0" :max="60000" :step="1000" style="width: 220px" />
+            <span class="solver-hint">毫秒，模拟退火优化预算；填 0 跳过退火仅用回溯解</span>
           </el-form-item>
         </template>
         <el-form-item label="覆盖草稿">
@@ -218,5 +226,11 @@ onMounted(fetchSemesters)
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.solver-hint {
+  margin-left: 10px;
+  color: #909399;
+  font-size: 12px;
 }
 </style>

@@ -21,4 +21,7 @@ public class ScheduleGenerateRequest {
     private Long solverSeed;
 
     private Long solverTimeBudgetMs;
+
+    /** 模拟退火优化时间预算（毫秒），仅 SOLVER_V8 生效；缺省走引擎默认 10s，传 0 跳过退火。 */
+    private Long solverOptimizeTimeBudgetMs;
 }

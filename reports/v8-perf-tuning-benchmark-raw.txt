@@ -1,0 +1,108 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] --------------------< com.paike:scheduler-backend >---------------------
+[INFO] Building scheduler-backend 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.12:prepare-agent (prepare-agent) @ scheduler-backend ---
+[INFO] argLine set to -javaagent:C:\\Users\\zxl\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.12\\org.jacoco.agent-0.8.12-runtime.jar=destfile=D:\\paike\\backend\\target\\jacoco.exec
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ scheduler-backend ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 36 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ scheduler-backend ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ scheduler-backend ---
+[INFO] skip non existing resourceDirectory D:\paike\backend\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ scheduler-backend ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 92 source files with javac [debug parameters release 17] to target\test-classes
+[INFO] 由于在类路径中发现了一个或多个处理程序，因此启用了
+  批注处理。未来发行版的 javac 可能会禁用批注处理，
+  除非至少按名称指定了一个处理程序 (-processor)，
+  或指定了搜索路径 (--processor-path, --processor-module-path)，
+  或显式启用了批注处理 (-proc:only, -proc:full)。
+  可使用 -Xlint:-options 隐藏此消息。
+  可使用 -proc:none 禁用批注处理。
+[INFO] /D:/paike/backend/src/test/java/com/paike/scheduler/service/PerformanceBaselineServiceTest.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /D:/paike/backend/src/test/java/com/paike/scheduler/service/PerformanceBaselineServiceTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ scheduler-backend ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.paike.scheduler.service.V8BenchmarkComparisonTest
+21:52:59.092 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.paike.scheduler.service.V8BenchmarkComparisonTest]: V8BenchmarkComparisonTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+21:53:00.671 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.paike.scheduler.SchedulerBackendApplication for test class com.paike.scheduler.service.V8BenchmarkComparisonTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.5)
+
+2026-06-13T21:53:03.641+08:00  INFO 13224 --- [scheduler-backend] [           main] c.p.s.service.V8BenchmarkComparisonTest  : Starting V8BenchmarkComparisonTest using Java 21.0.11 with PID 13224 (started by 周兴龙 in D:\paike\backend)
+2026-06-13T21:53:03.646+08:00  INFO 13224 --- [scheduler-backend] [           main] c.p.s.service.V8BenchmarkComparisonTest  : No active profile set, falling back to 1 default profile: "default"
+ _ _   |_  _ _|_. ___ _ |    _ 
+| | |\/|_)(_| | |_\  |_)||_|_\ 
+     /               |         
+                        3.5.7 
+2026-06-13T21:53:15.001+08:00  INFO 13224 --- [scheduler-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-06-13T21:53:17.235+08:00  INFO 13224 --- [scheduler-backend] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@5b293cc9
+2026-06-13T21:53:17.245+08:00  INFO 13224 --- [scheduler-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-06-13T21:53:29.270+08:00  INFO 13224 --- [scheduler-backend] [           main] c.p.s.service.V8BenchmarkComparisonTest  : Started V8BenchmarkComparisonTest in 27.669 seconds (process running for 35.307)
+WARNING: A Java agent has been loaded dynamically (C:\Users\zxl\.m2\repository\net\bytebuddy\byte-buddy-agent\1.14.19\byte-buddy-agent-1.14.19.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+================ V8 阶段4 质量/性能对比 ================
+[同权重(COMPREHENSIVE)总分 / 未排数 / 引擎ms / 端到端ms]
+规模   策略                     同权重分         未排       引擎ms       端到端ms     
+小    SOLVER_V8              94.97        0        10090      17127     
+小    TEACHER_PRIORITY       93.84        0        -          1123      
+小    CLASS_BALANCE          94.95        0        -          1073      
+小    CLASSROOM_UTILIZATION  76.77        0        -          621       
+小    COMPREHENSIVE          93.84        0        -          503       
+小    同权重: V8(94.97)≥旧最高(94.95) PASS | 未排: V8(0)≤旧最少(0) PASS
+中    SOLVER_V8              89.66        0        10990      15769     
+中    TEACHER_PRIORITY       73.45        0        -          1513      
+中    CLASS_BALANCE          79.31        0        -          1192      
+中    CLASSROOM_UTILIZATION  59.16        0        -          1091      
+中    COMPREHENSIVE          70.03        0        -          963       
+中    同权重: V8(89.66)≥旧最高(79.31) PASS | 未排: V8(0)≤旧最少(0) PASS
+大    SOLVER_V8              87.70        0        11117      14762     
+大    TEACHER_PRIORITY       79.34        0        -          3607      
+大    CLASS_BALANCE          82.28        0        -          4074      
+大    CLASSROOM_UTILIZATION  59.74        0        -          2834      
+大    COMPREHENSIVE          75.04        0        -          4103      
+大    同权重: V8(87.70)≥旧最高(82.28) PASS | 未排: V8(0)≤旧最少(0) PASS
+大    引擎求解耗时≤15000ms : 11117ms PASS | 端到端: 14762ms (记录用)
+=======================================================
+
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 293.2 s -- in com.paike.scheduler.service.V8BenchmarkComparisonTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- jacoco:0.8.12:report (report) @ scheduler-backend ---
+[INFO] Loading execution data file D:\paike\backend\target\jacoco.exec
+[INFO] Analyzed bundle 'scheduler-backend' with 268 classes
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  05:37 min
+[INFO] Finished at: 2026-06-13T21:57:58+08:00
+[INFO] ------------------------------------------------------------------------
