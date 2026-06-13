@@ -22,6 +22,7 @@
 - V5：智能修复建议、候选位置推荐、试算方案、局部重排、优化前后对比、一致性检查、AI 修复解释、最终回归验收。
 - V6：系统治理中心，包括审计日志、回归测试中心、一致性检查、性能基线、迁移状态和错误码中心。
 - V7：统计与展示补全，包括方案展示字段补齐、教师连续节次统计、首页治理摘要、性能趋势、E2E Cookie 认证统一和总体验收。
+- V8：排课引擎升级。方案生成新增"智能求解(SOLVER_V8)"策略——内存模型 + 回溯求解(保可行) + 模拟退火(提质量)，引擎运行期零 DB 读；旧四策略不删不改并存。阶段 4 对比验收：同权重(COMPREHENSIVE)口径下 SOLVER_V8 总分三档规模(30/120/300 任务)均 ≥ 旧策略最高分，未排数均 ≤ 旧策略最少值，大规模引擎求解耗时 < 15s。
 
 ## 目录结构
 
@@ -230,7 +231,7 @@ npm run test:stage7
 npm run test:stage9
 ```
 
-说明：`npm test` 等价于 `npm run test:acceptance`，会串行运行 V6 governance、stage6、stage7、stage9。E2E 页面用例统一使用 API 登录后拿到的 `paike_token` 与 `XSRF-TOKEN` Cookie，不再向 `localStorage` 注入旧 token。运行 Playwright 前需按本文启动后端 `8090` 和前端 `5173`。
+说明：`npm test` 等价于 `npm run test:acceptance`，会串行运行 V6 governance、stage6、stage7、stage9、v8-solver。E2E 页面用例统一使用 API 登录后拿到的 `paike_token` 与 `XSRF-TOKEN` Cookie，不再向 `localStorage` 注入旧 token。运行 Playwright 前需按本文启动后端 `8090` 和前端 `5173`。
 
 ## 安全与部署注意
 
@@ -286,6 +287,7 @@ $env:DB_PASSWORD="你的MySQL密码"
 - `docs/v5/`
 - `docs/v6/`
 - `docs/v7/`
+- `docs/v8/`
 - `claude-opus-4.7-bug验证报告.md`
 - `claude-opus-4.7-bug修复建议.md`
 
