@@ -89,6 +89,9 @@ CLAUDE*.md
 GIT_LOG.md
 claudeopus*.md
 .codebuddy/
+.mimocode/
+.workbuddy/
+.understand-anything/
 
 # Package manager drift
 frontend/pnpm-lock.yaml
