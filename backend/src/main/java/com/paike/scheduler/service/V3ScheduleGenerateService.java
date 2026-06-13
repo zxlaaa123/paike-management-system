@@ -549,7 +549,10 @@ public class V3ScheduleGenerateService {
                 "SOLVER_V8_FINISH",
                 "智能求解完成，已排 " + items.size() + " 个大节，未排 " + solution.unassignedSlots().size() + " 个大节",
                 stepCounter.next());
-        return new SolverPlanItems(items, meta.withCounts(items.size(), solution.unassignedSlots().size()));
+        return new SolverPlanItems(items, meta.withResult(
+                items.size(),
+                solution.unassignedSlots().size(),
+                solution.stats()));
     }
 
     private SchedulePlanItem toPlanItem(Long planId, Long semesterId, EngineContext ctx, Assignment assignment) {
@@ -619,7 +622,7 @@ public class V3ScheduleGenerateService {
     private SolverRunMeta resolveSolverRunMeta(ScheduleGenerateRequest request) {
         long seed = request.getSolverSeed() != null ? request.getSolverSeed() : UUID.randomUUID().getMostSignificantBits();
         long budget = clampSolverTimeBudget(request.getSolverTimeBudgetMs());
-        return new SolverRunMeta(seed, budget, null, null);
+        return new SolverRunMeta(seed, budget, null, null, null, null, null, null);
     }
 
     private long clampSolverTimeBudget(Long requested) {
@@ -680,10 +683,31 @@ public class V3ScheduleGenerateService {
     private record SolverPlanItems(List<SchedulePlanItem> items, SolverRunMeta meta) {
     }
 
-    private record SolverRunMeta(long seed, long timeBudgetMs, Integer scheduledCount, Integer unassignedCount) {
+    private record SolverRunMeta(
+            long seed,
+            long timeBudgetMs,
+            Integer scheduledCount,
+            Integer unassignedCount,
+            Integer backtracks,
+            Integer annealingSteps,
+            Double initialScore,
+            Double finalScore
+    ) {
 
-        private SolverRunMeta withCounts(int scheduledCount, int unassignedCount) {
-            return new SolverRunMeta(seed, timeBudgetMs, scheduledCount, unassignedCount);
+        private SolverRunMeta withResult(
+                int scheduledCount,
+                int unassignedCount,
+                EngineSolution.SolverStats stats
+        ) {
+            return new SolverRunMeta(
+                    seed,
+                    timeBudgetMs,
+                    scheduledCount,
+                    unassignedCount,
+                    stats == null ? null : stats.backtracks(),
+                    stats == null ? null : stats.annealingSteps(),
+                    stats == null ? null : stats.initialScore(),
+                    stats == null ? null : stats.finalScore());
         }
 
         private String toExtraJson() {
@@ -691,6 +715,10 @@ public class V3ScheduleGenerateService {
                     + ",\"timeBudgetMs\":" + timeBudgetMs
                     + ",\"scheduledCount\":" + scheduledCount
                     + ",\"unassignedCount\":" + unassignedCount
+                    + ",\"backtracks\":" + backtracks
+                    + ",\"annealingSteps\":" + annealingSteps
+                    + ",\"initialScore\":" + initialScore
+                    + ",\"finalScore\":" + finalScore
                     + "}";
         }
     }

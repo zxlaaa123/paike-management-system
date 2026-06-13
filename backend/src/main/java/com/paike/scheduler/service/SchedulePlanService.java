@@ -392,6 +392,9 @@ public class SchedulePlanService {
         scheduleMapper.delete(new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getSemesterId, semesterId));
         for (SchedulePlan oldPlan : oldAppliedPlans) {
+            scheduleMapper.delete(new LambdaQueryWrapper<Schedule>()
+                    .eq(Schedule::getSemesterId, semesterId)
+                    .eq(Schedule::getPlanId, oldPlan.getId()));
             oldPlan.setStatus(SchedulePlanStatus.DRAFT.getCode());
             oldPlan.setUpdatedAt(LocalDateTime.now());
             planMapper.updateById(oldPlan);

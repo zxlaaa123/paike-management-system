@@ -50,7 +50,7 @@ public class BacktrackingSolver {
 
         List<PendingSlot> pending = buildPendingSlots();
         if (pending.isEmpty()) {
-            return new EngineSolution(new ArrayList<>(), new ArrayList<>());
+            return new EngineSolution(new ArrayList<>(), new ArrayList<>(), EngineSolution.SolverStats.feasibleOnly(backtracks));
         }
 
         List<Assignment> placed = new ArrayList<>();
@@ -73,7 +73,7 @@ public class BacktrackingSolver {
             }
         }
 
-        return new EngineSolution(placed, unassigned);
+        return new EngineSolution(placed, unassigned, EngineSolution.SolverStats.feasibleOnly(backtracks));
     }
 
     public int backtracksUsed() {

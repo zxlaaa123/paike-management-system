@@ -7,7 +7,8 @@ import java.util.List;
  */
 public record EngineSolution(
     List<Assignment> assignments,
-    List<UnassignedSlot> unassignedSlots
+    List<UnassignedSlot> unassignedSlots,
+    SolverStats stats
 ) {
     /**
      * 未排的大节。
@@ -16,4 +17,15 @@ public record EngineSolution(
      * @param reasonType 失败原因 TYPE 标签
      */
     public record UnassignedSlot(int taskIndex, int slotIndex, String reasonType) {}
+
+    public record SolverStats(
+            int backtracks,
+            int annealingSteps,
+            double initialScore,
+            double finalScore
+    ) {
+        public static SolverStats feasibleOnly(int backtracks) {
+            return new SolverStats(backtracks, 0, 0D, 0D);
+        }
+    }
 }

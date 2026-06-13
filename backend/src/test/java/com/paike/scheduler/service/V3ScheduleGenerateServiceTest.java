@@ -144,6 +144,7 @@ class V3ScheduleGenerateServiceTest {
                 4,
                 4,
                 false,
+                5,
                 Map.of(),
                 List.of(),
                 List.of(),

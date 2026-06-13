@@ -13,11 +13,17 @@ public record SolverConfig(
         long seed,
         int maxBacktracks,
         long feasibleTimeBudgetMs,
+        long optimizeTimeBudgetMs,
         boolean greedyFallback
 ) {
 
     public static final long DEFAULT_FEASIBLE_TIME_BUDGET_MS = 5_000L;
+    public static final long DEFAULT_OPTIMIZE_TIME_BUDGET_MS = 10_000L;
     public static final int DEFAULT_MAX_BACKTRACKS = 100_000;
+
+    public SolverConfig(long seed, int maxBacktracks, long feasibleTimeBudgetMs, boolean greedyFallback) {
+        this(seed, maxBacktracks, feasibleTimeBudgetMs, DEFAULT_OPTIMIZE_TIME_BUDGET_MS, greedyFallback);
+    }
 
     public SolverConfig {
         if (maxBacktracks < 0) {
@@ -26,11 +32,14 @@ public record SolverConfig(
         if (feasibleTimeBudgetMs <= 0) {
             throw new IllegalArgumentException("feasibleTimeBudgetMs must be > 0, got " + feasibleTimeBudgetMs);
         }
+        if (optimizeTimeBudgetMs <= 0) {
+            throw new IllegalArgumentException("optimizeTimeBudgetMs must be > 0, got " + optimizeTimeBudgetMs);
+        }
         Objects.requireNonNull(greedyFallback, "greedyFallback");
     }
 
     public static SolverConfig defaults() {
-        return new SolverConfig(System.nanoTime(), DEFAULT_MAX_BACKTRACKS, DEFAULT_FEASIBLE_TIME_BUDGET_MS, true);
+        return new SolverConfig(0L, DEFAULT_MAX_BACKTRACKS, DEFAULT_FEASIBLE_TIME_BUDGET_MS, true);
     }
 
     public static SolverConfig withSeed(long seed) {

@@ -1,6 +1,10 @@
 package com.paike.scheduler.service;
 
 import com.paike.scheduler.config.ScheduleThresholdProperties;
+import com.paike.scheduler.engine.model.Assignment;
+import com.paike.scheduler.engine.model.EngineContext;
+import com.paike.scheduler.engine.model.EngineTask;
+import com.paike.scheduler.engine.optimize.ObjectiveFunction;
 import com.paike.scheduler.entity.Classroom;
 import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
@@ -10,11 +14,13 @@ import com.paike.scheduler.mapper.ClassroomMapper;
 import com.paike.scheduler.mapper.SchedulePlanItemMapper;
 import com.paike.scheduler.mapper.SchedulePlanMapper;
 import com.paike.scheduler.mapper.ScheduleScoreDetailMapper;
+import com.paike.scheduler.service.scheduling.DeltaPenaltyScorer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -130,6 +136,47 @@ class ScheduleScoreServiceTest {
 
         assertEquals(new BigDecimal("61.92"), plan.getTotalScore());
         assertEquals(0, plan.getConflictCount());
+    }
+
+    @Test
+    void rescore_detailsMatchV8ObjectiveFunctionWeightedPenalties() {
+        SchedulePlan plan = newPlan(11L);
+        List<SchedulePlanItem> items = List.of(
+                item(1L, 1L, 1L, 1L, 1, 1),
+                item(1L, 1L, 1L, 1L, 1, 3),
+                item(2L, 2L, 2L, 2L, 2, 5),
+                item(2L, 2L, 2L, 2L, 2, 7),
+                item(1L, 1L, 1L, 2L, 2, 1));
+        List<ScheduleRuleWeight> rules = List.of(
+                rule("CLASS_DAILY_BALANCE", "SOFT", "30"),
+                rule("TEACHER_DAILY_LOAD", "SOFT", "30"),
+                rule("COURSE_DISTRIBUTION", "SOFT", "25"),
+                rule("CONTINUOUS_PERIOD_LIMIT", "SOFT", "25"),
+                rule("CLASSROOM_UTILIZATION", "SOFT", "20"));
+        when(planItemMapper.selectList(any())).thenReturn(items);
+        when(classroomMapper.selectList(any())).thenReturn(List.of(
+                classroom(1L),
+                classroom(2L),
+                classroom(3L)));
+        when(ruleWeightService.list(2L, "COMPREHENSIVE", null)).thenReturn(rules);
+
+        service.rescore(plan);
+
+        ObjectiveFunction.ObjectiveValue objective = new ObjectiveFunction(scoreBaselineContext())
+                .evaluate(List.of(
+                        new Assignment(0, 0, 0, 0),
+                        new Assignment(1, 0, 1, 0),
+                        new Assignment(2, 0, 2, 1),
+                        new Assignment(3, 0, 3, 1),
+                        new Assignment(4, 0, 4, 1)));
+        Map<String, ScheduleScoreDetail> details = captureDetailsByCode(5);
+        for (ScheduleRuleWeight rule : rules) {
+            BigDecimal expectedScore = rule.getWeight()
+                    .multiply(objective.penalties().get(rule.getRuleCode()))
+                    .negate()
+                    .setScale(2, RoundingMode.HALF_UP);
+            assertEquals(expectedScore, details.get(rule.getRuleCode()).getScore(), rule.getRuleCode());
+        }
     }
 
     /**
@@ -292,6 +339,60 @@ class ScheduleScoreServiceTest {
         r.setWeight(new BigDecimal(weight));
         r.setEnabled(1);
         return r;
+    }
+
+    private EngineContext scoreBaselineContext() {
+        List<EngineTask> tasks = List.of(
+                new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1)),
+                new EngineTask(1, 102L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1)),
+                new EngineTask(2, 103L, 1, 1, 1, 1, "NORMAL", 30, List.of(0, 1)),
+                new EngineTask(3, 104L, 1, 1, 1, 1, "NORMAL", 30, List.of(0, 1)),
+                new EngineTask(4, 105L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1))
+        );
+        return new EngineContext(
+                tasks,
+                List.of(
+                        new EngineContext.TimeSlotData(0, 201L, 1, 1),
+                        new EngineContext.TimeSlotData(1, 202L, 1, 2),
+                        new EngineContext.TimeSlotData(2, 203L, 2, 3),
+                        new EngineContext.TimeSlotData(3, 204L, 2, 4),
+                        new EngineContext.TimeSlotData(4, 205L, 2, 1)
+                ),
+                List.of(
+                        new EngineContext.ClassroomData(0, 1L, 60, "NORMAL"),
+                        new EngineContext.ClassroomData(1, 2L, 60, "NORMAL"),
+                        new EngineContext.ClassroomData(2, 3L, 60, "NORMAL")
+                ),
+                List.of(
+                        new EngineContext.TeacherData(0, 1L, "T1", 1),
+                        new EngineContext.TeacherData(1, 2L, "T2", 1)
+                ),
+                List.of(
+                        new EngineContext.ClassData(0, 1L, 30, 1),
+                        new EngineContext.ClassData(1, 2L, 30, 1)
+                ),
+                List.of(
+                        new EngineContext.CourseData(0, 1L, "NORMAL"),
+                        new EngineContext.CourseData(1, 2L, "NORMAL")
+                ),
+                new boolean[2][5],
+                new boolean[2],
+                new boolean[2],
+                new boolean[3],
+                4,
+                4,
+                true,
+                5,
+                Map.of(
+                        DeltaPenaltyScorer.CLASS_DAILY_BALANCE, 30D,
+                        DeltaPenaltyScorer.TEACHER_DAILY_LOAD, 30D,
+                        DeltaPenaltyScorer.COURSE_DISTRIBUTION, 25D,
+                        DeltaPenaltyScorer.CONTINUOUS_PERIOD_LIMIT, 25D,
+                        DeltaPenaltyScorer.CLASSROOM_UTILIZATION, 20D
+                ),
+                List.of(),
+                List.of(),
+                new int[tasks.size()]);
     }
 
     private Map<String, ScheduleScoreDetail> captureDetailsByCode(int expectedCount) {

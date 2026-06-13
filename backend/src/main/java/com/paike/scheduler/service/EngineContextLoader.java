@@ -1,6 +1,7 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.paike.scheduler.config.ScheduleThresholdProperties;
 import com.paike.scheduler.engine.model.Assignment;
 import com.paike.scheduler.engine.model.EngineContext;
 import com.paike.scheduler.engine.model.EngineTask;
@@ -34,6 +35,7 @@ public class EngineContextLoader {
     private final SchedulePlanItemMapper planItemMapper;
     private final ScheduleMapper scheduleMapper;
     private final ScheduleRuleWeightMapper ruleWeightMapper;
+    private final ScheduleThresholdProperties thresholdProperties;
 
     @Transactional(readOnly = true)
     public EngineContext load(Long semesterId) {
@@ -47,16 +49,12 @@ public class EngineContextLoader {
             new LambdaQueryWrapper<TimeSlot>().orderByAsc(TimeSlot::getSortOrder));
 
         // Load ALL classrooms (including disabled, for pair test alignment)
-        List<Classroom> allClassrooms = classroomMapper.selectList(
-            new LambdaQueryWrapper<Classroom>().eq(Classroom::getDeleted, 0));
+        List<Classroom> allClassrooms = classroomMapper.selectList(new LambdaQueryWrapper<>());
 
         // Load ALL teachers and classes (including disabled, for pair test alignment)
-        List<Teacher> allTeachers = teacherMapper.selectList(
-            new LambdaQueryWrapper<Teacher>().eq(Teacher::getDeleted, 0));
-        List<ClassInfo> allClasses = classInfoMapper.selectList(
-            new LambdaQueryWrapper<ClassInfo>().eq(ClassInfo::getDeleted, 0));
-        List<Course> allCourses = courseMapper.selectList(
-            new LambdaQueryWrapper<Course>().eq(Course::getDeleted, 0));
+        List<Teacher> allTeachers = teacherMapper.selectList(new LambdaQueryWrapper<>());
+        List<ClassInfo> allClasses = classInfoMapper.selectList(new LambdaQueryWrapper<>());
+        List<Course> allCourses = courseMapper.selectList(new LambdaQueryWrapper<>());
 
         // 2. Build index maps
         Map<Long, Integer> teacherIdxMap = new HashMap<>();
@@ -188,8 +186,7 @@ public class EngineContextLoader {
         // 8. Load existing schedules as initial occupancy
         List<Schedule> existingSchedules = scheduleMapper.selectList(
             new LambdaQueryWrapper<Schedule>()
-                .eq(Schedule::getSemesterId, semesterId)
-                .eq(Schedule::getDeleted, 0));
+                .eq(Schedule::getSemesterId, semesterId));
 
         List<Assignment> existingAssignments = new ArrayList<>();
         int[] existingTaskScheduledCount = new int[engineTasks.size()];
@@ -217,8 +214,7 @@ public class EngineContextLoader {
         List<Assignment> lockedAssignments = new ArrayList<>();
         List<ScheduleLockedItem> lockedItems = lockedItemMapper.selectList(
             new LambdaQueryWrapper<ScheduleLockedItem>()
-                .eq(ScheduleLockedItem::getActiveFlag, 1)
-                .eq(ScheduleLockedItem::getDeleted, 0));
+                .eq(ScheduleLockedItem::getActiveFlag, 1));
 
         for (ScheduleLockedItem item : lockedItems) {
             if (item.getPlanItemId() == null) continue;
@@ -256,7 +252,7 @@ public class EngineContextLoader {
         return new EngineContext(engineTasks, slotDataList, roomDataList, teacherDataList,
             classDataList, courseDataList, teacherUnavailable, teacherDisabled, classDisabled,
             classroomDisabled, teacherMaxDailySlots, classMaxDailySlots, allowSameCourseSameDay,
-            ruleWeights, lockedAssignments, existingAssignments, existingTaskScheduledCount);
+            thresholdProperties.getAfternoonStartPeriod(), ruleWeights, lockedAssignments, existingAssignments, existingTaskScheduledCount);
     }
 
     private boolean isRoomTypeMatched(String courseType, String roomType) {
