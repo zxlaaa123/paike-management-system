@@ -127,13 +127,29 @@ npm test
 
 ## 最终实机验收（E2E）
 
-待用户启动前后端后回填。
-
-执行时间：（待回填）
+执行时间：2026-06-13 19:30-19:34
 
 环境：
 
 - 后端：`http://127.0.0.1:8090`
 - 前端：`http://127.0.0.1:5173`
+- 默认管理员：`APP_ADMIN_DEFAULT_PASSWORD=123456` 显式固定。
 
-结果：（待回填）
+完整验收命令：
+
+```powershell
+cd D:\paike
+npm test
+```
+
+结果：`57 passed (3.7m)`，exit code 0。含现有 52 个（V6 governance 2 + stage6 多方案管理 + stage7 手动排课冲突检测 22 + stage9 课表查询 8）+ 阶段 4 新增 `v8-solver.spec.ts` 5 个（登录、准备基础数据、智能求解生成方案、方案详情页可见、rescore 重算）。
+
+说明：
+
+- 首次完整 run 时 `stage7.spec.ts` 的「18. 前端登录页」因前端冷启动偶发 timeout（15s 内未跳转到 `/dashboard`）失败，单独复跑通过；第二次完整 run 全绿。该用例为 V1 时期既有前端 UI 登录测试，与 V8 改动无关（V8 阶段 4 仅改 README / 新增 benchmark / 新增 v8-solver / 新增 V8_FINAL 文档，未碰登录逻辑）。
+- 首次 run 还暴露 `package.json` 的 `test`/`test:acceptance` 脚本硬编码了 4 个 spec 文件、未含 v8-solver，导致 `npm test` 只跑 52 个。已在本阶段把 `tests/v8-solver.spec.ts` 加入 `test` 与 `test:acceptance`，并新增 `test:v8` 单文件入口；README 的 E2E 说明同步更新（串行运行含 v8-solver）。
+
+清理结果：
+
+- `v8-solver.spec.ts` 的 `afterAll` 已清理本测试创建的 plan / schedule / teaching-task / course / classroom / class / teacher，不残留。
+- 完整 run 结束后前后端进程由用户管理（CLAUDE.md §0.2：AI 不启动/不停止 Spring Boot）。
