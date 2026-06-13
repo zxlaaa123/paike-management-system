@@ -67,7 +67,7 @@ class V3ScheduleGenerateServiceTest {
             return 1;
         });
         when(planMapper.updateById(any(SchedulePlan.class))).thenReturn(1);
-        when(planItemMapper.insert(any(SchedulePlanItem.class))).thenReturn(1);
+        when(planItemMapper.insertBatch(anyList())).thenReturn(1);
         when(engineContextLoader.load(1L)).thenReturn(singleTaskContext());
         doAnswer(invocation -> {
             SchedulePlan plan = invocation.getArgument(0);
@@ -101,9 +101,11 @@ class V3ScheduleGenerateServiceTest {
         assertEquals(1, result.getScheduledCount());
         assertEquals(0, result.getUnscheduledCount());
 
-        ArgumentCaptor<SchedulePlanItem> itemCaptor = ArgumentCaptor.forClass(SchedulePlanItem.class);
-        verify(planItemMapper).insert(itemCaptor.capture());
-        SchedulePlanItem item = itemCaptor.getValue();
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<SchedulePlanItem>> batchCaptor = ArgumentCaptor.forClass(List.class);
+        verify(planItemMapper).insertBatch(batchCaptor.capture());
+        assertEquals(1, batchCaptor.getValue().size());
+        SchedulePlanItem item = batchCaptor.getValue().get(0);
         assertEquals(900L, item.getPlanId());
         assertEquals(101L, item.getTeachingTaskId());
         assertEquals(401L, item.getTeacherId());
@@ -126,7 +128,9 @@ class V3ScheduleGenerateServiceTest {
                 eq(true),
                 isNull(),
                 isNull(),
-                contains("\"timeBudgetMs\":1000"));
+                argThat((String extra) -> extra != null
+                        && extra.contains("\"timeBudgetMs\":1000")
+                        && extra.contains("\"optimizeTimeBudgetMs\":10000")));
     }
 
     private EngineContext singleTaskContext() {

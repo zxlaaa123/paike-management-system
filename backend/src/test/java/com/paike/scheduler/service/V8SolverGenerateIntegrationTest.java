@@ -246,6 +246,7 @@ class V8SolverGenerateIntegrationTest {
         assertEquals(1, record.getSuccess());
         assertTrue(record.getExtraJson().contains("\"seed\":42"));
         assertTrue(record.getExtraJson().contains("\"timeBudgetMs\":1000"));
+        assertTrue(record.getExtraJson().contains("\"optimizeTimeBudgetMs\":10000"));
         assertTrue(record.getExtraJson().contains("\"backtracks\":"));
         assertTrue(record.getExtraJson().contains("\"annealingSteps\":"));
         assertTrue(record.getExtraJson().contains("\"initialScore\":"));
