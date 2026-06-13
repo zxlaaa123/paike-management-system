@@ -21,6 +21,7 @@ public record EngineContext(
     int teacherMaxDailySlots,
     int classMaxDailySlots,
     boolean allowSameCourseSameDay,
+    int afternoonStartPeriod,
     Map<String, Double> ruleWeights,
     List<Assignment> lockedAssignments,
     List<Assignment> existingScheduleAssignments,

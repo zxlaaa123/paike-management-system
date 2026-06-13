@@ -113,7 +113,7 @@ class BacktrackingSolverTest {
     ) {
         return new EngineContext(tasks, slots, rooms, teachers, classes, courses,
                 unavailable, new boolean[teachers.size()], new boolean[classes.size()], new boolean[rooms.size()],
-                4, 4, false, Map.of(), locked, existing, existingCount);
+                4, 4, false, 5, Map.of(), locked, existing, existingCount);
     }
 
     private static List<EngineContext.TimeSlotData> oneSlot() {

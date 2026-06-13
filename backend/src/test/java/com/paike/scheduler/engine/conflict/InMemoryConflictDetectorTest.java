@@ -66,7 +66,7 @@ class InMemoryConflictDetectorTest {
                                    boolean[][] unavailable, List<Assignment> locked) {
         return new EngineContext(tasks, timeSlots, classrooms, teachers, classes, courses,
                 unavailable, new boolean[2], new boolean[2], new boolean[3],
-                teacherMax, classMax, allowSameCourseSameDay, Map.of(), locked, List.of(), new int[5]);
+                teacherMax, classMax, allowSameCourseSameDay, 5, Map.of(), locked, List.of(), new int[5]);
     }
 
     private EngineContext defaultCtx() {
@@ -86,7 +86,7 @@ class InMemoryConflictDetectorTest {
         boolean[] td = {true, false};
         EngineContext ctx = new EngineContext(tasks, timeSlots, classrooms, teachers, classes, courses,
                 new boolean[2][4], td, new boolean[2], new boolean[3],
-                3, 4, false, Map.of(), List.of(), List.of(), new int[5]);
+                3, 4, false, 5, Map.of(), List.of(), List.of(), new int[5]);
         assertEquals("TEACHER_DISABLED", new InMemoryConflictDetector(ctx).check(new Assignment(0, 0, 0, 0)));
     }
 
@@ -95,7 +95,7 @@ class InMemoryConflictDetectorTest {
         boolean[] cd = {true, false};
         EngineContext ctx = new EngineContext(tasks, timeSlots, classrooms, teachers, classes, courses,
                 new boolean[2][4], new boolean[2], cd, new boolean[3],
-                3, 4, false, Map.of(), List.of(), List.of(), new int[5]);
+                3, 4, false, 5, Map.of(), List.of(), List.of(), new int[5]);
         assertEquals("CLASS_DISABLED", new InMemoryConflictDetector(ctx).check(new Assignment(0, 0, 0, 0)));
     }
 
@@ -104,7 +104,7 @@ class InMemoryConflictDetectorTest {
         boolean[] rd = {true, false, false};
         EngineContext ctx = new EngineContext(tasks, timeSlots, classrooms, teachers, classes, courses,
                 new boolean[2][4], new boolean[2], new boolean[2], rd,
-                3, 4, false, Map.of(), List.of(), List.of(), new int[5]);
+                3, 4, false, 5, Map.of(), List.of(), List.of(), new int[5]);
         assertEquals("CLASSROOM_DISABLED", new InMemoryConflictDetector(ctx).check(new Assignment(0, 0, 0, 0)));
     }
 
@@ -119,7 +119,7 @@ class InMemoryConflictDetectorTest {
         List<EngineTask> t = List.of(new EngineTask(0, 1L, 0, 0, 0, 2, "NORMAL", -1, List.of(0)));
         EngineContext ctx = new EngineContext(t, timeSlots, classrooms, teachers, classes, courses,
                 new boolean[2][4], new boolean[2], new boolean[2], new boolean[3],
-                3, 4, false, Map.of(), List.of(), List.of(), new int[1]);
+                3, 4, false, 5, Map.of(), List.of(), List.of(), new int[1]);
         assertEquals("CLASSROOM_CAPACITY_NOT_ENOUGH", new InMemoryConflictDetector(ctx).check(new Assignment(0, 0, 0, 0)));
     }
 
@@ -230,7 +230,7 @@ class InMemoryConflictDetectorTest {
         int[] existingCount = {1, 0, 0, 0, 0};
         EngineContext ctx = new EngineContext(tasks, timeSlots, classrooms, teachers, classes, courses,
                 new boolean[2][4], new boolean[2], new boolean[2], new boolean[3],
-                3, 4, false, Map.of(), List.of(), existing, existingCount);
+                3, 4, false, 5, Map.of(), List.of(), existing, existingCount);
         InMemoryConflictDetector det = new InMemoryConflictDetector(ctx);
         assertEquals("ROOM_CONFLICT", det.check(new Assignment(3, 0, 0, 0)));
     }

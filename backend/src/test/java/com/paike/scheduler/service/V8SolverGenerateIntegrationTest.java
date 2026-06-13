@@ -127,6 +127,20 @@ class V8SolverGenerateIntegrationTest {
         assertPersistedPlan(oldResult.getPlanId(), "COMPREHENSIVE");
     }
 
+    @Test
+    void solverV8SameSeedGeneratesIdenticalPersistedPlanItems() {
+        assertFalse(timeSlotMapper.selectList(new LambdaQueryWrapper<TimeSlot>()).isEmpty(),
+                "time_slot must contain baseline slots");
+        createSolvableDataset();
+
+        ScheduleGenerateResult first = generate("SOLVER_V8", "V8_IT_SEED_A_" + suffix);
+        planIds.add(first.getPlanId());
+        ScheduleGenerateResult second = generate("SOLVER_V8", "V8_IT_SEED_B_" + suffix);
+        planIds.add(second.getPlanId());
+
+        assertEquals(planItemSignature(first.getPlanId()), planItemSignature(second.getPlanId()));
+    }
+
     private ScheduleGenerateResult generate(String strategyType, String planName) {
         ScheduleGenerateRequest request = new ScheduleGenerateRequest();
         request.setSemesterId(semesterId);
@@ -232,5 +246,25 @@ class V8SolverGenerateIntegrationTest {
         assertEquals(1, record.getSuccess());
         assertTrue(record.getExtraJson().contains("\"seed\":42"));
         assertTrue(record.getExtraJson().contains("\"timeBudgetMs\":1000"));
+        assertTrue(record.getExtraJson().contains("\"backtracks\":"));
+        assertTrue(record.getExtraJson().contains("\"annealingSteps\":"));
+        assertTrue(record.getExtraJson().contains("\"initialScore\":"));
+        assertTrue(record.getExtraJson().contains("\"finalScore\":"));
+    }
+
+    private List<String> planItemSignature(Long planId) {
+        return planItemMapper.selectList(new LambdaQueryWrapper<SchedulePlanItem>()
+                        .eq(SchedulePlanItem::getPlanId, planId))
+                .stream()
+                .map(item -> item.getTeachingTaskId()
+                        + ":" + item.getTeacherId()
+                        + ":" + item.getClassId()
+                        + ":" + item.getCourseId()
+                        + ":" + item.getClassroomId()
+                        + ":" + item.getWeekday()
+                        + ":" + item.getStartPeriod()
+                        + ":" + item.getEndPeriod())
+                .sorted()
+                .toList();
     }
 }
