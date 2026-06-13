@@ -439,13 +439,15 @@ test.describe.serial('阶段 7 & 8：手动排课与冲突检测', () => {
   // ====== 前端测试 ======
 
   test('18. 前端登录页', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`)
+    // waitUntil: 'domcontentloaded' 避免 Vite 首次按需 chunk 加载拖慢 goto;
+    // 30s 余量覆盖冷启动时序抖动(单跑稳定, 串行 52 用例末尾偶发首次 chunk 延迟)。
+    await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' })
     await expect(page.locator('input[placeholder="请输入用户名"]')).toBeVisible()
     await expect(page.locator('input[placeholder="请输入密码"]')).toBeVisible()
     await page.fill('input[placeholder="请输入用户名"]', 'admin')
     await page.fill('input[placeholder="请输入密码"]', '123456')
     await page.click('button:has-text("登录")')
-    await page.waitForURL('**/dashboard', { timeout: 15000 })
+    await page.waitForURL('**/dashboard', { timeout: 30000 })
     await expect(page.getByText('首页统计').first()).toBeVisible()
   })
 
