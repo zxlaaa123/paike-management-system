@@ -28,8 +28,14 @@ public final class NeighborOperator {
         if (current == null || current.isEmpty()) {
             return Optional.empty();
         }
+        // 构建 baseline detector 一次 (place existing+locked 在构造内, 再 place 全部 current),
+        // 供 moveOne/swapTwo 增量 remove→check→place→rollback 复用, 省去每次 attempt 全量重建的 O(n) 成本。
+        InMemoryConflictDetector baseline = new InMemoryConflictDetector(ctx);
+        for (Assignment a : current) {
+            baseline.place(a);
+        }
         boolean move = current.size() < 2 || random.nextDouble() < 0.70D;
-        return move ? moveOne(current, random) : swapTwo(current, random);
+        return move ? moveOne(current, random, baseline) : swapTwo(current, random, baseline);
     }
 
     public boolean isFeasible(List<Assignment> assignments) {
@@ -43,7 +49,7 @@ public final class NeighborOperator {
         return true;
     }
 
-    private Optional<List<Assignment>> moveOne(List<Assignment> current, Random random) {
+    private Optional<List<Assignment>> moveOne(List<Assignment> current, Random random, InMemoryConflictDetector baseline) {
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
             int index = random.nextInt(current.size());
             Assignment original = current.get(index);
@@ -58,16 +64,21 @@ public final class NeighborOperator {
             if (moved.equals(original)) {
                 continue;
             }
-            List<Assignment> candidate = new ArrayList<>(current);
-            candidate.set(index, moved);
-            if (isFeasible(candidate)) {
+            // 增量冲突检测: 从 baseline 移除 original, 检查 moved 是否可放入 (与 current 其余元素无冲突),
+            // 失败则 place 回 original 恢复 baseline。等价于全量 isFeasible(candidate) 但 O(1)/attempt 而非 O(n)。
+            baseline.remove(original);
+            if (baseline.check(moved) == null) {
+                baseline.place(moved);
+                List<Assignment> candidate = new ArrayList<>(current);
+                candidate.set(index, moved);
                 return Optional.of(candidate);
             }
+            baseline.place(original);
         }
         return Optional.empty();
     }
 
-    private Optional<List<Assignment>> swapTwo(List<Assignment> current, Random random) {
+    private Optional<List<Assignment>> swapTwo(List<Assignment> current, Random random, InMemoryConflictDetector baseline) {
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
             int left = random.nextInt(current.size());
             int right = random.nextInt(current.size());
@@ -81,12 +92,25 @@ public final class NeighborOperator {
             if (movedA.isEmpty() || movedB.isEmpty()) {
                 continue;
             }
-            List<Assignment> candidate = new ArrayList<>(current);
-            candidate.set(left, movedA.get());
-            candidate.set(right, movedB.get());
-            if (isFeasible(candidate)) {
-                return Optional.of(candidate);
+            Assignment newA = movedA.get();
+            Assignment newB = movedB.get();
+            // 增量: 移除 a, b, 检查 newA→newB 是否可放入 (newA 放 b 的 slot, newB 放 a 的 slot)。
+            // 任一冲突则按逆序回滚到 baseline。等价于全量 isFeasible(candidate) 但 O(1)/attempt。
+            baseline.remove(a);
+            baseline.remove(b);
+            if (baseline.check(newA) == null) {
+                baseline.place(newA);
+                if (baseline.check(newB) == null) {
+                    baseline.place(newB);
+                    List<Assignment> candidate = new ArrayList<>(current);
+                    candidate.set(left, newA);
+                    candidate.set(right, newB);
+                    return Optional.of(candidate);
+                }
+                baseline.remove(newA);
             }
+            baseline.place(a);
+            baseline.place(b);
         }
         return Optional.empty();
     }
