@@ -19,6 +19,10 @@ import java.util.Random;
 public final class AnnealingOptimizer {
 
     private static final int TEMPERATURE_SAMPLE_COUNT = 100;
+    /** estimateInitialTemperature 最少采样次数：保证 avg worsening 统计有意义，避免超时过早退出导致 T0 失真。 */
+    private static final int T0_MIN_SAMPLES = 20;
+    /** estimateInitialTemperature 时间上限占退火预算比例：小数据跑满 100 次无影响；大数据限制 T0 不吞主循环预算。 */
+    private static final double T0_BUDGET_RATIO = 0.20D;
     private static final double COOLING_RATE = 0.97D;
     private static final double MIN_TEMPERATURE_RATIO = 1e-4D;
 
@@ -49,12 +53,15 @@ public final class AnnealingOptimizer {
 
         boolean profile = Boolean.getBoolean("annealing.profile");
         long startedNanos = System.nanoTime();
+        long estimateT0BudgetMs = Math.max(50L, (long) (config.optimizeTimeBudgetMs() * T0_BUDGET_RATIO));
         long estimateT0Start = System.nanoTime();
-        double temperature = estimateInitialTemperature(feasible.assignments(), initialValue.totalPenalty(), random);
+        T0Estimate t0 = estimateInitialTemperature(
+                feasible.assignments(), initialValue.totalPenalty(), random, estimateT0BudgetMs * 1_000_000L);
         long estimateT0Nanos = System.nanoTime() - estimateT0Start;
-        if (temperature <= 0D) {
+        if (t0.temperature() <= 0D) {
             return withStats(feasible, initialValue, initialValue, 0);
         }
+        double temperature = t0.temperature();
 
         // 增量惩罚状态: 每步仅改 Map + 重算 6 个 penalty, 省去 evaluate 每次 groupingBy(items) 的 O(items) 成本。
         // 行为硬保证: state.value() 与 objectiveFunction.evaluate(currentList) 字节级一致
@@ -139,7 +146,9 @@ public final class AnnealingOptimizer {
                     .append(" steps=").append(steps)
                     .append(" budgetMs=").append(config.optimizeTimeBudgetMs())
                     .append(" elapsedMs=").append(totalElapsed / 1_000_000L).append('\n');
-            sb.append("[ANNEALING-PROFILE] estimateT0=").append(estimateT0Nanos / 1_000_000L).append("ms")
+            sb.append("[ANNEALING-PROFILE] estimateT0=").append(estimateT0Nanos / 1_000_000L)
+                    .append("ms samples=").append(t0.samples()).append(" worsening=").append(t0.worseningCount())
+                    .append(" budgetCapMs=").append(estimateT0BudgetMs)
                     .append(" | mainLoop=").append(mainNanos / 1_000_000L).append("ms\n");
             if (steps > 0) {
                 sb.append("[ANNEALING-PROFILE] per-step(us, avg over ").append(steps).append("): ");
@@ -162,18 +171,31 @@ public final class AnnealingOptimizer {
                         bestValue.score().doubleValue()));
     }
 
-    private double estimateInitialTemperature(
+    /**
+     * 估计退火初始温度：采样 neighbor 的平均 worsening delta，除以 ln(2) 使初始接受率≈50%。
+     * 时间上限 {@code budgetNanos}（退火预算的 {@link #T0_BUDGET_RATIO}）防止大规模下
+     * neighborOperator.next（每步 ~8ms）+ 全量 evaluate 吞掉主循环预算；至少跑
+     * {@link #T0_MIN_SAMPLES} 次保证统计有意义。
+     */
+    private T0Estimate estimateInitialTemperature(
             List<Assignment> current,
             BigDecimal currentPenalty,
-            Random random
+            Random random,
+            long budgetNanos
     ) {
+        long deadline = System.nanoTime() + budgetNanos;
         BigDecimal worseningSum = BigDecimal.ZERO;
         int worseningCount = 0;
+        int samples = 0;
         for (int i = 0; i < TEMPERATURE_SAMPLE_COUNT; i++) {
+            if (i >= T0_MIN_SAMPLES && System.nanoTime() > deadline) {
+                break;
+            }
             Optional<List<Assignment>> maybeNeighbor = neighborOperator.next(current, random);
             if (maybeNeighbor.isEmpty()) {
                 continue;
             }
+            samples++;
             BigDecimal delta = objectiveFunction.evaluate(maybeNeighbor.get()).totalPenalty().subtract(currentPenalty);
             if (delta.compareTo(BigDecimal.ZERO) > 0) {
                 worseningSum = worseningSum.add(delta);
@@ -181,12 +203,15 @@ public final class AnnealingOptimizer {
             }
         }
         if (worseningCount == 0) {
-            return 1D;
+            return new T0Estimate(1D, samples, worseningCount);
         }
         double avgWorsening = worseningSum.divide(BigDecimal.valueOf(worseningCount), 8, java.math.RoundingMode.HALF_UP)
                 .doubleValue();
-        return avgWorsening / Math.log(2D);
+        return new T0Estimate(avgWorsening / Math.log(2D), samples, worseningCount);
     }
+
+    /** estimateInitialTemperature 结果：温度 + 采样统计（供 profiling 输出）。 */
+    private record T0Estimate(double temperature, int samples, int worseningCount) {}
 
     /**
      * 找出 current 与 neighbor 之间的所有 changed indices（moveOne 通常 1 个，swapTwo 通常 2 个）。
