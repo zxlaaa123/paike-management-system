@@ -115,7 +115,7 @@ public class V3ScheduleGenerateService {
             List<SchedulePlanItem> generatedItems;
             SolverRunMeta solverRunMeta = null;
             if (STRATEGY_SOLVER_V8.equals(strategyType)) {
-                SolverPlanItems solverResult = generateSolverV8PlanItems(plan, request, stepCounter);
+                SolverPlanItems solverResult = generateSolverV8PlanItems(plan, request, tasks, stepCounter);
                 generatedItems = solverResult.items();
                 solverRunMeta = solverResult.meta();
             } else {
@@ -353,12 +353,12 @@ public class V3ScheduleGenerateService {
                         "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，教师禁排", stepCounter.next());
                 continue;
             }
-            if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), rules.teacherMaxDailySlots(), generatedItems)) {
+            if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), rules.teacherMaxDailySlots(), generatedItems, task.getWeekType())) {
                 explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_TEACHER",
                         "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，教师日排课上限", stepCounter.next());
                 continue;
             }
-            if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), rules.classMaxDailySlots(), generatedItems)) {
+            if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), rules.classMaxDailySlots(), generatedItems, task.getWeekType())) {
                 explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_CLASS",
                         "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，班级日排课上限", stepCounter.next());
                 continue;
@@ -368,7 +368,7 @@ public class V3ScheduleGenerateService {
                         "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，同任务已占用同一天", stepCounter.next());
                 continue;
             }
-            if (!rules.allowSameCourseSameDay() && hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), generatedItems)) {
+            if (!rules.allowSameCourseSameDay() && hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), generatedItems, task.getWeekType())) {
                 explainService.appendGenerateLog(plan.getId(), plan.getSemesterId(), task.getId(), "WARN", "CHECK_CLASS",
                         "教学任务：" + taskLabel + " 跳过 " + slot.getTimeLabel() + "，同班同课程同日限制", stepCounter.next());
                 continue;
@@ -414,8 +414,13 @@ public class V3ScheduleGenerateService {
     }
 
     private boolean hasConflict(TeachingTask task, TimeSlot slot, Classroom room, List<SchedulePlanItem> generatedItems) {
+        String taskWeekType = task.getWeekType();
         for (SchedulePlanItem item : generatedItems) {
             if (!Objects.equals(item.getWeekday(), slot.getDayOfWeek())) {
+                continue;
+            }
+            // V9 单双周：不同周次（ODD/EVEN）同资源可共存，仅当周次重叠才算冲突
+            if (!WeekTypeSupport.overlap(taskWeekType, item.getWeekType())) {
                 continue;
             }
             if (Objects.equals(item.getTeacherId(), task.getTeacherId()) && Objects.equals(item.getStartPeriod(), ScoringFunctions.slotToStartPeriod(slot))) {
@@ -431,34 +436,44 @@ public class V3ScheduleGenerateService {
         return false;
     }
 
-    private boolean checkTeacherDailyLimit(Long teacherId, int dayOfWeek, int maxSlots, List<SchedulePlanItem> generatedItems) {
+    /**
+     * V9 单双周：daily limit 按周次独立计数（裁决 β），仅当 item 的 weekType 与当前任务
+     * 重叠时才计入同一日上限池。ODD 与 EVEN 不互相挤占（共享时段各自独立）。
+     */
+    private boolean checkTeacherDailyLimit(Long teacherId, int dayOfWeek, int maxSlots,
+                                           List<SchedulePlanItem> generatedItems, String taskWeekType) {
         if (maxSlots <= 0) {
             return true;
         }
         long count = generatedItems.stream()
                 .filter(item -> Objects.equals(item.getTeacherId(), teacherId))
                 .filter(item -> Objects.equals(item.getWeekday(), dayOfWeek))
+                .filter(item -> WeekTypeSupport.overlap(taskWeekType, item.getWeekType()))
                 .count();
         return count < maxSlots;
     }
 
-    private boolean checkClassDailyLimit(Long classId, int dayOfWeek, int maxSlots, List<SchedulePlanItem> generatedItems) {
+    private boolean checkClassDailyLimit(Long classId, int dayOfWeek, int maxSlots,
+                                         List<SchedulePlanItem> generatedItems, String taskWeekType) {
         if (maxSlots <= 0) {
             return true;
         }
         long count = generatedItems.stream()
                 .filter(item -> Objects.equals(item.getClassId(), classId))
                 .filter(item -> Objects.equals(item.getWeekday(), dayOfWeek))
+                .filter(item -> WeekTypeSupport.overlap(taskWeekType, item.getWeekType()))
                 .count();
         return count < maxSlots;
     }
 
-    private boolean hasSameCourseSameDay(Long classId, Long courseId, int dayOfWeek, List<SchedulePlanItem> generatedItems) {
+    private boolean hasSameCourseSameDay(Long classId, Long courseId, int dayOfWeek,
+                                         List<SchedulePlanItem> generatedItems, String taskWeekType) {
         return generatedItems.stream()
                 .anyMatch(item ->
                         Objects.equals(item.getClassId(), classId)
                                 && Objects.equals(item.getCourseId(), courseId)
-                                && Objects.equals(item.getWeekday(), dayOfWeek));
+                                && Objects.equals(item.getWeekday(), dayOfWeek)
+                                && WeekTypeSupport.overlap(taskWeekType, item.getWeekType()));
     }
 
     /**
@@ -501,7 +516,7 @@ public class V3ScheduleGenerateService {
         item.setWeekday(slot.getDayOfWeek());
         item.setStartPeriod(ScoringFunctions.slotToStartPeriod(slot));
         item.setEndPeriod(slotToEndPeriod(slot));
-        item.setWeekType("ALL");
+        item.setWeekType(WeekTypeSupport.normalize(task.getWeekType()));
         item.setScore(null);
         item.setConflictFlag(0);
         item.setConflictReason(null);
@@ -515,7 +530,12 @@ public class V3ScheduleGenerateService {
         return ScoringFunctions.slotToStartPeriod(slot) + 1;
     }
 
-    private SolverPlanItems generateSolverV8PlanItems(SchedulePlan plan, ScheduleGenerateRequest request, StepCounter stepCounter) {
+    private static final String REASON_CODE_WEEK_TYPE_NOT_SUPPORTED = "WEEK_TYPE_NOT_SUPPORTED_BY_SOLVER_V8";
+    private static final String REASON_MSG_WEEK_TYPE_NOT_SUPPORTED = "V8 引擎暂不支持单双周任务，请使用其他策略";
+    private static final String REASON_SUGGESTION_WEEK_TYPE = "可改用 TEACHER_PRIORITY 等非 V8 策略，或等待 V9.2";
+
+    private SolverPlanItems generateSolverV8PlanItems(SchedulePlan plan, ScheduleGenerateRequest request,
+            List<TeachingTask> tasks, StepCounter stepCounter) {
         SolverRunMeta meta = resolveSolverRunMeta(request);
         explainService.appendGenerateLog(
                 plan.getId(),
@@ -525,9 +545,31 @@ public class V3ScheduleGenerateService {
                 "SOLVER_V8_CONFIG",
                 "智能求解参数：seed=" + meta.seed()
                         + "，回溯时间预算=" + meta.timeBudgetMs() + "ms"
-                        + "，退火时间预算=" + meta.optimizeTimeBudgetMs() + "ms"
+                        + "退火时间预算=" + meta.optimizeTimeBudgetMs() + "ms"
                         + (meta.optimizeTimeBudgetMs() == 0 ? "（跳过退火）" : ""),
                 stepCounter.next());
+
+        // V9 阶段1：V8 引擎暂不支持单双周任务，weekType!=ALL 的任务显式拒绝（不进引擎），落 unassigned。
+        // 阶段3引擎扩展后移除此拦截（loader 内对应的 continue 也一并删除）。
+        int rejectedWeekTypeCount = 0;
+        for (TeachingTask task : tasks) {
+            String weekType = task.getWeekType();
+            if (weekType == null || weekType.isBlank() || "ALL".equalsIgnoreCase(weekType.trim())) {
+                continue;
+            }
+            explainService.saveUnassignedTask(plan.getId(), plan.getSemesterId(), task.getId(),
+                    REASON_CODE_WEEK_TYPE_NOT_SUPPORTED, REASON_MSG_WEEK_TYPE_NOT_SUPPORTED, REASON_SUGGESTION_WEEK_TYPE);
+            explainService.appendGenerateLog(
+                    plan.getId(),
+                    plan.getSemesterId(),
+                    task.getId(),
+                    "WARN",
+                    "WEEK_TYPE_REJECTED",
+                    "教学任务 " + task.getId() + " 周次类型为 " + WeekTypeSupport.normalize(weekType)
+                            + "，V8 引擎暂不支持，已跳过",
+                    stepCounter.next());
+            rejectedWeekTypeCount++;
+        }
 
         EngineContext ctx = engineContextLoader.load(plan.getSemesterId());
         SolverConfig config = new SolverConfig(meta.seed(), SolverConfig.DEFAULT_MAX_BACKTRACKS,
@@ -543,7 +585,8 @@ public class V3ScheduleGenerateService {
         }
 
         plan.setScheduledCount(items.size());
-        plan.setUnscheduledCount(solution.unassignedSlots().size());
+        // 未排数 = 引擎求解未排 + V8 拒绝的单双周任务数
+        plan.setUnscheduledCount(solution.unassignedSlots().size() + rejectedWeekTypeCount);
         plan.setConflictCount(0);
         plan.setUpdatedAt(LocalDateTime.now());
         planMapper.updateById(plan);
@@ -552,13 +595,14 @@ public class V3ScheduleGenerateService {
                 plan.getId(),
                 plan.getSemesterId(),
                 null,
-                solution.unassignedSlots().isEmpty() ? "INFO" : "WARN",
+                solution.unassignedSlots().isEmpty() && rejectedWeekTypeCount == 0 ? "INFO" : "WARN",
                 "SOLVER_V8_FINISH",
-                "智能求解完成，已排 " + items.size() + " 个大节，未排 " + solution.unassignedSlots().size() + " 个大节",
+                "智能求解完成，已排 " + items.size() + " 个大节，未排 " + solution.unassignedSlots().size()
+                        + " 个大节，单双周拒绝 " + rejectedWeekTypeCount + " 个任务",
                 stepCounter.next());
         return new SolverPlanItems(items, meta.withResult(
                 items.size(),
-                solution.unassignedSlots().size(),
+                plan.getUnscheduledCount(),
                 solution.stats()));
     }
 
@@ -578,6 +622,9 @@ public class V3ScheduleGenerateService {
         item.setWeekday(slot.dayOfWeek());
         item.setStartPeriod(slotToStartPeriod(slot));
         item.setEndPeriod(slotToStartPeriod(slot) + 1);
+        // V9 阶段1：此处恒为 ALL。非 ALL 任务已在 generateSolverV8PlanItems 开头被拦截
+        // （落 unassigned，reasonCode=WEEK_TYPE_NOT_SUPPORTED_BY_SOLVER_V8），能进引擎的只有 ALL 任务。
+        // 阶段3引擎扩展后 EngineTask 将携带 weekType，此处改为读真实值。
         item.setWeekType("ALL");
         item.setScore(null);
         item.setConflictFlag(0);
@@ -789,11 +836,11 @@ public class V3ScheduleGenerateService {
                 teacherUnavailable = true;
                 continue;
             }
-            if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), rules.teacherMaxDailySlots(), generatedItems)) {
+            if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(), rules.teacherMaxDailySlots(), generatedItems, task.getWeekType())) {
                 teacherConflict = true;
                 continue;
             }
-            if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), rules.classMaxDailySlots(), generatedItems)) {
+            if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(), rules.classMaxDailySlots(), generatedItems, task.getWeekType())) {
                 classDayLimited = true;
                 continue;
             }
@@ -801,7 +848,7 @@ public class V3ScheduleGenerateService {
                 classConflict = true;
                 continue;
             }
-            if (!rules.allowSameCourseSameDay() && hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), generatedItems)) {
+            if (!rules.allowSameCourseSameDay() && hasSameCourseSameDay(task.getClassId(), task.getCourseId(), slot.getDayOfWeek(), generatedItems, task.getWeekType())) {
                 classConflict = true;
                 continue;
             }

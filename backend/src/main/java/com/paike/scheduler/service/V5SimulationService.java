@@ -890,7 +890,8 @@ public class V5SimulationService {
             item.setWeekday(slot.getDayOfWeek());
             item.setStartPeriod(slot.getPeriodNo() * 2 - 1);
             item.setEndPeriod(slot.getPeriodNo() * 2);
-            item.setWeekType("ALL");
+            // V9 单双周：schedule → plan_item 透传真实 weekType（之前硬编码 ALL，单双周试算会丢标识）
+            item.setWeekType(WeekTypeSupport.normalize(schedule.getWeekType()));
             item.setScore(BigDecimal.ZERO);
             item.setConflictFlag(0);
             item.setSourceType("SCHEDULE");

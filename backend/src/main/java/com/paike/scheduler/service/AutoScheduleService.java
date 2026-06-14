@@ -274,13 +274,13 @@ public class AutoScheduleService {
                 continue;
             }
             if (!checkTeacherDailyLimit(task.getTeacherId(), slot.getDayOfWeek(),
-                    rules.teacherMaxDailySlots(), semesterId, refData.slotIdsByDay())) {
+                    rules.teacherMaxDailySlots(), semesterId, refData.slotIdsByDay(), task.getWeekType())) {
                 lastFail = new FailReason("TEACHER_DAILY_LIMIT",
                         "教师每天最多" + rules.teacherMaxDailySlots() + "个大节");
                 continue;
             }
             if (!checkClassDailyLimit(task.getClassId(), slot.getDayOfWeek(),
-                    rules.classMaxDailySlots(), semesterId, refData.slotIdsByDay())) {
+                    rules.classMaxDailySlots(), semesterId, refData.slotIdsByDay(), task.getWeekType())) {
                 lastFail = new FailReason("CLASS_DAILY_LIMIT",
                         "班级每天最多" + rules.classMaxDailySlots() + "个大节");
                 continue;
@@ -288,7 +288,7 @@ public class AutoScheduleService {
             if (!rules.allowSameCourseSameDay()
                     && usedDays.contains(slot.getDayOfWeek())
                     && hasSameCourseSameDay(task.getClassId(), task.getCourseId(),
-                            slot.getDayOfWeek(), semesterId, refData.slotIdsByDay())) {
+                            slot.getDayOfWeek(), semesterId, refData.slotIdsByDay(), task.getWeekType())) {
                 lastFail = new FailReason("SAME_COURSE_SAME_DAY", "同一课程同一天不允许重复");
                 continue;
             }
@@ -357,42 +357,73 @@ public class AutoScheduleService {
      *
      * 同一批次内"先插再查"的行在同事务（@Transactional 见类入口）下 MyBatis
      * 通过同一连接读得到（MySQL 的 read-own-writes），无需额外 batchId 过滤。
+     *
+     * V9 单双周：daily limit 按周次独立计数（裁决 β），weekType 维度过滤见
+     * {@link #applyWeekTypeOverlapFilter}。
      */
     private boolean checkTeacherDailyLimit(Long teacherId, int dayOfWeek, int maxSlots,
-                                           Long semesterId, java.util.Map<Integer, List<Long>> slotIdsByDay) {
+                                           Long semesterId, java.util.Map<Integer, List<Long>> slotIdsByDay,
+                                           String taskWeekType) {
         List<Long> slotIds = slotIdsByDay.getOrDefault(dayOfWeek, List.of());
         if (slotIds.isEmpty()) return true;
         LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getTeacherId, teacherId)
                 .eq(Schedule::getSemesterId, semesterId)
                 .in(Schedule::getTimeSlotId, slotIds);
+        applyWeekTypeOverlapFilter(wrapper, taskWeekType);
         long count = scheduleMapper.selectCount(wrapper);
         return count < maxSlots;
     }
 
     private boolean checkClassDailyLimit(Long classId, int dayOfWeek, int maxSlots,
-                                         Long semesterId, java.util.Map<Integer, List<Long>> slotIdsByDay) {
+                                         Long semesterId, java.util.Map<Integer, List<Long>> slotIdsByDay,
+                                         String taskWeekType) {
         List<Long> slotIds = slotIdsByDay.getOrDefault(dayOfWeek, List.of());
         if (slotIds.isEmpty()) return true;
         LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getClassId, classId)
                 .eq(Schedule::getSemesterId, semesterId)
                 .in(Schedule::getTimeSlotId, slotIds);
+        applyWeekTypeOverlapFilter(wrapper, taskWeekType);
         long count = scheduleMapper.selectCount(wrapper);
         return count < maxSlots;
     }
 
     private boolean hasSameCourseSameDay(Long classId, Long courseId, int dayOfWeek,
-                                         Long semesterId, java.util.Map<Integer, List<Long>> slotIdsByDay) {
+                                         Long semesterId, java.util.Map<Integer, List<Long>> slotIdsByDay,
+                                         String taskWeekType) {
         List<Long> slotIds = slotIdsByDay.getOrDefault(dayOfWeek, List.of());
         if (slotIds.isEmpty()) return false;
-        long count = scheduleMapper.selectCount(
-                new LambdaQueryWrapper<Schedule>()
-                        .eq(Schedule::getClassId, classId)
-                        .eq(Schedule::getCourseId, courseId)
-                        .eq(Schedule::getSemesterId, semesterId)
-                        .in(Schedule::getTimeSlotId, slotIds));
+        LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getClassId, classId)
+                .eq(Schedule::getCourseId, courseId)
+                .eq(Schedule::getSemesterId, semesterId)
+                .in(Schedule::getTimeSlotId, slotIds);
+        applyWeekTypeOverlapFilter(wrapper, taskWeekType);
+        long count = scheduleMapper.selectCount(wrapper);
         return count > 0;
+    }
+
+    /**
+     * V9 单双周 daily limit 周次拆分：只统计与当前任务 weekType 会重叠的 schedule 行。
+     * <ul>
+     *   <li>taskWeekType=ALL（含 null/空白归一）→ 不加过滤（ALL 与任意重叠）</li>
+     *   <li>taskWeekType=ODD → IN ('ALL','ODD')（不含 EVEN）</li>
+     *   <li>taskWeekType=EVEN → IN ('ALL','EVEN')（不含 ODD）</li>
+     * </ul>
+     * 语义与 {@link WeekTypeSupport#overlap}、ScheduleMapper.xml 的 selectDailyConflictCounts
+     * 完全一致，三路对拍基准。
+     */
+    private void applyWeekTypeOverlapFilter(LambdaQueryWrapper<Schedule> wrapper, String taskWeekType) {
+        String wt = WeekTypeSupport.normalize(taskWeekType);
+        if (WeekTypeSupport.ALL.equals(wt)) {
+            return;
+        }
+        if (WeekTypeSupport.ODD.equals(wt)) {
+            wrapper.in(Schedule::getWeekType, java.util.List.of(WeekTypeSupport.ALL, WeekTypeSupport.ODD));
+        } else if (WeekTypeSupport.EVEN.equals(wt)) {
+            wrapper.in(Schedule::getWeekType, java.util.List.of(WeekTypeSupport.ALL, WeekTypeSupport.EVEN));
+        }
     }
 
     private void ensureSchedulesUnlocked(LambdaQueryWrapper<Schedule> wrapper) {
@@ -411,6 +442,8 @@ public class AutoScheduleService {
         schedule.setClassId(task.getClassId());
         schedule.setTimeSlotId(slot.getId());
         schedule.setClassroomId(room.getId());
+        // V9 单双周：从 TeachingTask 透传到正式 schedule 表
+        schedule.setWeekType(WeekTypeSupport.normalize(task.getWeekType()));
         schedule.setSourceType(ScheduleSourceType.AUTO.getCode());
         schedule.setBatchId(batchId);
         schedule.setDeleted(0);

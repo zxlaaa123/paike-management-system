@@ -42,6 +42,7 @@ const form = reactive<TeachingTaskForm>({
   teacherId: 0,
   classId: 0,
   weeklyHours: 4,
+  weekType: 'ALL',
   needContinuous: 0,
   status: 1,
   remark: '',
@@ -125,6 +126,7 @@ function openAdd() {
   form.teacherId = 0
   form.classId = 0
   form.weeklyHours = 4
+  form.weekType = 'ALL'
   form.needContinuous = 0
   form.status = 1
   form.remark = ''
@@ -138,6 +140,7 @@ function openEdit(row: TeachingTask) {
   form.teacherId = row.teacherId
   form.classId = row.classId
   form.weeklyHours = row.weeklyHours
+  form.weekType = row.weekType || 'ALL'
   form.needContinuous = row.needContinuous
   form.status = row.status
   form.remark = row.remark || ''
@@ -178,6 +181,19 @@ async function handleDelete(row: TeachingTask) {
 
 function needContinuousText(val: number) {
   return val === 1 ? '是' : '否'
+}
+
+/** 周次类型展示文案：ALL 全周 / ODD 单周 / EVEN 双周 */
+function weekTypeText(val: string) {
+  switch (val) {
+    case 'ODD':
+      return '单周'
+    case 'EVEN':
+      return '双周'
+    case 'ALL':
+    default:
+      return '全周'
+  }
 }
 
 function getSemesterName(id: number | undefined) {
@@ -267,6 +283,11 @@ onMounted(() => {
         <el-table-column prop="teacherName" label="教师姓名" width="100" />
         <el-table-column prop="className" label="班级名称" width="120" />
         <el-table-column prop="weeklyHours" label="每周课时" width="90" />
+        <el-table-column prop="weekType" label="周次类型" width="90">
+          <template #default="{ row }">
+            <el-tag :type="row.weekType === 'ALL' ? 'info' : 'warning'">{{ weekTypeText(row.weekType) }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="已排/需排" width="100">
           <template #default="{ row }">
             <span>{{ row.scheduledSlots }}/{{ row.requiredSlots }}大节</span>
@@ -320,6 +341,13 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="每周课时" prop="weeklyHours">
           <el-input-number v-model="form.weeklyHours" :min="1" />
+        </el-form-item>
+        <el-form-item label="周次类型" prop="weekType">
+          <el-select v-model="form.weekType" placeholder="请选择周次类型" style="width: 100%">
+            <el-option label="全周" value="ALL" />
+            <el-option label="单周" value="ODD" />
+            <el-option label="双周" value="EVEN" />
+          </el-select>
         </el-form-item>
         <el-form-item label="连续排课" prop="needContinuous">
           <el-switch v-model="form.needContinuous" :active-value="1" :inactive-value="0" />

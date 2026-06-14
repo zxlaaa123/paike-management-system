@@ -161,6 +161,14 @@ public class EngineContextLoader {
 
             if (tIdx == null || cIdx == null || coIdx == null) continue;
 
+            // V9 阶段1：V8 引擎暂不支持单双周任务，装载时跳过 weekType!=ALL 的任务。
+            // 被跳过的任务由调用方（generateSolverV8PlanItems）统一落 unassigned，
+            // 本 loader 保持纯查询无副作用。阶段3移除该约束后此 continue 删除。
+            String weekType = t.getWeekType();
+            if (weekType != null && !weekType.isBlank() && !"ALL".equalsIgnoreCase(weekType.trim())) {
+                continue;
+            }
+
             int weeklyHours = t.getWeeklyHours() != null ? t.getWeeklyHours() : 0;
             int requiredSlots = (int) Math.ceil(weeklyHours / 2.0);
 
