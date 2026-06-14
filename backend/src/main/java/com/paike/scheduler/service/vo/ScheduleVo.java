@@ -1,5 +1,6 @@
 package com.paike.scheduler.service.vo;
 
+import com.paike.scheduler.service.WeekTypeSupport;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -25,6 +26,7 @@ public class ScheduleVo {
     private Long teacherId;
     private Long classId;
     private Long timeSlotId;
+    private String weekType;
     private Long classroomId;
     private String sourceType;
     private Long batchId;
@@ -54,6 +56,7 @@ public class ScheduleVo {
         vo.setTeacherId(entity.getTeacherId());
         vo.setClassId(entity.getClassId());
         vo.setTimeSlotId(entity.getTimeSlotId());
+        vo.setWeekType(WeekTypeSupport.normalize(entity.getWeekType()));
         vo.setClassroomId(entity.getClassroomId());
         vo.setSourceType(entity.getSourceType());
         vo.setBatchId(entity.getBatchId());
