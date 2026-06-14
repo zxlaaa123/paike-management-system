@@ -26,7 +26,7 @@ import {
 import { createRepairTask } from '../../api/v5RepairTaskApi'
 import type { ScheduleReplanResult } from '../../api/v4ScheduleReplanApi'
 import { getScoreDetails, getScoreSummary, rescore, type ScheduleScoreDetail, type ScoreSummary } from '../../api/scheduleScore'
-import { schedulePlanStatusTagType as statusTagType, schedulePlanStatusText as statusText, strategyText } from '../../utils/status'
+import { schedulePlanStatusTagType as statusTagType, schedulePlanStatusText as statusText, strategyText, weekTypeText, weekTypeTagType } from '../../utils/status'
 import { extractMessage } from '../../utils/errors'
 
 const route = useRoute()
@@ -55,6 +55,13 @@ const classroomOptions = ref<Classroom[]>([])
 const timeSlotOptions = ref<TimeSlot[]>([])
 
 const activeTab = ref('items')
+/** 周次筛选：'ALL' 全部 / 'ODD' 仅单周 / 'EVEN' 仅双周（V9 阶段0 原型） */
+const weekTypeFilter = ref<'ALL' | 'ODD' | 'EVEN'>('ALL')
+/** 按周次筛选后的方案明细（V9 阶段0 原型） */
+const filteredItems = computed(() => {
+  if (weekTypeFilter.value === 'ALL') return items.value
+  return items.value.filter((item) => item.weekType === weekTypeFilter.value)
+})
 const taskLogDialogVisible = ref(false)
 const taskLogTitle = ref('')
 const currentTaskLogs = ref<ScheduleGenerateLog[]>([])
@@ -431,12 +438,26 @@ onMounted(async () => {
       <el-card shadow="never" style="margin-top: 16px">
         <el-tabs v-model="activeTab">
           <el-tab-pane label="课表明细" name="items">
-            <el-table :data="items" stripe>
+            <div class="items-toolbar">
+              <span class="toolbar-label">周次筛选：</span>
+              <el-radio-group v-model="weekTypeFilter" size="small">
+                <el-radio-button value="ALL">全部</el-radio-button>
+                <el-radio-button value="ODD">单周</el-radio-button>
+                <el-radio-button value="EVEN">双周</el-radio-button>
+              </el-radio-group>
+              <span class="toolbar-count">共 {{ filteredItems.length }} 条</span>
+            </div>
+            <el-table :data="filteredItems" stripe>
               <el-table-column prop="courseName" label="课程" width="120" />
               <el-table-column prop="teacherName" label="教师" width="100" />
               <el-table-column prop="className" label="班级" width="120" />
               <el-table-column label="时间" width="120">
                 <template #default="{ row }">周{{ row.weekday }} 第{{ row.startPeriod }}-{{ row.endPeriod }}节</template>
+              </el-table-column>
+              <el-table-column label="周次" width="90">
+                <template #default="{ row }">
+                  <el-tag :type="weekTypeTagType(row.weekType)" size="small">{{ weekTypeText(row.weekType) }}</el-tag>
+                </template>
               </el-table-column>
               <el-table-column prop="roomName" label="教室" width="120" />
               <el-table-column label="来源" width="80">
@@ -459,7 +480,7 @@ onMounted(async () => {
                 </template>
               </el-table-column>
             </el-table>
-            <el-empty v-if="items.length === 0" description="暂无方案明细" />
+            <el-empty v-if="filteredItems.length === 0" description="暂无方案明细" />
           </el-tab-pane>
 
           <el-tab-pane label="生成日志" name="logs">
@@ -612,5 +633,23 @@ onMounted(async () => {
   margin-bottom: 12px;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+.items-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.toolbar-label {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+.toolbar-count {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 </style>
