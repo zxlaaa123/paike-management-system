@@ -3,6 +3,7 @@ package com.paike.scheduler.engine.conflict;
 import com.paike.scheduler.engine.model.Assignment;
 import com.paike.scheduler.engine.model.EngineContext;
 import com.paike.scheduler.engine.model.EngineTask;
+import com.paike.scheduler.service.WeekTypeSupport;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,6 +11,11 @@ import java.util.List;
 /**
  * 内存冲突检测器：与 ScheduleConflictService.checkConflict 硬约束语义完全一致。
  * 判定顺序严格对齐 DB 版（per-record iteration: teacher → class → room for each record at same slot）。
+ *
+ * <p>V9 阶段3 方案 X（slot 物理翻倍）：ODD/EVEN slot 各有独立 slotIdx，占用数组自动隔离。
+ * <b>ALL 任务特殊处理</b>：占 ODD+EVEN 两个配对 slot（slotIdx ^ 1），保证 ALL 与 ODD/EVEN 都冲突
+ * （全周课占满整个时段）。配对 slot 在同一天，日计数（teacherDailyCount/classDailyCount/classCourseDay）
+ * 只算一次（1 个物理大节），taskScheduledCount 也只 +1（pending 按 requiredSlots 计，不按逻辑 slot）。
  */
 public class InMemoryConflictDetector {
 
@@ -150,33 +156,28 @@ public class InMemoryConflictDetector {
         placeInternal(a);
     }
 
-    public void remove(Assignment a) {
-        EngineTask task = ctx.tasks().get(a.taskIndex());
-        int teacherIdx = (int) task.teacherIndex();
-        int classIdx = (int) task.classIndex();
-        int slotIdx = a.timeSlotIndex();
-        int roomIdx = a.classroomIndex();
-        int day = ctx.timeSlots().get(slotIdx).dayOfWeek();
-        int courseIdx = (int) task.courseIndex();
-
-        teacherBusy[teacherIdx][slotIdx] = false;
-        classBusy[classIdx][slotIdx] = false;
-        roomBusy[roomIdx][slotIdx] = false;
-        teacherDailyCount[teacherIdx][day]--;
-        classDailyCount[classIdx][day]--;
-        taskScheduledCount[a.taskIndex()]--;
-        classCourseDay[classIdx][courseIdx][day]--;
-        slotAssignments.get(slotIdx).removeIf(existing ->
-            existing.taskIndex() == a.taskIndex()
-            && existing.timeSlotIndex() == a.timeSlotIndex()
-            && existing.classroomIndex() == a.classroomIndex());
-    }
-
+    /**
+     * V9 阶段3：ALL 任务 place 时扩散到配对 slot（slotIdx ^ 1）。
+     * 配对 slot 同 day，日计数/classCourseDay/taskScheduledCount 只算一次。
+     */
     private void placeInternal(Assignment a) {
         EngineTask task = ctx.tasks().get(a.taskIndex());
+        boolean isAll = WeekTypeSupport.ALL.equals(task.weekType());
+        placeOneSlot(a, a.timeSlotIndex(), !isAll);
+        if (isAll) {
+            // ALL 扩散到配对 slot（ODD↔EVEN），但计数已由首 slot 完成，这里只标占用+加列表
+            placeOneSlot(a, a.timeSlotIndex() ^ 1, false);
+        }
+    }
+
+    /**
+     * @param countDaily 是否累加 dailyCount/classDailyCount/classCourseDay/taskScheduledCount。
+     *                   ALL 的配对 slot 不重复计数。
+     */
+    private void placeOneSlot(Assignment a, int slotIdx, boolean countDaily) {
+        EngineTask task = ctx.tasks().get(a.taskIndex());
         int teacherIdx = (int) task.teacherIndex();
         int classIdx = (int) task.classIndex();
-        int slotIdx = a.timeSlotIndex();
         int roomIdx = a.classroomIndex();
         int day = ctx.timeSlots().get(slotIdx).dayOfWeek();
         int courseIdx = (int) task.courseIndex();
@@ -184,11 +185,45 @@ public class InMemoryConflictDetector {
         teacherBusy[teacherIdx][slotIdx] = true;
         classBusy[classIdx][slotIdx] = true;
         roomBusy[roomIdx][slotIdx] = true;
-        teacherDailyCount[teacherIdx][day]++;
-        classDailyCount[classIdx][day]++;
-        taskScheduledCount[a.taskIndex()]++;
-        classCourseDay[classIdx][courseIdx][day]++;
         slotAssignments.get(slotIdx).add(a);
+        if (countDaily) {
+            teacherDailyCount[teacherIdx][day]++;
+            classDailyCount[classIdx][day]++;
+            taskScheduledCount[a.taskIndex()]++;
+            classCourseDay[classIdx][courseIdx][day]++;
+        }
+    }
+
+    public void remove(Assignment a) {
+        EngineTask task = ctx.tasks().get(a.taskIndex());
+        boolean isAll = WeekTypeSupport.ALL.equals(task.weekType());
+        removeOneSlot(a, a.timeSlotIndex(), !isAll);
+        if (isAll) {
+            removeOneSlot(a, a.timeSlotIndex() ^ 1, false);
+        }
+    }
+
+    private void removeOneSlot(Assignment a, int slotIdx, boolean countDaily) {
+        EngineTask task = ctx.tasks().get(a.taskIndex());
+        int teacherIdx = (int) task.teacherIndex();
+        int classIdx = (int) task.classIndex();
+        int roomIdx = a.classroomIndex();
+        int day = ctx.timeSlots().get(slotIdx).dayOfWeek();
+        int courseIdx = (int) task.courseIndex();
+
+        teacherBusy[teacherIdx][slotIdx] = false;
+        classBusy[classIdx][slotIdx] = false;
+        roomBusy[roomIdx][slotIdx] = false;
+        slotAssignments.get(slotIdx).removeIf(existing ->
+            existing.taskIndex() == a.taskIndex()
+            && existing.timeSlotIndex() == a.timeSlotIndex()
+            && existing.classroomIndex() == a.classroomIndex());
+        if (countDaily) {
+            teacherDailyCount[teacherIdx][day]--;
+            classDailyCount[classIdx][day]--;
+            taskScheduledCount[a.taskIndex()]--;
+            classCourseDay[classIdx][courseIdx][day]--;
+        }
     }
 
     private boolean isRoomTypeMatched(String courseType, String roomType) {

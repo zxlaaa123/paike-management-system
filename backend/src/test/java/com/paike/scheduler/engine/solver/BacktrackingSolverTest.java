@@ -28,7 +28,7 @@ class BacktrackingSolverTest {
 
     @Test
     void reportsPartialWhenNoCandidateExists() {
-        List<EngineTask> tasks = List.of(new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0)));
+        List<EngineTask> tasks = List.of(new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0), "ODD"));
         boolean[][] unavailable = new boolean[1][1];
         unavailable[0][0] = true;
         EngineContext ctx = context(tasks, oneSlot(), oneRoom(), oneTeacher(), oneClass(), oneCourse(),
@@ -55,12 +55,12 @@ class BacktrackingSolverTest {
     @Test
     void lockedAssignmentsAreNotMoved() {
         List<EngineTask> tasks = List.of(
-                new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0)),
-                new EngineTask(1, 102L, 1, 1, 1, 1, "NORMAL", 30, List.of(0))
+                new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0), "ODD"),
+                new EngineTask(1, 102L, 1, 1, 1, 1, "NORMAL", 30, List.of(0), "ODD")
         );
         List<EngineContext.TimeSlotData> slots = List.of(
-                new EngineContext.TimeSlotData(0, 201L, 1, 1),
-                new EngineContext.TimeSlotData(1, 202L, 2, 1)
+                new EngineContext.TimeSlotData(0, 201L, 1, 1, "ODD"),
+                new EngineContext.TimeSlotData(1, 202L, 2, 1, "ODD")
         );
         EngineContext ctx = context(tasks, slots, oneRoom(), twoTeachers(), twoClasses(), twoCourses(),
                 new boolean[2][2], List.of(new Assignment(0, 0, 0, 0)), List.of(), new int[tasks.size()]);
@@ -74,14 +74,14 @@ class BacktrackingSolverTest {
 
     private static EngineContext greedyTrapContext() {
         List<EngineTask> tasks = List.of(
-                new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0)),
-                new EngineTask(1, 102L, 1, 0, 0, 1, "NORMAL", 30, List.of(0))
+                new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0), "ODD"),
+                new EngineTask(1, 102L, 1, 0, 0, 1, "NORMAL", 30, List.of(0), "ODD")
         );
         List<EngineContext.TimeSlotData> slots = List.of(
-                new EngineContext.TimeSlotData(0, 201L, 1, 1),
-                new EngineContext.TimeSlotData(1, 202L, 1, 2),
-                new EngineContext.TimeSlotData(2, 203L, 2, 1),
-                new EngineContext.TimeSlotData(3, 204L, 2, 2)
+                new EngineContext.TimeSlotData(0, 201L, 1, 1, "ODD"),
+                new EngineContext.TimeSlotData(1, 202L, 1, 2, "ODD"),
+                new EngineContext.TimeSlotData(2, 203L, 2, 1, "ODD"),
+                new EngineContext.TimeSlotData(3, 204L, 2, 2, "ODD")
         );
         boolean[][] unavailable = new boolean[2][4];
         unavailable[0][1] = true;
@@ -117,7 +117,7 @@ class BacktrackingSolverTest {
     }
 
     private static List<EngineContext.TimeSlotData> oneSlot() {
-        return List.of(new EngineContext.TimeSlotData(0, 201L, 1, 1));
+        return List.of(new EngineContext.TimeSlotData(0, 201L, 1, 1, "ODD"));
     }
 
     private static List<EngineContext.ClassroomData> oneRoom() {

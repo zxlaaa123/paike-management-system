@@ -5,6 +5,7 @@ import com.paike.scheduler.engine.model.Assignment;
 import com.paike.scheduler.engine.model.EngineContext;
 import com.paike.scheduler.engine.model.EngineSolution;
 import com.paike.scheduler.engine.model.EngineTask;
+import com.paike.scheduler.service.WeekTypeSupport;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -174,8 +175,18 @@ public class BacktrackingSolver {
 
     private List<int[]> listFeasibleCandidates(int taskIndex, List<Assignment> placed) {
         EngineTask task = ctx.tasks().get(taskIndex);
+        String taskWt = task.weekType();
         List<int[]> result = new ArrayList<>();
         for (int s = 0; s < ctx.timeSlotCount(); s++) {
+            // V9 阶段3：按 task.weekType 过滤 slot。ODD task 只进 ODD slot，EVEN 只进 EVEN，
+            // ALL 进 ODD slot（Detector place 自动扩散到 EVEN，保证与 ODD/EVEN 都冲突）。
+            String slotWt = ctx.timeSlots().get(s).weekType();
+            boolean slotOk = WeekTypeSupport.ALL.equals(taskWt)
+                    ? WeekTypeSupport.ODD.equals(slotWt)
+                    : taskWt.equals(slotWt);
+            if (!slotOk) {
+                continue;
+            }
             for (int r : task.candidateClassroomIndices()) {
                 Assignment probe = new Assignment(taskIndex, 0, s, r);
                 if (detector.check(probe) == null) {

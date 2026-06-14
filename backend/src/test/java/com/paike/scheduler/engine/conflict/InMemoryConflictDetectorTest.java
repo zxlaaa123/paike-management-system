@@ -30,10 +30,10 @@ class InMemoryConflictDetectorTest {
     @BeforeEach
     void setUp() {
         timeSlots = List.of(
-            new EngineContext.TimeSlotData(0, 1L, 1, 1),
-            new EngineContext.TimeSlotData(1, 2L, 1, 2),
-            new EngineContext.TimeSlotData(2, 3L, 2, 1),
-            new EngineContext.TimeSlotData(3, 4L, 2, 2)
+            new EngineContext.TimeSlotData(0, 1L, 1, 1, "ODD"),
+            new EngineContext.TimeSlotData(1, 2L, 1, 2, "ODD"),
+            new EngineContext.TimeSlotData(2, 3L, 2, 1, "ODD"),
+            new EngineContext.TimeSlotData(3, 4L, 2, 2, "ODD")
         );
         classrooms = List.of(
             new EngineContext.ClassroomData(0, 1L, 60, "NORMAL"),
@@ -54,11 +54,11 @@ class InMemoryConflictDetectorTest {
             new EngineContext.CourseData(2, 3L, "COMPUTER")
         );
         tasks = List.of(
-            new EngineTask(0, 1L, 0, 0, 0, 2, "NORMAL", 50, List.of(0)),
-            new EngineTask(1, 2L, 1, 1, 1, 1, "EXPERIMENT", 25, List.of(1)),
-            new EngineTask(2, 3L, 0, 1, 2, 1, "COMPUTER", 25, List.of(2)),
-            new EngineTask(3, 4L, 1, 1, 0, 1, "NORMAL", 25, List.of(0)),
-            new EngineTask(4, 5L, 1, 0, 0, 1, "NORMAL", 50, List.of(0))
+            new EngineTask(0, 1L, 0, 0, 0, 2, "NORMAL", 50, List.of(0), "ODD"),
+            new EngineTask(1, 2L, 1, 1, 1, 1, "EXPERIMENT", 25, List.of(1), "ODD"),
+            new EngineTask(2, 3L, 0, 1, 2, 1, "COMPUTER", 25, List.of(2), "ODD"),
+            new EngineTask(3, 4L, 1, 1, 0, 1, "NORMAL", 25, List.of(0), "ODD"),
+            new EngineTask(4, 5L, 1, 0, 0, 1, "NORMAL", 50, List.of(0), "ODD")
         );
     }
 
@@ -116,7 +116,7 @@ class InMemoryConflictDetectorTest {
 
     @Test
     void testNullStudentCountRejects() {
-        List<EngineTask> t = List.of(new EngineTask(0, 1L, 0, 0, 0, 2, "NORMAL", -1, List.of(0)));
+        List<EngineTask> t = List.of(new EngineTask(0, 1L, 0, 0, 0, 2, "NORMAL", -1, List.of(0), "ODD"));
         EngineContext ctx = new EngineContext(t, timeSlots, classrooms, teachers, classes, courses,
                 new boolean[2][4], new boolean[2], new boolean[2], new boolean[3],
                 3, 4, false, 5, Map.of(), List.of(), List.of(), new int[1]);
