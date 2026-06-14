@@ -28,17 +28,34 @@ const periods = computed(() => {
   })
 })
 
+// V9 单双周：同 (day,period) 可能有 ODD+EVEN 多条，按数组聚合避免后者覆盖前者。
 const cells = computed(() => {
-  const map: Record<string, TimetableItem> = {}
+  const map: Record<string, TimetableItem[]> = {}
   for (const item of props.items) {
     const key = `${item.dayOfWeek}-${item.period}`
-    map[key] = item
+    if (!map[key]) {
+      map[key] = []
+    }
+    map[key].push(item)
   }
   return map
 })
 
-function getCell(day: number, period: number) {
+function getCells(day: number, period: number) {
   return cells.value[`${day}-${period}`]
+}
+
+/** 与后端 WeekTypeSupport.displayLabel 同语义：ALL→无标记，ODD→单，EVEN→双 */
+function weekLabel(weekType?: string): string {
+  const w = (weekType ?? 'ALL').trim().toUpperCase()
+  if (w === 'ODD') return '单'
+  if (w === 'EVEN') return '双'
+  return ''
+}
+
+function courseLabel(item: TimetableItem): string {
+  const label = weekLabel(item.weekType)
+  return label ? `${item.courseName}[${label}]` : item.courseName
 }
 </script>
 
@@ -55,13 +72,20 @@ function getCell(day: number, period: number) {
         <tr v-for="p in periods" :key="p.index">
           <td class="period-label">{{ p.label }}</td>
           <td v-for="d in days" :key="d" class="cell">
-            <template v-if="getCell(d, p.index)">
+            <template v-if="getCells(d, p.index)?.length">
               <div class="cell-content">
-                <div class="primary">{{ getCell(d, p.index).courseName }}</div>
-                <div class="secondary">
-                  <span v-if="props.highlight !== 'teacher'">{{ getCell(d, p.index).teacherName }}</span>
-                  <span v-if="props.highlight !== 'class'">{{ getCell(d, p.index).className }}</span>
-                  <span v-if="props.highlight !== 'room'">{{ getCell(d, p.index).classroomName }}</span>
+                <div
+                  v-for="(item, idx) in getCells(d, p.index)"
+                  :key="item.scheduleId"
+                  class="course-block"
+                  :class="{ 'with-divider': idx > 0 }"
+                >
+                  <div class="primary">{{ courseLabel(item) }}</div>
+                  <div class="secondary">
+                    <span v-if="props.highlight !== 'teacher'">{{ item.teacherName }}</span>
+                    <span v-if="props.highlight !== 'class'">{{ item.className }}</span>
+                    <span v-if="props.highlight !== 'room'">{{ item.classroomName }}</span>
+                  </div>
                 </div>
               </div>
             </template>
@@ -126,6 +150,11 @@ function getCell(day: number, period: number) {
   font-size: 13px;
   color: #303133;
   line-height: 1.3;
+}
+.course-block.with-divider {
+  border-top: 1px dashed #dcdfe6;
+  padding-top: 4px;
+  margin-top: 2px;
 }
 .cell-content .secondary {
   font-size: 11px;

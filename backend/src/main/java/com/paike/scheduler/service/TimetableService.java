@@ -268,6 +268,8 @@ public class TimetableService {
                 vo.setClassName(classInfo.getClassName());
             }
         }
+        // V9 单双周：透传 weekType（之前在此处丢失，导致导出/网格无法区分单双周）
+        vo.setWeekType(WeekTypeSupport.normalize(schedule.getWeekType()));
         return vo;
     }
 
@@ -306,11 +308,12 @@ public class TimetableService {
             cell.setCellStyle(headerStyle);
         }
 
-        Map<String, TimetableVo> itemMap = items.stream().collect(Collectors.toMap(
+        // V9 单双周：同 (day,period) 可能有 ODD+EVEN 多条，groupingBy 保留全部，
+        // buildCellText 把同 cell 多条按 [单]/[双] 标记拼接（修复 R9 静默覆盖）。
+        Map<String, List<TimetableVo>> itemMap = items.stream().collect(Collectors.groupingBy(
             item -> buildCellKey(item.getDayOfWeek(), item.getPeriod()),
-            item -> item,
-            (first, second) -> first,
-            LinkedHashMap::new
+            LinkedHashMap::new,
+            Collectors.toList()
         ));
 
         for (int rowIndex = 0; rowIndex < PERIODS.size(); rowIndex++) {
@@ -322,8 +325,8 @@ public class TimetableService {
 
             for (int day = 1; day <= DAY_NAMES.size(); day++) {
                 Cell cell = getOrCreateCell(sheet, sheetRow, day);
-                TimetableVo item = itemMap.get(buildCellKey(day, period.index()));
-                cell.setCellValue(item == null ? "" : buildCellText(item, viewType));
+                List<TimetableVo> cellItems = itemMap.get(buildCellKey(day, period.index()));
+                cell.setCellValue(cellItems == null || cellItems.isEmpty() ? "" : buildCellText(cellItems, viewType));
                 cell.setCellStyle(cellStyle);
             }
         }
@@ -420,26 +423,45 @@ public class TimetableService {
         return dayOfWeek + "_" + period;
     }
 
-    private String buildCellText(TimetableVo item, TimetableViewType viewType) {
-        List<String> lines = new ArrayList<>();
-        lines.add(defaultString(item.getCourseName()));
-        switch (viewType) {
-            case CLASS -> {
-                appendIfPresent(lines, item.getTeacherName());
-                appendIfPresent(lines, item.getClassroomName());
+    /**
+     * V9 阶段 2B：同 cell 多条课程（单双周共槽）拼接，每条课程名加 [单]/[双] 标记（ALL 不加）。
+     * 多条之间用 "---" 分隔；每条内部仍按 viewType 附次要信息（教师/班级/教室）换行。
+     * 单条时退化到原有格式（ALL 课无标记，视觉与改造前一致，零回归）。
+     */
+    private String buildCellText(List<TimetableVo> cellItems, TimetableViewType viewType) {
+        List<String> blocks = new ArrayList<>();
+        for (TimetableVo item : cellItems) {
+            List<String> lines = new ArrayList<>();
+            String courseName = defaultString(item.getCourseName());
+            String label = WeekTypeSupport.displayLabel(item.getWeekType());
+            lines.add(label.isEmpty() ? courseName : courseName + "[" + label + "]");
+            switch (viewType) {
+                case CLASS -> {
+                    appendIfPresent(lines, item.getTeacherName());
+                    appendIfPresent(lines, item.getClassroomName());
+                }
+                case TEACHER -> {
+                    appendIfPresent(lines, item.getClassName());
+                    appendIfPresent(lines, item.getClassroomName());
+                }
+                case CLASSROOM -> {
+                    appendIfPresent(lines, item.getTeacherName());
+                    appendIfPresent(lines, item.getClassName());
+                }
             }
-            case TEACHER -> {
-                appendIfPresent(lines, item.getClassName());
-                appendIfPresent(lines, item.getClassroomName());
-            }
-            case CLASSROOM -> {
-                appendIfPresent(lines, item.getTeacherName());
-                appendIfPresent(lines, item.getClassName());
+            String block = lines.stream()
+                .filter(line -> line != null && !line.isBlank())
+                .collect(Collectors.joining("\n"));
+            if (!block.isBlank()) {
+                blocks.add(block);
             }
         }
-        return lines.stream()
-            .filter(line -> line != null && !line.isBlank())
-            .collect(Collectors.joining("\n"));
+        return String.join("\n---\n", blocks);
+    }
+
+    /** 单条重载（保留原方法名，M15 架构测试要求；委托给 List 版）。 */
+    private String buildCellText(TimetableVo item, TimetableViewType viewType) {
+        return buildCellText(List.of(item), viewType);
     }
 
     private void appendIfPresent(List<String> lines, String value) {

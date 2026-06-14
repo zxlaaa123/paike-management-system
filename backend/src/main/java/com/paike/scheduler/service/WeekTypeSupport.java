@@ -81,4 +81,26 @@ public final class WeekTypeSupport {
         String w = normalize(weekType);
         return ALL.equals(w) ? List.of(ODD, EVEN) : List.of(w);
     }
+
+    /**
+     * V9 阶段 2B 导出/网格显示：weekType 的中文显示标记。
+     * <p>规则（与产品术语一致，非技术 ODD/EVEN）：
+     * <ul>
+     *   <li>ALL（全周）→ {@code ""}（不加标记，不污染现有全周课显示）</li>
+     *   <li>ODD（单周）→ {@code "单"}</li>
+     *   <li>EVEN（双周）→ {@code "双"}</li>
+     * </ul>
+     * 调用方拼成 {@code "体育[单]"} / {@code "思政[双]"}，ALL 课直接 {@code "体育"}（无后缀）。
+     * 被 {@link com.paike.scheduler.service.TimetableService}（Excel 导出 + 网格 cell 文本）使用。
+     */
+    public static String displayLabel(String weekType) {
+        String w = normalize(weekType);
+        if (ODD.equals(w)) {
+            return "单";
+        }
+        if (EVEN.equals(w)) {
+            return "双";
+        }
+        return "";
+    }
 }
