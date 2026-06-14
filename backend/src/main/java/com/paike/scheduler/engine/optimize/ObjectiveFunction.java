@@ -4,12 +4,17 @@ import com.paike.scheduler.engine.model.Assignment;
 import com.paike.scheduler.engine.model.EngineContext;
 import com.paike.scheduler.engine.model.EngineTask;
 import com.paike.scheduler.entity.SchedulePlanItem;
+import com.paike.scheduler.service.WeekTypeSupport;
 import com.paike.scheduler.service.scheduling.DeltaPenaltyScorer;
 import com.paike.scheduler.service.scheduling.ScoringFunctions;
+import com.paike.scheduler.service.scheduling.ScoringFunctions.WeekOwner;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,7 +75,7 @@ public final class ObjectiveFunction {
         item.setWeekday(slot.dayOfWeek());
         item.setStartPeriod(slotToStartPeriod(slot));
         item.setEndPeriod(slotToStartPeriod(slot) + 1);
-        item.setWeekType("ALL");
+        item.setWeekType(task.weekType());
         item.setConflictFlag(0);
         item.setSourceType("AUTO");
         return item;
@@ -95,22 +100,26 @@ public final class ObjectiveFunction {
         item.setWeekday(slot.dayOfWeek());
         item.setStartPeriod(slotToStartPeriod(slot));
         item.setEndPeriod(slotToStartPeriod(slot) + 1);
-        item.setWeekType("ALL");
+        item.setWeekType(task.weekType());
         item.setConflictFlag(0);
         item.setSourceType("AUTO");
         return item;
     }
 
+    /**
+     * V9 阶段3B β 激活：聚合按 (owner, weekType) 分桶，ALL 展开成 ODD+EVEN。
+     * 与 ScheduleScoreService / DeltaPenaltyScorer 同源（保证在线/离线/引擎三方一致）。
+     */
     private Map<String, BigDecimal> penalties(List<SchedulePlanItem> items) {
         Map<String, BigDecimal> result = new LinkedHashMap<>();
         result.put(DeltaPenaltyScorer.CLASS_DAILY_BALANCE,
-                ScoringFunctions.penaltyVariance(nestedDayCounts(items, SchedulePlanItem::getClassId)));
+                ScoringFunctions.penaltyVarianceBeta(nestedDayCountsBeta(items, SchedulePlanItem::getClassId)));
         result.put(DeltaPenaltyScorer.TEACHER_DAILY_LOAD,
-                ScoringFunctions.penaltyVariance(nestedDayCounts(items, SchedulePlanItem::getTeacherId)));
+                ScoringFunctions.penaltyVarianceBeta(nestedDayCountsBeta(items, SchedulePlanItem::getTeacherId)));
         result.put(DeltaPenaltyScorer.COURSE_DISTRIBUTION,
-                ScoringFunctions.penaltyDuplicateCourse(courseDayCounts(items)));
+                ScoringFunctions.penaltyDuplicateCourse(courseDayCountsBeta(items)));
         result.put(DeltaPenaltyScorer.CONTINUOUS_PERIOD_LIMIT,
-                ScoringFunctions.penaltyContinuous(nestedDayItems(items, SchedulePlanItem::getTeacherId)));
+                ScoringFunctions.penaltyContinuousBeta(nestedDayItemsBeta(items, SchedulePlanItem::getTeacherId)));
         result.put(DeltaPenaltyScorer.CLASSROOM_UTILIZATION,
                 ScoringFunctions.penaltyClassroomUtilization(roomUseCounts(items), items.size()));
         result.put(DeltaPenaltyScorer.MORNING_THEORY_PRIORITY,
@@ -123,31 +132,50 @@ public final class ObjectiveFunction {
         return value == null ? BigDecimal.ZERO : BigDecimal.valueOf(value);
     }
 
-    private static Map<Long, Map<Integer, Long>> nestedDayCounts(
+    /** β 版：owner 维度加 weekType，ALL 展开成 ODD+EVEN 两个独立子桶 */
+    private static Map<WeekOwner, Map<Integer, Long>> nestedDayCountsBeta(
             List<SchedulePlanItem> items,
             Function<SchedulePlanItem, Long> ownerExtractor
     ) {
-        return items.stream().collect(Collectors.groupingBy(
-                ownerExtractor,
-                Collectors.groupingBy(SchedulePlanItem::getWeekday, Collectors.counting())
-        ));
+        return items.stream()
+                .flatMap(item -> WeekTypeSupport.countableWeekTypes(item.getWeekType()).stream()
+                        .map(wt -> new AbstractMap.SimpleEntry<>(
+                                new WeekOwner(ownerExtractor.apply(item), wt),
+                                item.getWeekday())))
+                .collect(Collectors.groupingBy(
+                        Map.Entry::getKey,
+                        Collectors.groupingBy(
+                                Map.Entry::getValue,
+                                Collectors.counting())));
     }
 
-    private static Map<String, Long> courseDayCounts(List<SchedulePlanItem> items) {
-        return items.stream().collect(Collectors.groupingBy(
-                item -> item.getClassId() + "_" + item.getCourseId() + "_" + item.getWeekday(),
-                Collectors.counting()
-        ));
+    /** β 版：courseDayCounts key 加 weekType 维度（ALL 展开后同 item 产生 ODD/EVEN 两个 key） */
+    private static Map<String, Long> courseDayCountsBeta(List<SchedulePlanItem> items) {
+        return items.stream()
+                .flatMap(item -> WeekTypeSupport.countableWeekTypes(item.getWeekType()).stream()
+                        .map(wt -> new AbstractMap.SimpleEntry<>(
+                                item.getClassId() + "_" + item.getCourseId() + "_" + item.getWeekday() + "_" + wt,
+                                1L)))
+                .collect(Collectors.groupingBy(
+                        Map.Entry::getKey,
+                        Collectors.summingLong(Map.Entry::getValue)));
     }
 
-    private static Map<Long, Map<Integer, List<SchedulePlanItem>>> nestedDayItems(
+    /** β 版：连续上课限制按 (teacher × weekType × day) 分桶 */
+    private static Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> nestedDayItemsBeta(
             List<SchedulePlanItem> items,
             Function<SchedulePlanItem, Long> ownerExtractor
     ) {
-        return items.stream().collect(Collectors.groupingBy(
-                ownerExtractor,
-                Collectors.groupingBy(SchedulePlanItem::getWeekday)
-        ));
+        Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> result = new HashMap<>();
+        for (SchedulePlanItem item : items) {
+            for (String wt : WeekTypeSupport.countableWeekTypes(item.getWeekType())) {
+                WeekOwner key = new WeekOwner(ownerExtractor.apply(item), wt);
+                result.computeIfAbsent(key, k -> new HashMap<>())
+                        .computeIfAbsent(item.getWeekday(), d -> new ArrayList<>())
+                        .add(item);
+            }
+        }
+        return result;
     }
 
     private Map<Long, Long> roomUseCounts(List<SchedulePlanItem> items) {
