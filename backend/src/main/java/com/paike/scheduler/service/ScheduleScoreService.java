@@ -12,6 +12,7 @@ import com.paike.scheduler.mapper.SchedulePlanItemMapper;
 import com.paike.scheduler.mapper.SchedulePlanMapper;
 import com.paike.scheduler.mapper.ScheduleScoreDetailMapper;
 import com.paike.scheduler.service.scheduling.ScoringFunctions;
+import com.paike.scheduler.service.scheduling.ScoringFunctions.WeekOwner;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -196,17 +197,24 @@ public class ScheduleScoreService {
     }
 
     private ScoreContext buildScoreContext(SchedulePlan plan, List<SchedulePlanItem> items) {
+        // V9 阶段 2A β 评分：硬冲突计数用 (owner,day,period) 同槽分组后做 weekType overlap 成对判定，
+        // ODD+EVEN 共槽（合法）不计冲突；纯 ALL 数据组内全 overlap，结果仍为 size-1（零回归）。
         Map<String, List<SchedulePlanItem>> teacherSlotMap = groupBy(items, item -> item.getTeacherId() + "_" + item.getWeekday() + "_" + item.getStartPeriod());
         Map<String, List<SchedulePlanItem>> classSlotMap = groupBy(items, item -> item.getClassId() + "_" + item.getWeekday() + "_" + item.getStartPeriod());
         Map<String, List<SchedulePlanItem>> roomSlotMap = groupBy(items, item -> item.getClassroomId() + "_" + item.getWeekday() + "_" + item.getStartPeriod());
 
-        Map<Long, Map<Integer, Long>> classDayCounts = nestedDayCounts(items, SchedulePlanItem::getClassId);
-        Map<Long, Map<Integer, Long>> teacherDayCounts = nestedDayCounts(items, SchedulePlanItem::getTeacherId);
-        Map<String, Long> courseDayCounts = items.stream().collect(Collectors.groupingBy(
-                item -> item.getClassId() + "_" + item.getCourseId() + "_" + item.getWeekday(),
-                Collectors.counting()
-        ));
-        Map<Long, Map<Integer, List<SchedulePlanItem>>> teacherDayItems = nestedDayItems(items, SchedulePlanItem::getTeacherId);
+        // β 评分（独立计数）：owner 维度加 weekType，ALL 展开成 ODD+EVEN 两个独立子桶。
+        Map<WeekOwner, Map<Integer, Long>> classDayCounts = nestedDayCountsBeta(items, SchedulePlanItem::getClassId);
+        Map<WeekOwner, Map<Integer, Long>> teacherDayCounts = nestedDayCountsBeta(items, SchedulePlanItem::getTeacherId);
+        Map<String, Long> courseDayCounts = items.stream()
+                .flatMap(item -> WeekTypeSupport.countableWeekTypes(item.getWeekType()).stream()
+                        .map(wt -> new AbstractMap.SimpleEntry<>(
+                                item.getClassId() + "_" + item.getCourseId() + "_" + item.getWeekday() + "_" + wt,
+                                1L)))
+                .collect(Collectors.groupingBy(
+                        Map.Entry::getKey,
+                        Collectors.summingLong(Map.Entry::getValue)));
+        Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> teacherDayItems = nestedDayItemsBeta(items, SchedulePlanItem::getTeacherId);
         Map<Long, Long> roomUseCounts = activeClassroomUseCounts();
         items.stream()
                 .map(SchedulePlanItem::getClassroomId)
@@ -220,10 +228,10 @@ public class ScheduleScoreService {
         int capacityViolationCount = countConflictReason(items, PlanConflictType.CLASSROOM_CAPACITY);
         int roomTypeMismatchCount = countConflictReason(items, PlanConflictType.CLASSROOM_TYPE_MISMATCH);
 
-        BigDecimal classBalancePenalty = ScoringFunctions.penaltyVariance(classDayCounts);
-        BigDecimal teacherLoadPenalty = ScoringFunctions.penaltyVariance(teacherDayCounts);
+        BigDecimal classBalancePenalty = ScoringFunctions.penaltyVarianceBeta(classDayCounts);
+        BigDecimal teacherLoadPenalty = ScoringFunctions.penaltyVarianceBeta(teacherDayCounts);
         BigDecimal courseDistributionPenalty = ScoringFunctions.penaltyDuplicateCourse(courseDayCounts);
-        BigDecimal continuousPenalty = ScoringFunctions.penaltyContinuous(teacherDayItems);
+        BigDecimal continuousPenalty = ScoringFunctions.penaltyContinuousBeta(teacherDayItems);
         BigDecimal classroomUtilizationPenalty = ScoringFunctions.penaltyClassroomUtilization(roomUseCounts, items.size());
         BigDecimal morningPriorityPenalty = ScoringFunctions.penaltyMorningPriority(items, thresholds.getAfternoonStartPeriod());
 
@@ -262,24 +270,69 @@ public class ScheduleScoreService {
                 .collect(Collectors.toMap(Function.identity(), id -> 0L));
     }
 
-    private Map<Long, Map<Integer, Long>> nestedDayCounts(List<SchedulePlanItem> items, Function<SchedulePlanItem, Long> ownerFunc) {
-        return items.stream().collect(Collectors.groupingBy(
-                ownerFunc,
-                Collectors.groupingBy(SchedulePlanItem::getWeekday, Collectors.counting())
-        ));
+    /**
+     * β 版（V9 阶段 2A）：owner 维度加 weekType，ALL 用
+     * {@link WeekTypeSupport#countableWeekTypes(String)} 展开成 ODD+EVEN 两个独立子桶。
+     * 下游用 {@link ScoringFunctions#penaltyVarianceBeta(Map)}。
+     */
+    private Map<WeekOwner, Map<Integer, Long>> nestedDayCountsBeta(List<SchedulePlanItem> items, Function<SchedulePlanItem, Long> ownerFunc) {
+        return items.stream()
+                .flatMap(item -> WeekTypeSupport.countableWeekTypes(item.getWeekType()).stream()
+                        .map(wt -> new AbstractMap.SimpleEntry<>(new WeekOwner(ownerFunc.apply(item), wt), item.getWeekday())))
+                .collect(Collectors.groupingBy(
+                        Map.Entry::getKey,
+                        Collectors.groupingBy(
+                                Map.Entry::getValue,
+                                Collectors.counting())));
     }
 
-    private Map<Long, Map<Integer, List<SchedulePlanItem>>> nestedDayItems(List<SchedulePlanItem> items, Function<SchedulePlanItem, Long> ownerFunc) {
-        return items.stream().collect(Collectors.groupingBy(
-                ownerFunc,
-                Collectors.groupingBy(SchedulePlanItem::getWeekday)
-        ));
+    /**
+     * β 版（V9 阶段 2A）：同 {@link #nestedDayCountsBeta}，连续上课限制按 (teacher × weekType × day) 分桶。
+     * ALL 展开后同一教师同一 day 的 item 会在 ODD 与 EVEN 桶各算一次连续链（对称，纯 ALL 数据数值不变）。
+     */
+    private Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> nestedDayItemsBeta(List<SchedulePlanItem> items, Function<SchedulePlanItem, Long> ownerFunc) {
+        Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> result = new HashMap<>();
+        for (SchedulePlanItem item : items) {
+            for (String wt : WeekTypeSupport.countableWeekTypes(item.getWeekType())) {
+                WeekOwner key = new WeekOwner(ownerFunc.apply(item), wt);
+                result.computeIfAbsent(key, k -> new HashMap<>())
+                        .computeIfAbsent(item.getWeekday(), d -> new ArrayList<>())
+                        .add(item);
+            }
+        }
+        return result;
     }
 
+    /**
+     * V9 阶段 2A：硬冲突计数按 weekType overlap 成对判定。
+     * ODD+EVEN 共槽（合法，不冲突）不再被误计；纯 ALL 数据组内全 overlap，结果仍为 size-1（零回归）。
+     * 同一组内 N 条记录中真正冲突数 = 必须移除才能两两 overlap=false 的最小数。
+     * ALL 与任意 overlap，故含 ALL 的组只需保留 1 条；纯 ODD+EVEN 的组按各自周次分别 size-1。
+     */
     private int countConflicts(Map<String, List<SchedulePlanItem>> grouped) {
-        return grouped.values().stream()
-                .mapToInt(list -> Math.max(0, list.size() - 1))
-                .sum();
+        int total = 0;
+        for (List<SchedulePlanItem> list : grouped.values()) {
+            if (list.size() <= 1) {
+                continue;
+            }
+            // 按 weekType 分桶：ODD 一桶、EVEN 一桶、ALL 一桶；ALL 与 ODD/EVEN 都冲突
+            Map<String, List<SchedulePlanItem>> byWeek = new HashMap<>();
+            for (SchedulePlanItem item : list) {
+                byWeek.computeIfAbsent(WeekTypeSupport.normalize(item.getWeekType()), k -> new ArrayList<>()).add(item);
+            }
+            int allCount = byWeek.getOrDefault(WeekTypeSupport.ALL, List.of()).size();
+            int oddCount = byWeek.getOrDefault(WeekTypeSupport.ODD, List.of()).size();
+            int evenCount = byWeek.getOrDefault(WeekTypeSupport.EVEN, List.of()).size();
+            if (allCount > 0) {
+                // 含 ALL：ALL 与 ODD/EVEN 都冲突，ALL 内部相互冲突 → 保留 1 条（ALL 优先），其余全冲突
+                int others = oddCount + evenCount;
+                total += (allCount - 1) + others;
+            } else {
+                // 纯 ODD/EVEN：ODD 内部冲突 + EVEN 内部冲突，ODD vs EVEN 共存
+                total += Math.max(0, oddCount - 1) + Math.max(0, evenCount - 1);
+            }
+        }
+        return total;
     }
 
     private BigDecimal safeWeight(BigDecimal weight) {
