@@ -129,6 +129,43 @@ class V5ConsistencyCheckServiceTest {
         assertTrue(report.getIssues().isEmpty());
     }
 
+    /**
+     * V9 阶段 2C T7 核心：单双周共槽（ODD+EVEN）合法，不误报硬冲突。
+     * 教师/班级/教室相同、时段重叠，但 weekType ODD vs EVEN → 不冲突 → PASS。
+     */
+    @Test
+    void check_oddEvenSharedSlotNotReportedAsConflict() {
+        V5ConsistencyCheckReportVo report = runCheck(List.of(
+                item(1L, 101L, 1L, 1L, 1L, 1, 1, 2, "ODD"),
+                item(2L, 102L, 1L, 1L, 1L, 1, 1, 2, "EVEN")));
+
+        assertEquals("PASS", report.getStatus());
+        assertEquals(0, report.getBlockingIssueCount());
+        assertTrue(report.getIssues().isEmpty(),
+                "ODD+EVEN 共槽应合法，实际 issues: " + report.getIssues());
+    }
+
+    /**
+     * V9 阶段 2C：ALL 与任意 weekType 冲突（ALL 占满整个时段）。
+     * ALL + ODD 同槽同资源 → 仍报 3 个硬冲突。
+     */
+    @Test
+    void check_allOverlapsWithOddStillReportedAsConflict() {
+        V5ConsistencyCheckReportVo report = runCheck(List.of(
+                item(1L, 101L, 1L, 1L, 1L, 1, 1, 2, "ALL"),
+                item(2L, 102L, 1L, 1L, 1L, 1, 1, 2, "ODD")));
+
+        List<String> codes = report.getIssues().stream()
+                .map(issue -> issue.getCode())
+                .toList();
+
+        assertEquals("FAIL", report.getStatus());
+        assertEquals(3, report.getBlockingIssueCount());
+        assertTrue(codes.contains("TEACHER_HARD_CONFLICT"));
+        assertTrue(codes.contains("CLASS_HARD_CONFLICT"));
+        assertTrue(codes.contains("CLASSROOM_HARD_CONFLICT"));
+    }
+
     private V5ConsistencyCheckReportVo runCheck(List<SchedulePlanItem> simulationItems) {
         ScheduleRepairTask task = new ScheduleRepairTask();
         task.setId(1L);
@@ -168,6 +205,12 @@ class V5ConsistencyCheckServiceTest {
 
     private SchedulePlanItem item(Long id, Long teachingTaskId, Long teacherId, Long classId, Long classroomId,
                                   Integer weekday, Integer startPeriod, Integer endPeriod) {
+        return item(id, teachingTaskId, teacherId, classId, classroomId, weekday, startPeriod, endPeriod, null);
+    }
+
+    /** V9 单双周：带 weekType 的 item 构造（null 视为 ALL，向后兼容现有 fixture） */
+    private SchedulePlanItem item(Long id, Long teachingTaskId, Long teacherId, Long classId, Long classroomId,
+                                  Integer weekday, Integer startPeriod, Integer endPeriod, String weekType) {
         SchedulePlanItem item = new SchedulePlanItem();
         item.setId(id);
         item.setPlanId(10L);
@@ -180,6 +223,7 @@ class V5ConsistencyCheckServiceTest {
         item.setWeekday(weekday);
         item.setStartPeriod(startPeriod);
         item.setEndPeriod(endPeriod);
+        item.setWeekType(weekType);
         return item;
     }
 

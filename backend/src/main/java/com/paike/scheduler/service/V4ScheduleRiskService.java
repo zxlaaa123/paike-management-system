@@ -167,24 +167,31 @@ public class V4ScheduleRiskService {
                 .collect(Collectors.groupingBy(item -> ownerIdFunc.apply(item) + "_" + item.getWeekday() + "_" + item.getStartPeriod()));
 
         for (List<SchedulePlanItem> sameSlotItems : grouped.values()) {
-            if (sameSlotItems.size() <= 1) {
+            // V9 单双周：组内过滤出真冲突子集——与组内其他任一项 weekType overlap 的 item。
+            // ODD+EVEN 共槽（合法）不报；ALL+任意 / 同周次 才报。
+            List<SchedulePlanItem> realConflicts = sameSlotItems.stream()
+                    .filter(item -> sameSlotItems.stream()
+                            .anyMatch(other -> !Objects.equals(other.getId(), item.getId())
+                                    && WeekTypeSupport.overlap(item.getWeekType(), other.getWeekType())))
+                    .toList();
+            if (realConflicts.size() <= 1) {
                 continue;
             }
-            SchedulePlanItem first = sameSlotItems.get(0);
+            SchedulePlanItem first = realConflicts.get(0);
             Long ownerId = ownerIdFunc.apply(first);
             T owner = ownerMap.get(ownerId);
             String ownerName = owner == null ? "未知对象" : safeName(ownerNameFunc.apply(owner));
-            List<String> courses = sameSlotItems.stream().map(item -> buildItemCourseLabel(item, context)).distinct().toList();
+            List<String> courses = realConflicts.stream().map(item -> buildItemCourseLabel(item, context)).distinct().toList();
 
             ScheduleRiskIssueVo risk = baseRisk(idGenerator, riskType, riskTypeName, "HIGH");
             risk.setTitle(ownerName + " " + formatWeekDay(first.getWeekday()) + " " + formatPeriod(first) + " 存在时间冲突");
-            risk.setDescription(ownerName + " 在同一时间被安排了 " + sameSlotItems.size() + " 门课程：" + String.join("、", courses));
+            risk.setDescription(ownerName + " 在同一时间被安排了 " + realConflicts.size() + " 门课程：" + String.join("、", courses));
             risk.setWeekDay(first.getWeekday());
             risk.setPeriod(formatPeriod(first));
             risk.setSuggestion(suggestion);
             risk.setAffectedObjects(ownerName);
-            risk.setRelatedItemIds(sameSlotItems.stream().map(SchedulePlanItem::getId).toList());
-            risk.setDetailLines(buildConflictDetailLines(context, sameSlotItems));
+            risk.setRelatedItemIds(realConflicts.stream().map(SchedulePlanItem::getId).toList());
+            risk.setDetailLines(buildConflictDetailLines(context, realConflicts));
             fillRelationsFromFirst(risk, first, context);
             if ("TEACHER_CONFLICT".equals(riskType)) {
                 risk.setRelatedTeacherId(ownerId);
