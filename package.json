@@ -15,7 +15,8 @@
     "test:stage7": "playwright test tests/stage7.spec.ts --reporter=line",
     "test:stage9": "playwright test tests/stage9.spec.ts --reporter=line",
     "test:v8": "playwright test tests/v8-solver.spec.ts --reporter=line",
-    "test:acceptance": "playwright test tests/v6-governance.spec.ts tests/stage6.spec.ts tests/stage7.spec.ts tests/stage9.spec.ts tests/v8-solver.spec.ts --reporter=line"
+    "test:v9": "playwright test tests/v9-week-type.spec.ts --reporter=line",
+    "test:acceptance": "playwright test tests/v6-governance.spec.ts tests/stage6.spec.ts tests/stage7.spec.ts tests/stage9.spec.ts tests/v8-solver.spec.ts tests/v9-week-type.spec.ts --reporter=line"
   },
   "keywords": [],
   "author": "",

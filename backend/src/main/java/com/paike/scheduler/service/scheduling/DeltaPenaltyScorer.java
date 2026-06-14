@@ -1,9 +1,11 @@
 package com.paike.scheduler.service.scheduling;
 
 import com.paike.scheduler.entity.SchedulePlanItem;
+import com.paike.scheduler.service.WeekTypeSupport;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -56,10 +58,10 @@ public final class DeltaPenaltyScorer {
                 afternoonStartPeriod,
                 items.size(),
                 afternoonCount,
-                nestedDayCounts(items, SchedulePlanItem::getClassId),
-                nestedDayCounts(items, SchedulePlanItem::getTeacherId),
-                courseDayCounts(items),
-                nestedDayItems(items, SchedulePlanItem::getTeacherId),
+                nestedDayCountsBeta(items, SchedulePlanItem::getClassId),
+                nestedDayCountsBeta(items, SchedulePlanItem::getTeacherId),
+                courseDayCountsBeta(items),
+                nestedDayItemsBeta(items, SchedulePlanItem::getTeacherId),
                 roomUseCounts(items, activeClassroomIds)
         );
     }
@@ -141,10 +143,11 @@ public final class DeltaPenaltyScorer {
         private final int afternoonStartPeriod;
         private final int itemCount;
         private final int afternoonCount;
-        private final Map<Long, Map<Integer, Long>> classDayCounts;
-        private final Map<Long, Map<Integer, Long>> teacherDayCounts;
+        // V9 阶段 2A β：owner 维度加 weekType（ALL 已展开为 ODD+EVEN 两个独立子桶）
+        private final Map<ScoringFunctions.WeekOwner, Map<Integer, Long>> classDayCounts;
+        private final Map<ScoringFunctions.WeekOwner, Map<Integer, Long>> teacherDayCounts;
         private final Map<String, Long> courseDayCounts;
-        private final Map<Long, Map<Integer, List<SchedulePlanItem>>> teacherDayItems;
+        private final Map<ScoringFunctions.WeekOwner, Map<Integer, List<SchedulePlanItem>>> teacherDayItems;
         private final Map<Long, Long> roomUseCounts;
         private final double classVariancePenaltySum;
         private final double teacherVariancePenaltySum;
@@ -163,10 +166,10 @@ public final class DeltaPenaltyScorer {
                 int afternoonStartPeriod,
                 int itemCount,
                 int afternoonCount,
-                Map<Long, Map<Integer, Long>> classDayCounts,
-                Map<Long, Map<Integer, Long>> teacherDayCounts,
+                Map<ScoringFunctions.WeekOwner, Map<Integer, Long>> classDayCounts,
+                Map<ScoringFunctions.WeekOwner, Map<Integer, Long>> teacherDayCounts,
                 Map<String, Long> courseDayCounts,
-                Map<Long, Map<Integer, List<SchedulePlanItem>>> teacherDayItems,
+                Map<ScoringFunctions.WeekOwner, Map<Integer, List<SchedulePlanItem>>> teacherDayItems,
                 Map<Long, Long> roomUseCounts
         ) {
             this.afternoonStartPeriod = afternoonStartPeriod;
@@ -193,26 +196,33 @@ public final class DeltaPenaltyScorer {
             this.morningTheoryPriorityPenalty = morningPenalty(itemCount, afternoonCount);
         }
 
+        /**
+         * V9 阶段 2A β：candidate 按 {@link WeekTypeSupport#countableWeekTypes} 展开到对应周次桶，
+         * 每个受影响桶分别算 before/after delta 再汇总。ALL candidate 同时影响 ODD 与 EVEN 桶；
+         * 纯 ALL 数据下两个桶对称，delta 与旧全周公式一致（零回归）。
+         */
         public BigDecimal deltaPenalty(String ruleCode, SchedulePlanItem candidate) {
             Objects.requireNonNull(ruleCode, "ruleCode must not be null");
             Objects.requireNonNull(candidate, "candidate must not be null");
 
             return switch (ruleCode) {
-                case CLASS_DAILY_BALANCE -> variancePenaltyAfter(
+                case CLASS_DAILY_BALANCE -> variancePenaltyAfterBeta(
                         classDayCounts,
                         classVariancePenaltySum,
                         candidate.getClassId(),
-                        candidate.getWeekday()
+                        candidate.getWeekday(),
+                        candidate.getWeekType()
                 ).subtract(classDailyBalancePenalty);
-                case TEACHER_DAILY_LOAD -> variancePenaltyAfter(
+                case TEACHER_DAILY_LOAD -> variancePenaltyAfterBeta(
                         teacherDayCounts,
                         teacherVariancePenaltySum,
                         candidate.getTeacherId(),
-                        candidate.getWeekday()
+                        candidate.getWeekday(),
+                        candidate.getWeekType()
                 ).subtract(teacherDailyLoadPenalty);
-                case COURSE_DISTRIBUTION -> duplicateCoursePenaltyAfter(candidate)
+                case COURSE_DISTRIBUTION -> duplicateCoursePenaltyAfterBeta(candidate)
                         .subtract(courseDistributionPenalty);
-                case CONTINUOUS_PERIOD_LIMIT -> continuousPenaltyAfter(candidate)
+                case CONTINUOUS_PERIOD_LIMIT -> continuousPenaltyAfterBeta(candidate)
                         .subtract(continuousPeriodLimitPenalty);
                 case CLASSROOM_UTILIZATION -> classroomPenaltyAfter(candidate)
                         .subtract(classroomUtilizationPenalty);
@@ -224,34 +234,70 @@ public final class DeltaPenaltyScorer {
             };
         }
 
-        private BigDecimal variancePenaltyAfter(
-                Map<Long, Map<Integer, Long>> countsByOwner,
+        /**
+         * β 版：candidate 展开到每个 countableWeekType 桶，对每个受影响的 (owner,weekType) 算 before/after。
+         * 受影响 owner 数 = candidate 展开的 weekType 集合里"该 (owner,wt) 桶是否已存在"的判定，
+         * 保守按"新增桶计数"处理：candidate 影响的每个 weekType 桶，若原本不存在该 (owner,wt) 则 ownerCount+1。
+         */
+        private BigDecimal variancePenaltyAfterBeta(
+                Map<ScoringFunctions.WeekOwner, Map<Integer, Long>> countsByOwner,
                 double penaltySum,
                 Long ownerId,
-                Integer weekday
+                Integer weekday,
+                String candidateWeekType
         ) {
-            Map<Integer, Long> beforeCounts = countsByOwner.get(ownerId);
-            double beforeOwnerPenalty = ownerVariancePenalty(beforeCounts);
-            double afterOwnerPenalty = ownerVariancePenaltyAfter(beforeCounts, weekday);
-            int ownerCount = countsByOwner.containsKey(ownerId) ? countsByOwner.size() : countsByOwner.size() + 1;
-            return variancePenalty(penaltySum - beforeOwnerPenalty + afterOwnerPenalty, ownerCount);
+            double sumAfter = penaltySum;
+            int newOwners = 0;
+            for (String wt : WeekTypeSupport.countableWeekTypes(candidateWeekType)) {
+                ScoringFunctions.WeekOwner key = new ScoringFunctions.WeekOwner(ownerId, wt);
+                Map<Integer, Long> beforeCounts = countsByOwner.get(key);
+                double beforeOwnerPenalty = ownerVariancePenalty(beforeCounts);
+                double afterOwnerPenalty = ownerVariancePenaltyAfter(beforeCounts, weekday);
+                sumAfter = sumAfter - beforeOwnerPenalty + afterOwnerPenalty;
+                if (!countsByOwner.containsKey(key)) {
+                    newOwners++;
+                }
+            }
+            return variancePenalty(sumAfter, countsByOwner.size() + newOwners);
         }
 
-        private BigDecimal duplicateCoursePenaltyAfter(SchedulePlanItem candidate) {
-            long beforeCount = courseDayCounts.getOrDefault(courseDayKey(candidate), 0L);
-            long afterDuplicateDays = duplicateCourseDays + (beforeCount == 1L ? 1L : 0L);
-            int afterTotalDays = courseDayCounts.size() + (beforeCount == 0L ? 1 : 0);
+        /**
+         * β 版：candidate 展开到每个 countableWeekType，分别查 courseDayCounts 桶，累计 duplicate 增量。
+         */
+        private BigDecimal duplicateCoursePenaltyAfterBeta(SchedulePlanItem candidate) {
+            long afterDuplicateDays = duplicateCourseDays;
+            int afterTotalDays = courseDayCounts.size();
+            for (String wt : WeekTypeSupport.countableWeekTypes(candidate.getWeekType())) {
+                String key = courseDayKeyBeta(candidate, wt);
+                long beforeCount = courseDayCounts.getOrDefault(key, 0L);
+                if (beforeCount == 1L) {
+                    afterDuplicateDays++;
+                }
+                if (beforeCount == 0L) {
+                    afterTotalDays++;
+                }
+            }
             return duplicateCoursePenalty(afterDuplicateDays, afterTotalDays);
         }
 
-        private BigDecimal continuousPenaltyAfter(SchedulePlanItem candidate) {
-            List<SchedulePlanItem> beforeItems = teacherDayItems
-                    .getOrDefault(candidate.getTeacherId(), Map.of())
-                    .get(candidate.getWeekday());
-            double beforeSamplePenalty = continuousSamplePenalty(beforeItems);
-            double afterSamplePenalty = continuousSamplePenaltyAfter(beforeItems, candidate);
-            int afterSampleCount = continuousSampleCount + (beforeItems == null ? 1 : 0);
-            return continuousPenalty(continuousPenaltySum - beforeSamplePenalty + afterSamplePenalty, afterSampleCount);
+        /**
+         * β 版：candidate 展开到每个 countableWeekType，对每个 (teacher,wt) 桶的该 day sample 算 before/after。
+         */
+        private BigDecimal continuousPenaltyAfterBeta(SchedulePlanItem candidate) {
+            double afterSum = continuousPenaltySum;
+            int afterSampleCount = continuousSampleCount;
+            for (String wt : WeekTypeSupport.countableWeekTypes(candidate.getWeekType())) {
+                ScoringFunctions.WeekOwner key = new ScoringFunctions.WeekOwner(candidate.getTeacherId(), wt);
+                Map<Integer, List<SchedulePlanItem>> dayMap = teacherDayItems.getOrDefault(key, Map.of());
+                List<SchedulePlanItem> beforeItems = dayMap.get(candidate.getWeekday());
+                double beforeSamplePenalty = continuousSamplePenalty(beforeItems);
+                double afterSamplePenalty = continuousSamplePenaltyAfter(beforeItems, candidate);
+                afterSum = afterSum - beforeSamplePenalty + afterSamplePenalty;
+                if (beforeItems == null) {
+                    afterSampleCount++;
+                }
+            }
+            return continuousPenalty(afterSum, afterSampleCount);
         }
 
         private BigDecimal classroomPenaltyAfter(SchedulePlanItem candidate) {
@@ -268,11 +314,12 @@ public final class DeltaPenaltyScorer {
             Collection<Long> activeClassroomIds,
             int afternoonStartPeriod
     ) {
+        // V9 阶段 2A β：全量重算走 Beta 重载（ALL 展开为 ODD+EVEN）
         return switch (ruleCode) {
-            case CLASS_DAILY_BALANCE -> ScoringFunctions.penaltyVariance(nestedDayCounts(items, SchedulePlanItem::getClassId));
-            case TEACHER_DAILY_LOAD -> ScoringFunctions.penaltyVariance(nestedDayCounts(items, SchedulePlanItem::getTeacherId));
-            case COURSE_DISTRIBUTION -> ScoringFunctions.penaltyDuplicateCourse(courseDayCounts(items));
-            case CONTINUOUS_PERIOD_LIMIT -> ScoringFunctions.penaltyContinuous(nestedDayItems(items, SchedulePlanItem::getTeacherId));
+            case CLASS_DAILY_BALANCE -> ScoringFunctions.penaltyVarianceBeta(nestedDayCountsBeta(items, SchedulePlanItem::getClassId));
+            case TEACHER_DAILY_LOAD -> ScoringFunctions.penaltyVarianceBeta(nestedDayCountsBeta(items, SchedulePlanItem::getTeacherId));
+            case COURSE_DISTRIBUTION -> ScoringFunctions.penaltyDuplicateCourse(courseDayCountsBeta(items));
+            case CONTINUOUS_PERIOD_LIMIT -> ScoringFunctions.penaltyContinuousBeta(nestedDayItemsBeta(items, SchedulePlanItem::getTeacherId));
             case CLASSROOM_UTILIZATION -> ScoringFunctions.penaltyClassroomUtilization(
                     roomUseCounts(items, activeClassroomIds),
                     items.size());
@@ -288,31 +335,48 @@ public final class DeltaPenaltyScorer {
         return result;
     }
 
-    private static Map<Long, Map<Integer, Long>> nestedDayCounts(
+    /**
+     * V9 阶段 2A β：owner 维度加 weekType，ALL 用 countableWeekTypes 展开成 ODD+EVEN 两个独立子桶。
+     */
+    private static Map<ScoringFunctions.WeekOwner, Map<Integer, Long>> nestedDayCountsBeta(
             List<SchedulePlanItem> items,
             Function<SchedulePlanItem, Long> ownerExtractor
     ) {
-        return items.stream().collect(Collectors.groupingBy(
-                ownerExtractor,
-                Collectors.groupingBy(SchedulePlanItem::getWeekday, Collectors.counting())
-        ));
+        return items.stream()
+                .flatMap(item -> WeekTypeSupport.countableWeekTypes(item.getWeekType()).stream()
+                        .map(wt -> new AbstractMap.SimpleEntry<>(
+                                new ScoringFunctions.WeekOwner(ownerExtractor.apply(item), wt),
+                                item.getWeekday())))
+                .collect(Collectors.groupingBy(
+                        Map.Entry::getKey,
+                        Collectors.groupingBy(
+                                Map.Entry::getValue,
+                                Collectors.counting())));
     }
 
-    private static Map<String, Long> courseDayCounts(List<SchedulePlanItem> items) {
-        return items.stream().collect(Collectors.groupingBy(
-                DeltaPenaltyScorer::courseDayKey,
-                Collectors.counting()
-        ));
+    private static Map<String, Long> courseDayCountsBeta(List<SchedulePlanItem> items) {
+        return items.stream()
+                .flatMap(item -> WeekTypeSupport.countableWeekTypes(item.getWeekType()).stream()
+                        .map(wt -> new AbstractMap.SimpleEntry<>(courseDayKeyBeta(item, wt), 1L)))
+                .collect(Collectors.groupingBy(
+                        Map.Entry::getKey,
+                        Collectors.summingLong(Map.Entry::getValue)));
     }
 
-    private static Map<Long, Map<Integer, List<SchedulePlanItem>>> nestedDayItems(
+    private static Map<ScoringFunctions.WeekOwner, Map<Integer, List<SchedulePlanItem>>> nestedDayItemsBeta(
             List<SchedulePlanItem> items,
             Function<SchedulePlanItem, Long> ownerExtractor
     ) {
-        return items.stream().collect(Collectors.groupingBy(
-                ownerExtractor,
-                Collectors.groupingBy(SchedulePlanItem::getWeekday)
-        ));
+        Map<ScoringFunctions.WeekOwner, Map<Integer, List<SchedulePlanItem>>> result = new HashMap<>();
+        for (SchedulePlanItem item : items) {
+            for (String wt : WeekTypeSupport.countableWeekTypes(item.getWeekType())) {
+                ScoringFunctions.WeekOwner key = new ScoringFunctions.WeekOwner(ownerExtractor.apply(item), wt);
+                result.computeIfAbsent(key, k -> new HashMap<>())
+                        .computeIfAbsent(item.getWeekday(), d -> new ArrayList<>())
+                        .add(item);
+            }
+        }
+        return result;
     }
 
     private static Map<Long, Long> roomUseCounts(List<SchedulePlanItem> items, Collection<Long> activeClassroomIds) {
@@ -330,7 +394,7 @@ public final class DeltaPenaltyScorer {
         return counts;
     }
 
-    private static double variancePenaltySum(Map<Long, Map<Integer, Long>> countsByOwner) {
+    private static double variancePenaltySum(Map<ScoringFunctions.WeekOwner, Map<Integer, Long>> countsByOwner) {
         return countsByOwner.values().stream()
                 .mapToDouble(DeltaPenaltyScorer::ownerVariancePenalty)
                 .sum();
@@ -374,14 +438,14 @@ public final class DeltaPenaltyScorer {
         return BigDecimal.valueOf((double) duplicateDays / totalDays).setScale(4, RoundingMode.HALF_UP);
     }
 
-    private static double continuousPenaltySum(Map<Long, Map<Integer, List<SchedulePlanItem>>> teacherDayItems) {
+    private static double continuousPenaltySum(Map<ScoringFunctions.WeekOwner, Map<Integer, List<SchedulePlanItem>>> teacherDayItems) {
         return teacherDayItems.values().stream()
                 .flatMap(dayItems -> dayItems.values().stream())
                 .mapToDouble(DeltaPenaltyScorer::continuousSamplePenalty)
                 .sum();
     }
 
-    private static int continuousSampleCount(Map<Long, Map<Integer, List<SchedulePlanItem>>> teacherDayItems) {
+    private static int continuousSampleCount(Map<ScoringFunctions.WeekOwner, Map<Integer, List<SchedulePlanItem>>> teacherDayItems) {
         return teacherDayItems.values().stream()
                 .mapToInt(Map::size)
                 .sum();
@@ -434,8 +498,11 @@ public final class DeltaPenaltyScorer {
         return BigDecimal.valueOf(Math.min(1D, variance / Math.max(1D, avg * avg))).setScale(4, RoundingMode.HALF_UP);
     }
 
-    private static String courseDayKey(SchedulePlanItem item) {
-        return item.getClassId() + "_" + item.getCourseId() + "_" + item.getWeekday();
+    /**
+     * V9 阶段 2A β：courseDayCounts 的 key 加 weekType 维度（ALL 展开后同 item 产生 ODD/EVEN 两个 key）。
+     */
+    private static String courseDayKeyBeta(SchedulePlanItem item, String weekType) {
+        return item.getClassId() + "_" + item.getCourseId() + "_" + item.getWeekday() + "_" + weekType;
     }
 
     private static boolean isAfternoon(SchedulePlanItem item, int afternoonStartPeriod) {

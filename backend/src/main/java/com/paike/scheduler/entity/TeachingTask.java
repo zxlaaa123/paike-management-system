@@ -28,6 +28,9 @@ public class TeachingTask {
 
     private Integer weeklyHours;
 
+    /** 周次类型：ALL全周、ODD单周、EVEN双周（V9 单双周支持） */
+    private String weekType;
+
     private Integer needContinuous;
 
     private Integer status;

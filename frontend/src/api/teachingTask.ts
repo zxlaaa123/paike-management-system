@@ -1,6 +1,9 @@
 import request from '../utils/request'
 import type { ApiResponse, PageResult } from './types'
 
+/** 周次类型：ALL 全周 / ODD 单周 / EVEN 双周（与后端 WeekType 对齐，V9 单双周支持） */
+export type WeekType = 'ALL' | 'ODD' | 'EVEN'
+
 export interface TeachingTask {
   id: number
   courseId: number
@@ -10,6 +13,7 @@ export interface TeachingTask {
   classId: number
   className: string
   weeklyHours: number
+  weekType: WeekType
   needContinuous: number
   status: number
   remark: string
@@ -24,6 +28,7 @@ export interface TeachingTaskForm {
   teacherId: number
   classId: number
   weeklyHours: number
+  weekType: WeekType
   needContinuous?: number
   status?: number
   remark?: string

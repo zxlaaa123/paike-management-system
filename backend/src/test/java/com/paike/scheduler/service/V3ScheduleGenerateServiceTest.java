@@ -154,4 +154,87 @@ class V3ScheduleGenerateServiceTest {
                 List.of(),
                 new int[1]);
     }
+
+    /**
+     * V9 阶段1：V8 引擎对 weekType!=ALL 的任务显式拒绝（不进引擎），落 unassigned，
+     * reasonCode=WEEK_TYPE_NOT_SUPPORTED_BY_SOLVER_V8。ALL 任务正常排课。
+     */
+    @Test
+    void solverV8RejectsNonAllWeekTypeTasksToUnassigned() {
+        SemesterService semesterService = mock(SemesterService.class);
+        ScheduleRuleService ruleService = mock(ScheduleRuleService.class);
+        ScheduleScoreService scoreService = mock(ScheduleScoreService.class);
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SchedulePlanItemMapper planItemMapper = mock(SchedulePlanItemMapper.class);
+        TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
+        SchedulingReferenceLoader referenceLoader = mock(SchedulingReferenceLoader.class);
+        SchedulePlanExplainService explainService = mock(SchedulePlanExplainService.class);
+        ScheduleThresholdProperties thresholdProperties = mock(ScheduleThresholdProperties.class);
+        EngineContextLoader engineContextLoader = mock(EngineContextLoader.class);
+        PerformanceBaselineService performanceBaselineService = mock(PerformanceBaselineService.class);
+
+        // 两个任务：101L=ALL（引擎正常排）、102L=ODD（被拦截落 unassigned）
+        TeachingTask allTask = new TeachingTask();
+        allTask.setId(101L);
+        allTask.setSemesterId(1L);
+        allTask.setStatus(1);
+        allTask.setWeekType("ALL");
+        TeachingTask oddTask = new TeachingTask();
+        oddTask.setId(102L);
+        oddTask.setSemesterId(1L);
+        oddTask.setStatus(1);
+        oddTask.setWeekType("ODD");
+        when(teachingTaskMapper.selectList(any())).thenReturn(List.of(allTask, oddTask));
+        when(planMapper.insert(any(SchedulePlan.class))).thenAnswer(invocation -> {
+            SchedulePlan plan = invocation.getArgument(0);
+            plan.setId(900L);
+            return 1;
+        });
+        when(planMapper.updateById(any(SchedulePlan.class))).thenReturn(1);
+        when(planItemMapper.insertBatch(anyList())).thenReturn(1);
+        // loader 只装载 ALL 任务（ODD 在 loader 内部也被跳过，ctx 仅含 101L）
+        when(engineContextLoader.load(1L)).thenReturn(singleTaskContext());
+        doAnswer(invocation -> {
+            SchedulePlan plan = invocation.getArgument(0);
+            plan.setTotalScore(BigDecimal.valueOf(100));
+            return null;
+        }).when(scoreService).rescore(any(SchedulePlan.class));
+
+        V3ScheduleGenerateService service = new V3ScheduleGenerateService(
+                semesterService,
+                ruleService,
+                scoreService,
+                planMapper,
+                planItemMapper,
+                teachingTaskMapper,
+                referenceLoader,
+                explainService,
+                thresholdProperties,
+                engineContextLoader,
+                performanceBaselineService
+        );
+        ScheduleGenerateRequest request = new ScheduleGenerateRequest();
+        request.setSemesterId(1L);
+        request.setStrategyType("SOLVER_V8");
+        request.setSolverSeed(7L);
+        request.setSolverTimeBudgetMs(500L);
+
+        ScheduleGenerateResult result = service.generate(request);
+
+        // ALL 任务 101L 正常排课
+        assertEquals(1, result.getScheduledCount(), "ALL 任务应被正常排课");
+        // ODD 任务 102L 被拒绝计入未排
+        assertEquals(1, result.getUnscheduledCount(), "ODD 任务应计入未排数");
+
+        // ODD 任务落 unassigned，reasonCode 正确
+        verify(explainService).saveUnassignedTask(
+                eq(900L), eq(1L), eq(102L),
+                eq("WEEK_TYPE_NOT_SUPPORTED_BY_SOLVER_V8"),
+                contains("单双周"),
+                anyString());
+        // ALL 任务不应被拒绝
+        verify(explainService, never()).saveUnassignedTask(
+                eq(900L), eq(1L), eq(101L),
+                anyString(), anyString(), anyString());
+    }
 }

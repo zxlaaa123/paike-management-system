@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * 评分体系的纯函数集合 —— 双轨制评分都在这里。
@@ -29,6 +30,20 @@ import java.util.function.Predicate;
  *   <li><b>离线 penaltyXxx</b>：返回 {@code BigDecimal}（写库要严格精度，scale=4）</li>
  * </ul>
  * 不要混用。两套刻意分开，让阅读者一眼看出在线/离线身份。
+ *
+ * <h2>V9 阶段 2A β 评分（独立计数）</h2>
+ * 聚合维度从 {@code (owner/day)} 扩展为 {@code (owner/day/weekType)}（V9_00 §5 β 裁决）。
+ * 实现<b>不改动旧签名</b>（引擎 {@link com.paike.scheduler.engine.optimize.ObjectiveFunction}
+ * / {@link com.paike.scheduler.engine.optimize.IncrementalPenaltyState} 仍按纯 ALL 世界调用旧签名，
+ * 阶段 3 激活引擎 β 时才切换），而是<b>新增 weekType 维度重载</b>：
+ * <ul>
+ *   <li>用 {@link WeekOwner}（ownerId + weekType 复合键）替换裸 {@code Long ownerId}</li>
+ *   <li>调用方（ScheduleScoreService / DeltaPenaltyScorer）在聚合上游用
+ *       {@link com.paike.scheduler.service.WeekTypeSupport#countableWeekTypes(String)}
+ *       把 ALL 展开成 [ODD, EVEN] 两条虚拟记录</li>
+ * </ul>
+ * 关键性质：纯 ALL 数据展开后 ODD/EVEN 两桶完全对称，归一化后数值与旧签名<b>完全相同</b>，
+ * 现有 baseline 零回归（已在 ScheduleScoreServiceTest 手算验证）。
  */
 public final class ScoringFunctions {
 
@@ -224,5 +239,86 @@ public final class ScoringFunctions {
                 .filter(item -> item.getStartPeriod() >= afternoonStartPeriod)
                 .count();
         return BigDecimal.valueOf((double) afternoonCount / items.size()).setScale(4, RoundingMode.HALF_UP);
+    }
+
+    // ============================================================
+    // V9 阶段 2A β 维度重载（weekType 独立计数） —— 不删旧签名，引擎继续用旧签名
+    // 调用方（ScheduleScoreService / DeltaPenaltyScorer）已用 WeekTypeSupport.countableWeekTypes
+    // 把 ALL 展开成 [ODD, EVEN]，此处只负责按复合 key 算 penalty，公式与旧签名完全一致。
+    // ============================================================
+
+    /**
+     * β 评分的复合 owner 键：ownerId（教师或班级）× weekType（ODD/EVEN）。
+     * 由调用方聚合时构造，ALL 已在上游展开为 (ownerId, ODD) + (ownerId, EVEN) 两个独立键。
+     */
+    public record WeekOwner(Long ownerId, String weekType) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof WeekOwner that)) return false;
+            return Objects.equals(ownerId, that.ownerId) && Objects.equals(weekType, that.weekType);
+        }
+        @Override
+        public int hashCode() {
+            return Objects.hash(ownerId, weekType);
+        }
+    }
+
+    /**
+     * β 版（weekType 独立计数）：班级/教师每日数方差归一惩罚。
+     * 公式与 {@link #penaltyVariance(Map)} 完全一致，仅外层 key 从 {@code Long ownerId}
+     * 换成 {@link WeekOwner}（ownerId × weekType）。空集统一返 ZERO。
+     */
+    public static BigDecimal penaltyVarianceBeta(Map<WeekOwner, Map<Integer, Long>> countsByOwnerWeek) {
+        if (countsByOwnerWeek.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        double penalty = 0D;
+        for (Map<Integer, Long> dayCounts : countsByOwnerWeek.values()) {
+            if (dayCounts.size() <= 1) {
+                continue;
+            }
+            double avg = dayCounts.values().stream().mapToLong(Long::longValue).average().orElse(0D);
+            double variance = dayCounts.values().stream()
+                    .mapToDouble(count -> Math.pow(count - avg, 2))
+                    .average()
+                    .orElse(0D);
+            penalty += Math.min(1D, variance / 4D);
+        }
+        double normalized = penalty / countsByOwnerWeek.size();
+        return BigDecimal.valueOf(normalized).setScale(4, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * β 版（weekType 独立计数）：教师连续上课链平均惩罚。
+     * 公式与 {@link #penaltyContinuous(Map)} 完全一致，仅外层 key 从 {@code Long teacherId}
+     * 换成 {@link WeekOwner}（teacherId × weekType）。空集统一返 ZERO。
+     */
+    public static BigDecimal penaltyContinuousBeta(Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> teacherDayItemsWeek) {
+        if (teacherDayItemsWeek.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        double penalty = 0D;
+        int sampleCount = 0;
+        for (Map<Integer, List<SchedulePlanItem>> dayItems : teacherDayItemsWeek.values()) {
+            for (List<SchedulePlanItem> items : dayItems.values()) {
+                sampleCount++;
+                List<Integer> starts = items.stream()
+                        .map(SchedulePlanItem::getStartPeriod)
+                        .sorted()
+                        .toList();
+                int consecutiveChains = 0;
+                for (int i = 1; i < starts.size(); i++) {
+                    if (starts.get(i) - starts.get(i - 1) == 2) {
+                        consecutiveChains++;
+                    }
+                }
+                penalty += Math.min(1D, consecutiveChains / 2D);
+            }
+        }
+        if (sampleCount == 0) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf(penalty / sampleCount).setScale(4, RoundingMode.HALF_UP);
     }
 }

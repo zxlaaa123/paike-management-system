@@ -28,7 +28,7 @@ class M16TeachingTaskVoSerializationTest {
 
     private static final Set<String> EXPECTED_FIELDS = Set.of(
             "id", "semesterId", "courseId", "teacherId", "classId",
-            "weeklyHours", "needContinuous", "status", "remark", "deleted",
+            "weeklyHours", "weekType", "needContinuous", "status", "remark", "deleted",
             "createTime", "updateTime",
             "courseName", "teacherName", "className", "scheduledSlots",
             "courseType", "teacherStatus", "classStatus", "studentCount");
@@ -37,14 +37,15 @@ class M16TeachingTaskVoSerializationTest {
     void teachingTaskVoKeepsAllNineteenFieldsWithRelations() throws Exception {
         JsonNode json = toJson(new TeachingTaskVo(
                 1L, 2L, 10L, 20L, 30L,
-                4, 1, 1, "备注", 0,
+                4, "ALL", 1, 1, "备注", 0,
                 LocalDateTime.of(2026, 6, 3, 10, 0, 0), LocalDateTime.of(2026, 6, 3, 10, 0, 0),
                 "高等数学", "张老师", "计科2401", 2,
                 "THEORY", 1, 1, 45));
 
         assertEquals(EXPECTED_FIELDS, fieldNames(json));
-        assertEquals(20, fieldNames(json).size());
+        assertEquals(21, fieldNames(json).size());
         assertEquals(0, json.get("deleted").asInt());
+        assertEquals("ALL", json.get("weekType").asText());
         assertEquals("高等数学", json.get("courseName").asText());
         assertEquals("张老师", json.get("teacherName").asText());
         assertEquals("计科2401", json.get("className").asText());

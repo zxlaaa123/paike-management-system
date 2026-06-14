@@ -59,6 +59,18 @@
                   AND s.plan_id IS NULL
               </otherwise>
           </choose>
+          <choose>
+              <!-- V9 单双周 daily limit 按周次独立计数（裁决 β）：仅统计与传入 weekType 重叠的行 -->
+              <when test="weekType == null or weekType == 'ALL'">
+                  <!-- ALL 与任意重叠，不加过滤 -->
+              </when>
+              <when test="weekType == 'ODD'">
+                  AND (s.week_type = 'ALL' OR s.week_type = 'ODD')
+              </when>
+              <when test="weekType == 'EVEN'">
+                  AND (s.week_type = 'ALL' OR s.week_type = 'EVEN')
+              </when>
+          </choose>
     </select>
 
 </mapper>

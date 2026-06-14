@@ -74,8 +74,8 @@ public class TeachingTaskService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public TeachingTaskVo create(Long courseId, Long teacherId, Long classId, Integer weeklyHours, Integer needContinuous,
-            Integer status, String remark) {
+    public TeachingTaskVo create(Long courseId, Long teacherId, Long classId, Integer weeklyHours, String weekType,
+            Integer needContinuous, Integer status, String remark) {
         Course course = requireActiveCourse(courseId);
         Teacher teacher = requireActiveTeacher(teacherId);
         ClassInfo classInfo = requireActiveClass(classId);
@@ -86,6 +86,7 @@ public class TeachingTaskService {
         task.setTeacherId(teacherId);
         task.setClassId(classId);
         task.setWeeklyHours(weeklyHours);
+        task.setWeekType(normalizeWeekType(weekType));
         task.setNeedContinuous(needContinuous != null ? needContinuous : 0);
         task.setStatus(status != null ? status : 1);
         task.setRemark(remark);
@@ -104,7 +105,7 @@ public class TeachingTaskService {
 
     @Transactional(rollbackFor = Exception.class)
     public TeachingTaskVo update(Long id, Long courseId, Long teacherId, Long classId, Integer weeklyHours,
-            Integer needContinuous, Integer status, String remark) {
+            String weekType, Integer needContinuous, Integer status, String remark) {
         TeachingTask task = teachingTaskMapper.selectById(id);
         if (task == null || Integer.valueOf(1).equals(task.getDeleted())) {
             throw new BusinessException(404, "教学任务不存在");
@@ -118,6 +119,9 @@ public class TeachingTaskService {
         task.setTeacherId(teacherId);
         task.setClassId(classId);
         task.setWeeklyHours(weeklyHours);
+        if (weekType != null) {
+            task.setWeekType(normalizeWeekType(weekType));
+        }
         task.setNeedContinuous(needContinuous != null ? needContinuous : 0);
         if (status != null) {
             task.setStatus(status);
@@ -219,5 +223,22 @@ public class TeachingTaskService {
             throw new BusinessException(400, "所选班级已停用，无法创建教学任务");
         }
         return classInfo;
+    }
+
+    private static final java.util.Set<String> VALID_WEEK_TYPES = java.util.Set.of("ALL", "ODD", "EVEN");
+
+    /**
+     * 规范化周次类型：null/空 → "ALL"；非空则校验 ∈ {ALL, ODD, EVEN}，非法值拒绝。
+     * 与 DB DEFAULT 'ALL' 语义一致，V9 单双周支持。
+     */
+    private String normalizeWeekType(String weekType) {
+        if (weekType == null || weekType.isEmpty()) {
+            return "ALL";
+        }
+        String upper = weekType.trim().toUpperCase();
+        if (!VALID_WEEK_TYPES.contains(upper)) {
+            throw new BusinessException(400, "周次类型必须为 ALL/ODD/EVEN");
+        }
+        return upper;
     }
 }

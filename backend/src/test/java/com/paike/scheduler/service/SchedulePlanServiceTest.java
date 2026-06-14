@@ -229,6 +229,120 @@ class SchedulePlanServiceTest {
     }
 
     @Test
+    void refreshPlanConflictState_oddEvenSameSlotNoConflict() {
+        // V9 单双周：同教师/班级/教室同时段，一条 ODD 一条 EVEN，共享时段合法，应 0 冲突。
+        // 改造前（按 weekday+startPeriod 桶聚组 size>1 即冲突）会误报 2 个冲突。
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SchedulePlanItemMapper planItemMapper = mock(SchedulePlanItemMapper.class);
+        CourseMapper courseMapper = mock(CourseMapper.class);
+        TeacherMapper teacherMapper = mock(TeacherMapper.class);
+        ClassInfoMapper classInfoMapper = mock(ClassInfoMapper.class);
+        ClassroomMapper classroomMapper = mock(ClassroomMapper.class);
+        TimeSlotMapper timeSlotMapper = mock(TimeSlotMapper.class);
+        TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
+        SchedulePlanService service = new SchedulePlanService(
+                planMapper,
+                mock(SemesterMapper.class),
+                planItemMapper,
+                mock(ScheduleMapper.class),
+                mock(ScheduleLockedItemMapper.class),
+                mock(ScheduleLockGuardService.class),
+                courseMapper,
+                teacherMapper,
+                classInfoMapper,
+                classroomMapper,
+                timeSlotMapper,
+                teachingTaskMapper,
+                mock(TeacherUnavailableTimeService.class),
+                mock(ScheduleScoreService.class),
+                mock(SchedulePlanExplainService.class),
+                mock(SystemAuditLogService.class));
+
+        // 同教师 201L / 同班级 301L / 同教室 401L / 同时段(周1 第1节)，weekType 互补
+        SchedulePlanItem odd = planItem(1L, 101L, 201L, 301L, 401L, 1, 1, 2);
+        odd.setWeekType("ODD");
+        odd.setCourseId(501L);
+        SchedulePlanItem even = planItem(2L, 102L, 201L, 301L, 401L, 1, 1, 2);
+        even.setWeekType("EVEN");
+        even.setCourseId(502L);
+
+        when(planItemMapper.selectList(any())).thenReturn(List.of(odd, even));
+        when(teachingTaskMapper.selectBatchIds(any())).thenReturn(List.of(
+                teachingTask(101L, 201L, 301L, 501L),
+                teachingTask(102L, 201L, 301L, 502L)));
+        when(courseMapper.selectBatchIds(any())).thenReturn(List.of());
+        when(teacherMapper.selectBatchIds(any())).thenReturn(List.of(teacher(201L, "张老师")));
+        when(classInfoMapper.selectBatchIds(any())).thenReturn(List.of(classInfo(301L, "一班")));
+        when(classroomMapper.selectBatchIds(any())).thenReturn(List.of(classroom(401L, "A101")));
+        when(timeSlotMapper.selectList(any())).thenReturn(List.of(timeSlot(901L, 1, 1)));
+        SchedulePlan plan = new SchedulePlan();
+        plan.setId(10L);
+        when(planMapper.selectById(10L)).thenReturn(plan);
+
+        int conflictCount = service.refreshPlanConflictState(10L);
+
+        assertEquals(0, conflictCount);
+        // 两条 item 都不该被打上冲突标记，因此不该有 updateById
+        verify(planItemMapper, never()).updateById(any(SchedulePlanItem.class));
+        assertEquals(0, plan.getConflictCount());
+        assertEquals(0, odd.getConflictFlag());
+        assertEquals(0, even.getConflictFlag());
+    }
+
+    @Test
+    void refreshPlanConflictState_sameWeekTypeSameSlotConflicts() {
+        // 对照组：同教师/班级/教室同时段、同 weekType（都 ODD），应报冲突（2 个 item 都标记）。
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SchedulePlanItemMapper planItemMapper = mock(SchedulePlanItemMapper.class);
+        CourseMapper courseMapper = mock(CourseMapper.class);
+        TeacherMapper teacherMapper = mock(TeacherMapper.class);
+        ClassInfoMapper classInfoMapper = mock(ClassInfoMapper.class);
+        ClassroomMapper classroomMapper = mock(ClassroomMapper.class);
+        TimeSlotMapper timeSlotMapper = mock(TimeSlotMapper.class);
+        TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
+        SchedulePlanService service = new SchedulePlanService(
+                planMapper,
+                mock(SemesterMapper.class),
+                planItemMapper,
+                mock(ScheduleMapper.class),
+                mock(ScheduleLockedItemMapper.class),
+                mock(ScheduleLockGuardService.class),
+                courseMapper,
+                teacherMapper,
+                classInfoMapper,
+                classroomMapper,
+                timeSlotMapper,
+                teachingTaskMapper,
+                mock(TeacherUnavailableTimeService.class),
+                mock(ScheduleScoreService.class),
+                mock(SchedulePlanExplainService.class),
+                mock(SystemAuditLogService.class));
+
+        SchedulePlanItem odd1 = planItem(1L, 101L, 201L, 301L, 401L, 1, 1, 2);
+        odd1.setWeekType("ODD");
+        SchedulePlanItem odd2 = planItem(2L, 102L, 201L, 301L, 401L, 1, 1, 2);
+        odd2.setWeekType("ODD");
+
+        when(planItemMapper.selectList(any())).thenReturn(List.of(odd1, odd2));
+        when(teachingTaskMapper.selectBatchIds(any())).thenReturn(List.of(
+                teachingTask(101L, 201L, 301L, 501L),
+                teachingTask(102L, 201L, 301L, 502L)));
+        when(courseMapper.selectBatchIds(any())).thenReturn(List.of());
+        when(teacherMapper.selectBatchIds(any())).thenReturn(List.of(teacher(201L, "张老师")));
+        when(classInfoMapper.selectBatchIds(any())).thenReturn(List.of(classInfo(301L, "一班")));
+        when(classroomMapper.selectBatchIds(any())).thenReturn(List.of(classroom(401L, "A101")));
+        when(timeSlotMapper.selectList(any())).thenReturn(List.of(timeSlot(901L, 1, 1)));
+        SchedulePlan plan = new SchedulePlan();
+        plan.setId(10L);
+        when(planMapper.selectById(10L)).thenReturn(plan);
+
+        int conflictCount = service.refreshPlanConflictState(10L);
+
+        assertEquals(2, conflictCount);
+        verify(planItemMapper, times(2)).updateById(any(SchedulePlanItem.class));
+    }
+
+    @Test
     void applyPlan_recordsFailureAuditWhenPlanRejected() {
         SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
         SystemAuditLogService auditLogService = mock(SystemAuditLogService.class);
@@ -310,6 +424,8 @@ class SchedulePlanServiceTest {
 
         SchedulePlanItem item = planItem(101L, 201L, 301L, 401L, 501L, 1, 1, 2);
         item.setCourseId(601L);
+        // V9 单双周：plan_item 设 ODD，验证透传到正式 schedule
+        item.setWeekType("ODD");
         when(planItemMapper.selectList(any())).thenReturn(List.of(item));
         when(planItemMapper.updateById(any(SchedulePlanItem.class))).thenReturn(1);
 
@@ -344,6 +460,8 @@ class SchedulePlanServiceTest {
         assertWrapperContains(deleteCaptor.getValue(), Schedule.class, "semester_id", 3L);
         assertEquals(3L, insertCaptor.getValue().getSemesterId());
         assertEquals(10L, insertCaptor.getValue().getPlanId());
+        // V9 单双周：applyPlan 必须把 plan_item.weekType 透传到 schedule（之前会丢）
+        assertEquals("ODD", insertCaptor.getValue().getWeekType());
         verify(auditLogService).recordSuccess(
                 eq(SystemAuditLogService.ACTION_APPLY_PLAN),
                 eq(SystemAuditLogService.TARGET_SCHEDULE_PLAN),
