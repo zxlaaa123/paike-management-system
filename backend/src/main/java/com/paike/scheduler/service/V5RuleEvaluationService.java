@@ -166,15 +166,19 @@ public class V5RuleEvaluationService {
                 .filter(other -> overlap(request.getCandidateStartPeriod(), request.getCandidateEndPeriod(), other.getStartPeriod(), other.getEndPeriod()))
                 .toList();
 
-        boolean teacherConflict = overlaps.stream().anyMatch(other -> Objects.equals(other.getTeacherId(), item.getTeacherId()));
+        // V9 单双周：period overlap 且 weekType overlap 才算真冲突（candidate weekType 取自被评估的 item）
+        boolean teacherConflict = overlaps.stream().anyMatch(other -> Objects.equals(other.getTeacherId(), item.getTeacherId())
+                && WeekTypeSupport.overlap(item.getWeekType(), other.getWeekType()));
         details.add(hard("TEACHER_TIME_CONFLICT", "教师时间冲突", !teacherConflict,
                 teacherConflict ? safeName(teacher == null ? null : teacher.getName()) + " 在该时段已有课程" : "教师时段可用"));
 
-        boolean classConflict = overlaps.stream().anyMatch(other -> Objects.equals(other.getClassId(), item.getClassId()));
+        boolean classConflict = overlaps.stream().anyMatch(other -> Objects.equals(other.getClassId(), item.getClassId())
+                && WeekTypeSupport.overlap(item.getWeekType(), other.getWeekType()));
         details.add(hard("CLASS_TIME_CONFLICT", "班级时间冲突", !classConflict,
                 classConflict ? safeName(classInfo == null ? null : classInfo.getClassName()) + " 在该时段已有课程" : "班级时段可用"));
 
-        boolean roomConflict = overlaps.stream().anyMatch(other -> Objects.equals(other.getClassroomId(), request.getCandidateClassroomId()));
+        boolean roomConflict = overlaps.stream().anyMatch(other -> Objects.equals(other.getClassroomId(), request.getCandidateClassroomId())
+                && WeekTypeSupport.overlap(item.getWeekType(), other.getWeekType()));
         details.add(hard("CLASSROOM_TIME_CONFLICT", "教室时间冲突", !roomConflict,
                 roomConflict ? safeName(room.getRoomName()) + " 在该时段已被占用" : "教室时段可用"));
 

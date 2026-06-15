@@ -173,6 +173,44 @@ class DatabaseSchemaScriptTest {
     }
 
     @Test
+    void weekTypeSupportMigrationIsIdempotent() throws IOException {
+        String migration = resource("db/v23_week_type_support.sql");
+
+        // 幂等模板：所有 DDL 走 PREPARE/EXECUTE + information_schema 探测
+        assertTrue(count(migration, "PREPARE stmt FROM @ddl") >= 14,
+                "v23 每个 ADD COLUMN / DROP INDEX / ADD INDEX 至少一对 PREPARE/EXECUTE");
+        assertTrue(migration.contains("EXECUTE stmt"));
+        assertTrue(migration.contains("DEALLOCATE PREPARE stmt"));
+
+        // schedule / teaching_task 加 week_type 列，幂等探测
+        assertTrue(migration.contains("TABLE_NAME = 'schedule' AND COLUMN_NAME = 'week_type'"));
+        assertTrue(migration.contains("TABLE_NAME = 'teaching_task' AND COLUMN_NAME = 'week_type'"));
+        assertTrue(migration.contains("ADD COLUMN week_type VARCHAR(20) NOT NULL DEFAULT ''ALL''"));
+    }
+
+    @Test
+    void weekTypeSupportRebuildsUniqueKeysAndIndexes() throws IOException {
+        String migration = resource("db/v23_week_type_support.sql");
+        String application = resource("application.yml");
+
+        // schedule 三个软删除安全唯一键重建：纳入 week_type，保留 active_key 语义
+        assertTrue(migration.contains("ADD UNIQUE KEY uk_schedule_teacher_slot (semester_id, time_slot_id, week_type, teacher_id, active_key)"));
+        assertTrue(migration.contains("ADD UNIQUE KEY uk_schedule_class_slot (semester_id, time_slot_id, week_type, class_id, active_key)"));
+        assertTrue(migration.contains("ADD UNIQUE KEY uk_schedule_classroom_slot (semester_id, time_slot_id, week_type, classroom_id, active_key)"));
+
+        // plan_item 唯一键重建：允许同任务同时段 ODD + EVEN 共存
+        assertTrue(migration.contains("ADD UNIQUE KEY uk_plan_task_slot (plan_id, teaching_task_id, weekday, start_period, end_period, week_type)"));
+
+        // plan_item 三个时间索引重建：冲突检测按 week_type 区分
+        assertTrue(migration.contains("ADD INDEX idx_plan_item_teacher_time (teacher_id, weekday, start_period, end_period, week_type)"));
+        assertTrue(migration.contains("ADD INDEX idx_plan_item_class_time (class_id, weekday, start_period, end_period, week_type)"));
+        assertTrue(migration.contains("ADD INDEX idx_plan_item_room_time (classroom_id, weekday, start_period, end_period, week_type)"));
+
+        // 注册到 schema-locations
+        assertTrue(application.contains("classpath:db/v23_week_type_support.sql"));
+    }
+
+    @Test
     void reportBatchSemesterMigrationIsRegistered() throws IOException {
         String schema = resource("db/v2_schema.sql");
         String migration = resource("db/v17_report_batch_semester.sql");

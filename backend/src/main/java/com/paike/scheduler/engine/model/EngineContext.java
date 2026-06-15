@@ -27,7 +27,12 @@ public record EngineContext(
     List<Assignment> existingScheduleAssignments,
     int[] existingTaskScheduledCount
 ) {
-    public record TimeSlotData(int index, long originalId, int dayOfWeek, int periodNo) {}
+    /**
+     * V9 阶段3 方案 X：每个物理时段翻倍为两个逻辑 slot（ODD + EVEN），weekType 标识其所属周次。
+     * ODD 任务只能占用 weekType=ODD 的 slot，EVEN 任务只能占用 EVEN 的，ALL 任务可占两者。
+     * 翻倍后 timeSlotIndex 隐式编码 weekType，引擎核心（Detector/Neighbor/Backtracking）零改动。
+     */
+    public record TimeSlotData(int index, long originalId, int dayOfWeek, int periodNo, String weekType) {}
 
     public record ClassroomData(int index, long originalId, Integer capacity, String roomType) {}
 

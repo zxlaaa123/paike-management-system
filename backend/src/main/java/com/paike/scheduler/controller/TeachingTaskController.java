@@ -58,6 +58,7 @@ public class TeachingTaskController {
             form.getTeacherId(),
             form.getClassId(),
             form.getWeeklyHours(),
+            form.getWeekType(),
             form.getNeedContinuous(),
             form.getStatus(),
             form.getRemark()));
@@ -71,6 +72,7 @@ public class TeachingTaskController {
             form.getTeacherId(),
             form.getClassId(),
             form.getWeeklyHours(),
+            form.getWeekType(),
             form.getNeedContinuous(),
             form.getStatus(),
             form.getRemark()));
@@ -97,6 +99,8 @@ public class TeachingTaskController {
         private Long classId;
         @Min(value = 1, message = "每周课时必须大于0")
         private Integer weeklyHours;
+        @jakarta.validation.constraints.Pattern(regexp = "ALL|ODD|EVEN", message = "周次类型必须为 ALL/ODD/EVEN")
+        private String weekType;
         private Integer needContinuous;
         private Integer status;
         @Size(max = 255, message = "备注不能超过255字符")

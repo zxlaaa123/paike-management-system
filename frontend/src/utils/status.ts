@@ -43,6 +43,24 @@ export function strategyText(strategy: string): string {
   return map[strategy] || strategy
 }
 
+/** 周次类型文本映射（V9 单双周） */
+export function weekTypeText(weekType: string | null | undefined): string {
+  const map: Record<string, string> = {
+    ALL: '全周',
+    ODD: '单周',
+    EVEN: '双周',
+  }
+  if (!weekType) return '全周'
+  return map[weekType] || weekType
+}
+
+/** 周次类型 Tag 颜色映射（V9 单双周） */
+export function weekTypeTagType(weekType: string | null | undefined): string {
+  if (weekType === 'ODD') return 'warning'
+  if (weekType === 'EVEN') return 'success'
+  return 'info'
+}
+
 /** 排课方案状态文本映射 */
 export function schedulePlanStatusText(status: string): string {
   const map: Record<string, string> = { DRAFT: '草稿', APPLIED: '已应用', ABANDONED: '已废弃' }

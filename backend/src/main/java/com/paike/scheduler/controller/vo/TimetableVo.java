@@ -26,4 +26,7 @@ public class TimetableVo {
     private String classroomName;
 
     private String building;
+
+    /** 周次类型：ALL全周、ODD单周、EVEN双周（V9 单双周支持，导出与网格显示用） */
+    private String weekType;
 }

@@ -4,6 +4,7 @@ import com.paike.scheduler.engine.conflict.InMemoryConflictDetector;
 import com.paike.scheduler.engine.model.Assignment;
 import com.paike.scheduler.engine.model.EngineContext;
 import com.paike.scheduler.engine.model.EngineTask;
+import com.paike.scheduler.service.WeekTypeSupport;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,7 +58,13 @@ public final class NeighborOperator {
             if (task.candidateClassroomIndices().isEmpty()) {
                 continue;
             }
-            int slotIndex = random.nextInt(ctx.timeSlotCount());
+            // V9 阶段3：按 task.weekType 选合法 slot。ODD→偶数 slot，EVEN→奇数 slot，ALL→偶数 slot（扩散）。
+            // 用物理 slot（0..timeSlotCount/2-1）随机后映射到合法翻倍 slot，避免随机到错误周次。
+            int physicalSlot = random.nextInt(ctx.timeSlotCount() / 2);
+            String taskWt = task.weekType();
+            int slotIndex = WeekTypeSupport.EVEN.equals(taskWt)
+                    ? physicalSlot * 2 + 1
+                    : physicalSlot * 2;
             int roomIndex = task.candidateClassroomIndices()
                     .get(random.nextInt(task.candidateClassroomIndices().size()));
             Assignment moved = new Assignment(original.taskIndex(), original.slotIndex(), slotIndex, roomIndex);
@@ -87,6 +94,18 @@ public final class NeighborOperator {
             }
             Assignment a = current.get(left);
             Assignment b = current.get(right);
+            // V9 阶段3：只 swap 同 weekType 分类的 task，避免跨周次 slot 交换导致语义错误
+            String wtA = ctx.tasks().get(a.taskIndex()).weekType();
+            String wtB = ctx.tasks().get(b.taskIndex()).weekType();
+            boolean aAll = WeekTypeSupport.ALL.equals(wtA);
+            boolean bAll = WeekTypeSupport.ALL.equals(wtB);
+            // ALL 与非 ALL 不可 swap（slot 占用模型不同）；ODD 与 EVEN 不可 swap
+            if (aAll != bAll) {
+                continue;
+            }
+            if (!aAll && !wtA.equals(wtB)) {
+                continue;
+            }
             Optional<Assignment> movedA = chooseRoom(a, b.timeSlotIndex(), random);
             Optional<Assignment> movedB = chooseRoom(b, a.timeSlotIndex(), random);
             if (movedA.isEmpty() || movedB.isEmpty()) {

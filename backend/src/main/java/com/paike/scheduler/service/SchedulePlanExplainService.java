@@ -31,6 +31,7 @@ public class SchedulePlanExplainService {
             "CLASSROOM_CAPACITY_NOT_ENOUGH", "教室容量不足",
             "TEACHER_UNAVAILABLE", "教师禁排时间冲突",
             "PERIOD_NOT_ENOUGH", "可用节次不足",
+            "WEEK_TYPE_NOT_SUPPORTED_BY_SOLVER_V8", "V8 求解器暂不支持单双周任务",
             "UNKNOWN_REASON", "未知原因"
     );
 

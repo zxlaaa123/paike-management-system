@@ -429,6 +429,8 @@ public class SchedulePlanService {
             schedule.setClassId(item.getClassId());
             schedule.setClassroomId(item.getClassroomId());
             schedule.setTimeSlotId(timeSlotId);
+            // V9 单双周：plan_item → schedule 透传 weekType（之前 schedule 无此列会丢）
+            schedule.setWeekType(WeekTypeSupport.normalize(item.getWeekType()));
             schedule.setSourceType("PLAN");
             schedule.setDeleted(0);
             schedule.setCreateTime(LocalDateTime.now());
@@ -685,12 +687,28 @@ public class SchedulePlanService {
             grouped.computeIfAbsent(keyExtractor.apply(item), ignored -> new ArrayList<>()).add(item);
         }
         for (Map.Entry<Long, List<SchedulePlanItem>> entry : grouped.entrySet()) {
-            if (entry.getValue().size() <= 1) {
+            List<SchedulePlanItem> groupItems = entry.getValue();
+            if (groupItems.size() <= 1) {
                 continue;
             }
             String reason = reasonBuilder.apply(entry.getKey());
-            for (SchedulePlanItem item : entry.getValue()) {
-                reasonsByItemId.computeIfAbsent(item.getId(), ignored -> new ArrayList<>()).add(reason);
+            // V9 单双周：同一资源（教师/班级/教室）同时段多条约冲突，但 ODD 与 EVEN
+            // 共享时段合法（WeekTypeSupport.overlap=false），不标记为冲突。
+            // 即每条 item 只有在组内存在另一条 weekType 与之重叠的 item 时才算冲突。
+            for (SchedulePlanItem item : groupItems) {
+                boolean hasOverlapPeer = false;
+                for (SchedulePlanItem other : groupItems) {
+                    if (other == item) {
+                        continue;
+                    }
+                    if (WeekTypeSupport.overlap(item.getWeekType(), other.getWeekType())) {
+                        hasOverlapPeer = true;
+                        break;
+                    }
+                }
+                if (hasOverlapPeer) {
+                    reasonsByItemId.computeIfAbsent(item.getId(), ignored -> new ArrayList<>()).add(reason);
+                }
             }
         }
     }

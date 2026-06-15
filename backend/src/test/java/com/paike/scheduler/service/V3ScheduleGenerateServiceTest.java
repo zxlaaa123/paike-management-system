@@ -135,8 +135,8 @@ class V3ScheduleGenerateServiceTest {
 
     private EngineContext singleTaskContext() {
         return new EngineContext(
-                List.of(new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0))),
-                List.of(new EngineContext.TimeSlotData(0, 201L, 1, 1)),
+                List.of(new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0), "ODD")),
+                List.of(new EngineContext.TimeSlotData(0, 201L, 1, 1, "ODD")),
                 List.of(new EngineContext.ClassroomData(0, 301L, 60, "NORMAL")),
                 List.of(new EngineContext.TeacherData(0, 401L, "T1", 1)),
                 List.of(new EngineContext.ClassData(0, 501L, 30, 1)),
@@ -153,5 +153,82 @@ class V3ScheduleGenerateServiceTest {
                 List.of(),
                 List.of(),
                 new int[1]);
+    }
+
+    /**
+     * V9 阶段3（反向，原阶段1 stub 已移除）：V8 引擎已支持单双周任务，ODD 任务正常进引擎排课，
+     * 不再被拒绝落 unassigned，不再有 WEEK_TYPE_NOT_SUPPORTED_BY_SOLVER_V8 reasonCode。
+     *
+     * <p>阶段 1 此测试验证 stub 拒绝；阶段 3 引擎扩展后 stub 移除，测试改为反向：
+     * ODD 任务不被拒绝（unscheduledCount=0，无 WEEK_TYPE reasonCode 落 unassigned）。
+     */
+    @Test
+    void solverV8AcceptsNonAllWeekTypeTasksAfterStage3() {
+        SemesterService semesterService = mock(SemesterService.class);
+        ScheduleRuleService ruleService = mock(ScheduleRuleService.class);
+        ScheduleScoreService scoreService = mock(ScheduleScoreService.class);
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SchedulePlanItemMapper planItemMapper = mock(SchedulePlanItemMapper.class);
+        TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
+        SchedulingReferenceLoader referenceLoader = mock(SchedulingReferenceLoader.class);
+        SchedulePlanExplainService explainService = mock(SchedulePlanExplainService.class);
+        ScheduleThresholdProperties thresholdProperties = mock(ScheduleThresholdProperties.class);
+        EngineContextLoader engineContextLoader = mock(EngineContextLoader.class);
+        PerformanceBaselineService performanceBaselineService = mock(PerformanceBaselineService.class);
+
+        // 两个任务：101L=ALL、102L=ODD，阶段3 后都正常进引擎
+        TeachingTask allTask = new TeachingTask();
+        allTask.setId(101L);
+        allTask.setSemesterId(1L);
+        allTask.setStatus(1);
+        allTask.setWeekType("ALL");
+        TeachingTask oddTask = new TeachingTask();
+        oddTask.setId(102L);
+        oddTask.setSemesterId(1L);
+        oddTask.setStatus(1);
+        oddTask.setWeekType("ODD");
+        when(teachingTaskMapper.selectList(any())).thenReturn(List.of(allTask, oddTask));
+        when(planMapper.insert(any(SchedulePlan.class))).thenAnswer(invocation -> {
+            SchedulePlan plan = invocation.getArgument(0);
+            plan.setId(900L);
+            return 1;
+        });
+        when(planMapper.updateById(any(SchedulePlan.class))).thenReturn(1);
+        when(planItemMapper.insertBatch(anyList())).thenReturn(1);
+        when(engineContextLoader.load(1L)).thenReturn(singleTaskContext());
+        doAnswer(invocation -> {
+            SchedulePlan plan = invocation.getArgument(0);
+            plan.setTotalScore(BigDecimal.valueOf(100));
+            return null;
+        }).when(scoreService).rescore(any(SchedulePlan.class));
+
+        V3ScheduleGenerateService service = new V3ScheduleGenerateService(
+                semesterService,
+                ruleService,
+                scoreService,
+                planMapper,
+                planItemMapper,
+                teachingTaskMapper,
+                referenceLoader,
+                explainService,
+                thresholdProperties,
+                engineContextLoader,
+                performanceBaselineService
+        );
+        ScheduleGenerateRequest request = new ScheduleGenerateRequest();
+        request.setSemesterId(1L);
+        request.setStrategyType("SOLVER_V8");
+        request.setSolverSeed(7L);
+        request.setSolverTimeBudgetMs(500L);
+
+        ScheduleGenerateResult result = service.generate(request);
+
+        // 阶段3：ODD 任务不再被拒绝，unscheduledCount=0（mock 的 singleTaskContext 引擎正常排下）
+        assertEquals(0, result.getUnscheduledCount(), "阶段3 后 ODD 任务不应计入未排数");
+        // 不应有 WEEK_TYPE_NOT_SUPPORTED reasonCode 落 unassigned
+        verify(explainService, never()).saveUnassignedTask(
+                eq(900L), eq(1L), eq(102L),
+                eq("WEEK_TYPE_NOT_SUPPORTED_BY_SOLVER_V8"),
+                anyString(), anyString());
     }
 }

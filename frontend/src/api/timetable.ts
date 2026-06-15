@@ -14,6 +14,8 @@ export interface TimetableItem {
   className: string
   classroomName: string
   building: string
+  /** 周次类型：ALL全周、ODD单周、EVEN双周（V9 单双周支持）。历史数据可能缺省，按 ALL 处理 */
+  weekType?: string
 }
 
 interface TimetableParams {

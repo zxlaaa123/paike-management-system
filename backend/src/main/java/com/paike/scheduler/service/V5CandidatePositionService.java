@@ -255,6 +255,7 @@ public class V5CandidatePositionService {
                 .filter(other -> !Objects.equals(other.getId(), target.getId()))
                 .filter(other -> Objects.equals(other.getWeekday(), weekday))
                 .filter(other -> overlap(start, end, other.getStartPeriod(), other.getEndPeriod()))
+                .filter(other -> WeekTypeSupport.overlap(target.getWeekType(), other.getWeekType()))
                 .filter(other ->
                         Objects.equals(other.getTeacherId(), target.getTeacherId())
                                 || Objects.equals(other.getClassId(), target.getClassId())
@@ -330,9 +331,13 @@ public class V5CandidatePositionService {
                 .filter(other -> Objects.equals(other.getWeekday(), weekday))
                 .filter(other -> overlap(start, end, other.getStartPeriod(), other.getEndPeriod()))
                 .toList();
-        boolean teacherConflict = overlaps.stream().anyMatch(other -> Objects.equals(other.getTeacherId(), target.getTeacherId()));
-        boolean classConflict = overlaps.stream().anyMatch(other -> Objects.equals(other.getClassId(), target.getClassId()));
-        boolean roomConflict = overlaps.stream().anyMatch(other -> Objects.equals(other.getClassroomId(), room.getId()));
+        // V9 单双周：period overlap 且 weekType overlap 才算真冲突（ODD+EVEN 共槽合法）
+        boolean teacherConflict = overlaps.stream().anyMatch(other -> Objects.equals(other.getTeacherId(), target.getTeacherId())
+                && WeekTypeSupport.overlap(target.getWeekType(), other.getWeekType()));
+        boolean classConflict = overlaps.stream().anyMatch(other -> Objects.equals(other.getClassId(), target.getClassId())
+                && WeekTypeSupport.overlap(target.getWeekType(), other.getWeekType()));
+        boolean roomConflict = overlaps.stream().anyMatch(other -> Objects.equals(other.getClassroomId(), room.getId())
+                && WeekTypeSupport.overlap(target.getWeekType(), other.getWeekType()));
         boolean unavailable = target.getTeacherId() != null && unavailableTimeService.isUnavailable(target.getTeacherId(), slot.getId());
         boolean classMissing = false;
         boolean capacityViolation = false;
@@ -346,7 +351,8 @@ public class V5CandidatePositionService {
         }
         boolean lockedRoomConflict = overlaps.stream()
                 .filter(other -> lockedIds.contains(other.getId()))
-                .anyMatch(other -> Objects.equals(other.getClassroomId(), room.getId()));
+                .anyMatch(other -> Objects.equals(other.getClassroomId(), room.getId())
+                        && WeekTypeSupport.overlap(target.getWeekType(), other.getWeekType()));
         int fail = 0;
         if (teacherConflict) fail++;
         if (classConflict) fail++;
@@ -356,7 +362,9 @@ public class V5CandidatePositionService {
         if (capacityViolation) fail++;
         if (lockedRoomConflict) fail++;
         result.hardConflictCount = fail;
-        result.affectedItems = overlaps.stream().map(SchedulePlanItem::getId).limit(6).toList();
+        result.affectedItems = overlaps.stream()
+                .filter(other -> WeekTypeSupport.overlap(target.getWeekType(), other.getWeekType()))
+                .map(SchedulePlanItem::getId).limit(6).toList();
         if (fail > 0) {
             result.available = false;
             if (teacherConflict) result.reason = "教师时间冲突";
