@@ -86,13 +86,19 @@ public class EngineContextLoader {
             courseDataList.add(new EngineContext.CourseData(i, c.getId(), c.getCourseType()));
         }
 
+        // V9 阶段3 方案 X：slot 物理翻倍——每个物理时段生成 ODD + EVEN 两个逻辑 slot。
+        // ODD slot 在偶数 index（物理×2），EVEN slot 在奇数 index（物理×2+1）。
+        // slotIdxMap 记录物理时段基准 index（翻倍前），后续按 weekType 算最终 slotIdx。
         List<EngineContext.TimeSlotData> slotDataList = new ArrayList<>();
         for (int i = 0; i < timeSlots.size(); i++) {
             TimeSlot s = timeSlots.get(i);
             slotIdxMap.put(s.getId(), i);
-            slotDataList.add(new EngineContext.TimeSlotData(i, s.getId(),
-                s.getDayOfWeek() != null ? s.getDayOfWeek() : 0,
-                s.getPeriodNo() != null ? s.getPeriodNo() : 0));
+            int day = s.getDayOfWeek() != null ? s.getDayOfWeek() : 0;
+            int period = s.getPeriodNo() != null ? s.getPeriodNo() : 0;
+            // ODD slot（物理×2）
+            slotDataList.add(new EngineContext.TimeSlotData(i * 2, s.getId(), day, period, WeekTypeSupport.ODD));
+            // EVEN slot（物理×2+1）
+            slotDataList.add(new EngineContext.TimeSlotData(i * 2 + 1, s.getId(), day, period, WeekTypeSupport.EVEN));
         }
 
         List<EngineContext.ClassroomData> roomDataList = new ArrayList<>();
@@ -119,16 +125,17 @@ public class EngineContextLoader {
             classroomDisabled[i] = r.getStatus() == null || r.getStatus() != 1;
         }
 
-        // 4. Teacher unavailable
+        // 4. Teacher unavailable —— V9 阶段3：翻倍后物理禁排要标记到 ODD + EVEN 两个逻辑 slot
         boolean[][] teacherUnavailable = new boolean[teacherDataList.size()][slotDataList.size()];
         for (Teacher t : allTeachers) {
             Integer tIdx = teacherIdxMap.get(t.getId());
             if (tIdx == null) continue;
             for (TimeSlot s : timeSlots) {
-                Integer sIdx = slotIdxMap.get(s.getId());
-                if (sIdx == null) continue;
+                Integer baseIdx = slotIdxMap.get(s.getId());
+                if (baseIdx == null) continue;
                 if (unavailableTimeService.isUnavailable(t.getId(), s.getId())) {
-                    teacherUnavailable[tIdx][sIdx] = true;
+                    teacherUnavailable[tIdx][baseIdx * 2] = true;       // ODD slot
+                    teacherUnavailable[tIdx][baseIdx * 2 + 1] = true;   // EVEN slot
                 }
             }
         }
@@ -161,13 +168,8 @@ public class EngineContextLoader {
 
             if (tIdx == null || cIdx == null || coIdx == null) continue;
 
-            // V9 阶段1：V8 引擎暂不支持单双周任务，装载时跳过 weekType!=ALL 的任务。
-            // 被跳过的任务由调用方（generateSolverV8PlanItems）统一落 unassigned，
-            // 本 loader 保持纯查询无副作用。阶段3移除该约束后此 continue 删除。
-            String weekType = t.getWeekType();
-            if (weekType != null && !weekType.isBlank() && !"ALL".equalsIgnoreCase(weekType.trim())) {
-                continue;
-            }
+            // V9 阶段3：移除 stub 拒绝，单双周任务正常进引擎（weekType 透传，方案 X 翻倍 slot 支持共槽）
+            String taskWeekType = WeekTypeSupport.normalize(t.getWeekType());
 
             int weeklyHours = t.getWeeklyHours() != null ? t.getWeeklyHours() : 0;
             int requiredSlots = (int) Math.ceil(weeklyHours / 2.0);
@@ -188,7 +190,7 @@ public class EngineContextLoader {
 
             int engineTaskIndex = engineTasks.size();
             engineTasks.add(new EngineTask(engineTaskIndex, t.getId(), tIdx, cIdx, coIdx, requiredSlots,
-                courseType, studentCount, candidateRooms));
+                courseType, studentCount, candidateRooms, taskWeekType));
         }
 
         // 8. Load existing schedules as initial occupancy
@@ -206,14 +208,21 @@ public class EngineContextLoader {
         }
 
         for (Schedule s : existingSchedules) {
-            Integer slotIdx = slotIdxMap.get(s.getTimeSlotId());
+            Integer baseSlotIdx = slotIdxMap.get(s.getTimeSlotId());
             Integer roomIdx = roomIdxMap.get(s.getClassroomId());
             Integer taskEngineIdx = s.getTeachingTaskId() != null ? taskIdToEngineIdx.get(s.getTeachingTaskId()) : null;
 
-            if (slotIdx == null || roomIdx == null) continue;
+            if (baseSlotIdx == null || roomIdx == null) continue;
 
             if (taskEngineIdx != null) {
                 existingTaskScheduledCount[taskEngineIdx]++;
+                // V9 阶段3：按 schedule.weekType 映射到翻倍 slot。
+                // ALL/ODD → ODD slot（baseSlotIdx*2）；EVEN → EVEN slot（baseSlotIdx*2+1）。
+                // 注：ALL 在引擎里占 1 条 Assignment（pending 按 requiredSlots 计数，不按逻辑 slot），
+                // ALL 的"同时计入单双周"语义在 β 评分层（ObjectiveFunction）通过 countableWeekTypes 展开体现，
+                // 引擎冲突层只需保证 ALL 与 ODD/EVEN 都冲突（占 ODD slot 即可与 ODD/EVEN slot 都隔离）。
+                String normalizedWt = WeekTypeSupport.normalize(s.getWeekType());
+                int slotIdx = WeekTypeSupport.EVEN.equals(normalizedWt) ? baseSlotIdx * 2 + 1 : baseSlotIdx * 2;
                 existingAssignments.add(new Assignment(taskEngineIdx, 0, slotIdx, roomIdx));
             }
         }
@@ -239,9 +248,13 @@ public class EngineContextLoader {
             if (taskIdx == null) continue;
 
             int periodNo = (startPeriod + 1) / 2;
+            // V9 阶段3：翻倍后按 planItem.weekType 选 ODD 或 EVEN slot（ALL/ODD→ODD，EVEN→EVEN）
+            String lockedWt = WeekTypeSupport.normalize(planItem.getWeekType());
+            String targetWt = WeekTypeSupport.EVEN.equals(lockedWt) ? WeekTypeSupport.EVEN : WeekTypeSupport.ODD;
             Integer slotIdx = null;
             for (int i = 0; i < slotDataList.size(); i++) {
-                if (slotDataList.get(i).dayOfWeek() == weekday && slotDataList.get(i).periodNo() == periodNo) {
+                EngineContext.TimeSlotData sd = slotDataList.get(i);
+                if (sd.dayOfWeek() == weekday && sd.periodNo() == periodNo && targetWt.equals(sd.weekType())) {
                     slotIdx = i;
                     break;
                 }

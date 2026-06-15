@@ -135,8 +135,8 @@ class V3ScheduleGenerateServiceTest {
 
     private EngineContext singleTaskContext() {
         return new EngineContext(
-                List.of(new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0))),
-                List.of(new EngineContext.TimeSlotData(0, 201L, 1, 1)),
+                List.of(new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0), "ODD")),
+                List.of(new EngineContext.TimeSlotData(0, 201L, 1, 1, "ODD")),
                 List.of(new EngineContext.ClassroomData(0, 301L, 60, "NORMAL")),
                 List.of(new EngineContext.TeacherData(0, 401L, "T1", 1)),
                 List.of(new EngineContext.ClassData(0, 501L, 30, 1)),
@@ -156,11 +156,14 @@ class V3ScheduleGenerateServiceTest {
     }
 
     /**
-     * V9 阶段1：V8 引擎对 weekType!=ALL 的任务显式拒绝（不进引擎），落 unassigned，
-     * reasonCode=WEEK_TYPE_NOT_SUPPORTED_BY_SOLVER_V8。ALL 任务正常排课。
+     * V9 阶段3（反向，原阶段1 stub 已移除）：V8 引擎已支持单双周任务，ODD 任务正常进引擎排课，
+     * 不再被拒绝落 unassigned，不再有 WEEK_TYPE_NOT_SUPPORTED_BY_SOLVER_V8 reasonCode。
+     *
+     * <p>阶段 1 此测试验证 stub 拒绝；阶段 3 引擎扩展后 stub 移除，测试改为反向：
+     * ODD 任务不被拒绝（unscheduledCount=0，无 WEEK_TYPE reasonCode 落 unassigned）。
      */
     @Test
-    void solverV8RejectsNonAllWeekTypeTasksToUnassigned() {
+    void solverV8AcceptsNonAllWeekTypeTasksAfterStage3() {
         SemesterService semesterService = mock(SemesterService.class);
         ScheduleRuleService ruleService = mock(ScheduleRuleService.class);
         ScheduleScoreService scoreService = mock(ScheduleScoreService.class);
@@ -173,7 +176,7 @@ class V3ScheduleGenerateServiceTest {
         EngineContextLoader engineContextLoader = mock(EngineContextLoader.class);
         PerformanceBaselineService performanceBaselineService = mock(PerformanceBaselineService.class);
 
-        // 两个任务：101L=ALL（引擎正常排）、102L=ODD（被拦截落 unassigned）
+        // 两个任务：101L=ALL、102L=ODD，阶段3 后都正常进引擎
         TeachingTask allTask = new TeachingTask();
         allTask.setId(101L);
         allTask.setSemesterId(1L);
@@ -192,7 +195,6 @@ class V3ScheduleGenerateServiceTest {
         });
         when(planMapper.updateById(any(SchedulePlan.class))).thenReturn(1);
         when(planItemMapper.insertBatch(anyList())).thenReturn(1);
-        // loader 只装载 ALL 任务（ODD 在 loader 内部也被跳过，ctx 仅含 101L）
         when(engineContextLoader.load(1L)).thenReturn(singleTaskContext());
         doAnswer(invocation -> {
             SchedulePlan plan = invocation.getArgument(0);
@@ -221,20 +223,12 @@ class V3ScheduleGenerateServiceTest {
 
         ScheduleGenerateResult result = service.generate(request);
 
-        // ALL 任务 101L 正常排课
-        assertEquals(1, result.getScheduledCount(), "ALL 任务应被正常排课");
-        // ODD 任务 102L 被拒绝计入未排
-        assertEquals(1, result.getUnscheduledCount(), "ODD 任务应计入未排数");
-
-        // ODD 任务落 unassigned，reasonCode 正确
-        verify(explainService).saveUnassignedTask(
+        // 阶段3：ODD 任务不再被拒绝，unscheduledCount=0（mock 的 singleTaskContext 引擎正常排下）
+        assertEquals(0, result.getUnscheduledCount(), "阶段3 后 ODD 任务不应计入未排数");
+        // 不应有 WEEK_TYPE_NOT_SUPPORTED reasonCode 落 unassigned
+        verify(explainService, never()).saveUnassignedTask(
                 eq(900L), eq(1L), eq(102L),
                 eq("WEEK_TYPE_NOT_SUPPORTED_BY_SOLVER_V8"),
-                contains("单双周"),
-                anyString());
-        // ALL 任务不应被拒绝
-        verify(explainService, never()).saveUnassignedTask(
-                eq(900L), eq(1L), eq(101L),
-                anyString(), anyString(), anyString());
+                anyString(), anyString());
     }
 }

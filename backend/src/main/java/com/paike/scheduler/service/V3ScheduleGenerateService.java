@@ -530,10 +530,6 @@ public class V3ScheduleGenerateService {
         return ScoringFunctions.slotToStartPeriod(slot) + 1;
     }
 
-    private static final String REASON_CODE_WEEK_TYPE_NOT_SUPPORTED = "WEEK_TYPE_NOT_SUPPORTED_BY_SOLVER_V8";
-    private static final String REASON_MSG_WEEK_TYPE_NOT_SUPPORTED = "V8 引擎暂不支持单双周任务，请使用其他策略";
-    private static final String REASON_SUGGESTION_WEEK_TYPE = "可改用 TEACHER_PRIORITY 等非 V8 策略，或等待 V9.2";
-
     private SolverPlanItems generateSolverV8PlanItems(SchedulePlan plan, ScheduleGenerateRequest request,
             List<TeachingTask> tasks, StepCounter stepCounter) {
         SolverRunMeta meta = resolveSolverRunMeta(request);
@@ -549,27 +545,7 @@ public class V3ScheduleGenerateService {
                         + (meta.optimizeTimeBudgetMs() == 0 ? "（跳过退火）" : ""),
                 stepCounter.next());
 
-        // V9 阶段1：V8 引擎暂不支持单双周任务，weekType!=ALL 的任务显式拒绝（不进引擎），落 unassigned。
-        // 阶段3引擎扩展后移除此拦截（loader 内对应的 continue 也一并删除）。
-        int rejectedWeekTypeCount = 0;
-        for (TeachingTask task : tasks) {
-            String weekType = task.getWeekType();
-            if (weekType == null || weekType.isBlank() || "ALL".equalsIgnoreCase(weekType.trim())) {
-                continue;
-            }
-            explainService.saveUnassignedTask(plan.getId(), plan.getSemesterId(), task.getId(),
-                    REASON_CODE_WEEK_TYPE_NOT_SUPPORTED, REASON_MSG_WEEK_TYPE_NOT_SUPPORTED, REASON_SUGGESTION_WEEK_TYPE);
-            explainService.appendGenerateLog(
-                    plan.getId(),
-                    plan.getSemesterId(),
-                    task.getId(),
-                    "WARN",
-                    "WEEK_TYPE_REJECTED",
-                    "教学任务 " + task.getId() + " 周次类型为 " + WeekTypeSupport.normalize(weekType)
-                            + "，V8 引擎暂不支持，已跳过",
-                    stepCounter.next());
-            rejectedWeekTypeCount++;
-        }
+        // V9 阶段3：移除单双周任务拒绝（引擎已支持 ODD/EVEN，方案 X slot 翻倍 + ALL 扩散）
 
         EngineContext ctx = engineContextLoader.load(plan.getSemesterId());
         SolverConfig config = new SolverConfig(meta.seed(), SolverConfig.DEFAULT_MAX_BACKTRACKS,
@@ -585,8 +561,8 @@ public class V3ScheduleGenerateService {
         }
 
         plan.setScheduledCount(items.size());
-        // 未排数 = 引擎求解未排 + V8 拒绝的单双周任务数
-        plan.setUnscheduledCount(solution.unassignedSlots().size() + rejectedWeekTypeCount);
+        // V9 阶段3：未排数 = 引擎求解未排（单双周任务正常进引擎，不再单独拒绝）
+        plan.setUnscheduledCount(solution.unassignedSlots().size());
         plan.setConflictCount(0);
         plan.setUpdatedAt(LocalDateTime.now());
         planMapper.updateById(plan);
@@ -595,10 +571,9 @@ public class V3ScheduleGenerateService {
                 plan.getId(),
                 plan.getSemesterId(),
                 null,
-                solution.unassignedSlots().isEmpty() && rejectedWeekTypeCount == 0 ? "INFO" : "WARN",
+                solution.unassignedSlots().isEmpty() ? "INFO" : "WARN",
                 "SOLVER_V8_FINISH",
-                "智能求解完成，已排 " + items.size() + " 个大节，未排 " + solution.unassignedSlots().size()
-                        + " 个大节，单双周拒绝 " + rejectedWeekTypeCount + " 个任务",
+                "智能求解完成，已排 " + items.size() + " 个大节，未排 " + solution.unassignedSlots().size() + " 个大节",
                 stepCounter.next());
         return new SolverPlanItems(items, meta.withResult(
                 items.size(),
@@ -622,10 +597,8 @@ public class V3ScheduleGenerateService {
         item.setWeekday(slot.dayOfWeek());
         item.setStartPeriod(slotToStartPeriod(slot));
         item.setEndPeriod(slotToStartPeriod(slot) + 1);
-        // V9 阶段1：此处恒为 ALL。非 ALL 任务已在 generateSolverV8PlanItems 开头被拦截
-        // （落 unassigned，reasonCode=WEEK_TYPE_NOT_SUPPORTED_BY_SOLVER_V8），能进引擎的只有 ALL 任务。
-        // 阶段3引擎扩展后 EngineTask 将携带 weekType，此处改为读真实值。
-        item.setWeekType("ALL");
+        // V9 阶段3：读 EngineTask 真实 weekType（引擎已支持单双周，slot 翻倍 + ALL 扩散）
+        item.setWeekType(task.weekType());
         item.setScore(null);
         item.setConflictFlag(0);
         item.setConflictReason(null);

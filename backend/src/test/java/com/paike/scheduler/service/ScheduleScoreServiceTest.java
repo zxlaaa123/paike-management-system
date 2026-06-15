@@ -343,20 +343,20 @@ class ScheduleScoreServiceTest {
 
     private EngineContext scoreBaselineContext() {
         List<EngineTask> tasks = List.of(
-                new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1)),
-                new EngineTask(1, 102L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1)),
-                new EngineTask(2, 103L, 1, 1, 1, 1, "NORMAL", 30, List.of(0, 1)),
-                new EngineTask(3, 104L, 1, 1, 1, 1, "NORMAL", 30, List.of(0, 1)),
-                new EngineTask(4, 105L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1))
+                new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1), "ODD"),
+                new EngineTask(1, 102L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1), "ODD"),
+                new EngineTask(2, 103L, 1, 1, 1, 1, "NORMAL", 30, List.of(0, 1), "ODD"),
+                new EngineTask(3, 104L, 1, 1, 1, 1, "NORMAL", 30, List.of(0, 1), "ODD"),
+                new EngineTask(4, 105L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1), "ODD")
         );
         return new EngineContext(
                 tasks,
                 List.of(
-                        new EngineContext.TimeSlotData(0, 201L, 1, 1),
-                        new EngineContext.TimeSlotData(1, 202L, 1, 2),
-                        new EngineContext.TimeSlotData(2, 203L, 2, 3),
-                        new EngineContext.TimeSlotData(3, 204L, 2, 4),
-                        new EngineContext.TimeSlotData(4, 205L, 2, 1)
+                        new EngineContext.TimeSlotData(0, 201L, 1, 1, "ODD"),
+                        new EngineContext.TimeSlotData(1, 202L, 1, 2, "ODD"),
+                        new EngineContext.TimeSlotData(2, 203L, 2, 3, "ODD"),
+                        new EngineContext.TimeSlotData(3, 204L, 2, 4, "ODD"),
+                        new EngineContext.TimeSlotData(4, 205L, 2, 1, "ODD")
                 ),
                 List.of(
                         new EngineContext.ClassroomData(0, 1L, 60, "NORMAL"),
