@@ -39,12 +39,13 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * V9 阶段 3C 性能 benchmark（V9_05 T10，R2 门槛）。
+ * V9 阶段 3C/4 性能 benchmark（V9_05 T10，R2 门槛）。
  *
  * <p>默认不参与 {@code mvn test}（耗时分钟级、需真实 MySQL）。显式触发：
  * {@code mvn -Dtest=V9WeekTypeBenchmarkTest -Dv9.benchmark=true test}。</p>
@@ -53,13 +54,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <ul>
  *   <li><b>回溯成功率 ≥95%</b>：混合数据集（30% ODD + 30% EVEN + 40% ALL）SOLVER_V8 排下率 ≥95%
  *       （unassigned ≤ taskCount × 5%）。基线是 V8 全 ALL 数据（回溯成功率 100%）。</li>
- *   <li><b>退火耗时增幅 ≤50%</b>：退火按 optimizeTimeBudgetMs 墙钟停机（10s 固定），耗时不会膨胀，
+ *   <li><b>退火耗时增幅 ≤50%</b>：退火按 optimizeTimeBudgetMs 墙钟停机，耗时不会膨胀，
  *       故门槛落在"每步成本"维度——同等预算下混合数据的退火步数 ≥ 全 ALL 基线的 1/1.5（即每步耗时增幅 ≤50%）。
  *       同时记录引擎总耗时（回溯+退火）作横向参考。</li>
  * </ul>
  *
  * <p>设计：每档规模跑两轮——全 ALL（V8 基线）+ 混合 weekType（V9 新能力），同 seed，
- * 对比排下率与退火步数。结果表 + profiling 原始输出落 {@code reports/v9-week-type-benchmark-raw.txt}（手动重定向）。
+ * 对比排下率与退火步数。可用 {@code v9.benchmark.scale} 和 {@code v9.benchmark.dataset} 拆分大档运行。
  */
 @SpringBootTest
 @EnabledIfSystemProperty(named = "v9.benchmark", matches = "true")
@@ -69,6 +70,8 @@ class V9WeekTypeBenchmarkTest {
     private static final long SOLVER_SEED = 42L;
     private static final long SOLVER_TIME_BUDGET_MS = 1_000L;
     private static final long SOLVER_OPTIMIZE_TIME_BUDGET_MS = 3_000L;
+    private static final String SCALE_PROPERTY = "v9.benchmark.scale";
+    private static final String DATASET_PROPERTY = "v9.benchmark.dataset";
     /** 混合数据每步耗时增幅门槛：退火步数 ≥ 基线 / 1.5（即每步耗时 ≤ 基线 ×1.5）。 */
     private static final double STEP_TIME_INCREASE_GATE = 1.5D;
     /** 回溯成功率门槛：排下率 ≥95%。 */
@@ -97,30 +100,58 @@ class V9WeekTypeBenchmarkTest {
     @Test
     void compareAllBaselineVsMixedWeekTypeAcrossScales() {
         List<ScaleComparison> results = new ArrayList<>();
-        results.add(runScale("小", 30, 10, 8, 10));
-        results.add(runScale("中", 120, 35, 25, 30));
-        // 注：去掉"大"档（300 任务）以控制总耗时在 harness 后台超时内。
-        // V8 全ALL 基线"大"档数据已在 reports/v8-neighbor-incremental-benchmark.txt，
-        // 阶段 4 收口时再补跑大档做完整三档对比。
-
-        StringBuilder table = benchmarkHeader();
-        for (ScaleComparison sc : results) {
-            table.append(formatRun(sc.label, "全ALL基线", sc.allBaseline));
-            table.append(formatRun(sc.label, "混合weekType", sc.mixed));
-            table.append(formatGate(sc));
+        for (ScaleSpec scale : selectedScales()) {
+            ScaleComparison result = runScale(scale);
+            if (result.hasBothDatasets()) {
+                results.add(result);
+            }
         }
-        table.append("===========================================================\n");
-        System.out.println(table);
+
+        if (!results.isEmpty()) {
+            StringBuilder table = benchmarkHeader();
+            for (ScaleComparison sc : results) {
+                table.append(formatRun(sc.scale, "all-baseline", sc.allBaseline));
+                table.append(formatRun(sc.scale, "mixed-weekType", sc.mixed));
+                table.append(formatGate(sc));
+            }
+            table.append("===========================================================\n");
+            System.out.println(table);
+        }
 
         for (ScaleComparison sc : results) {
             assertTrue(sc.mixed.scheduleRate() >= BACKTRACK_SUCCESS_RATE_GATE,
-                    "[" + sc.label + "] 混合数据排下率 " + (sc.mixed.scheduleRate() * 100)
+                    "[" + sc.scale + "] 混合数据排下率 " + (sc.mixed.scheduleRate() * 100)
                             + "% 低于 " + (BACKTRACK_SUCCESS_RATE_GATE * 100) + "% 门槛（R2 回溯成功率）");
             assertTrue(sc.stepRatio() >= (1 / STEP_TIME_INCREASE_GATE),
-                    "[" + sc.label + "] 退火步数比 混合/基线=" + sc.stepRatio()
+                    "[" + sc.scale + "] 退火步数比 混合/基线=" + sc.stepRatio()
                             + " 低于 " + (1 / STEP_TIME_INCREASE_GATE)
                             + "（即每步耗时增幅 >" + (STEP_TIME_INCREASE_GATE * 100 - 100) + "%，R2 门槛）");
         }
+    }
+
+    private List<ScaleSpec> selectedScales() {
+        String scale = System.getProperty(SCALE_PROPERTY, "default").trim().toLowerCase(Locale.ROOT);
+        return switch (scale) {
+            case "small" -> List.of(new ScaleSpec("small", 30, 10, 8, 10));
+            case "medium" -> List.of(new ScaleSpec("medium", 120, 35, 25, 30));
+            case "large" -> List.of(new ScaleSpec("large", 300, 80, 60, 60));
+            case "all" -> List.of(
+                    new ScaleSpec("small", 30, 10, 8, 10),
+                    new ScaleSpec("medium", 120, 35, 25, 30),
+                    new ScaleSpec("large", 300, 80, 60, 60));
+            case "default", "" -> List.of(
+                    new ScaleSpec("small", 30, 10, 8, 10),
+                    new ScaleSpec("medium", 120, 35, 25, 30));
+            default -> throw new IllegalArgumentException("Unsupported " + SCALE_PROPERTY + ": " + scale);
+        };
+    }
+
+    private String selectedDataset() {
+        String dataset = System.getProperty(DATASET_PROPERTY, "both").trim().toLowerCase(Locale.ROOT);
+        if (!List.of("all", "mixed", "both").contains(dataset)) {
+            throw new IllegalArgumentException("Unsupported " + DATASET_PROPERTY + ": " + dataset);
+        }
+        return dataset;
     }
 
     private String formatRun(String label, String datasetName, RunMetrics run) {
@@ -131,35 +162,53 @@ class V9WeekTypeBenchmarkTest {
 
     private StringBuilder benchmarkHeader() {
         StringBuilder table = new StringBuilder();
-        table.append("\n================ V9 阶段3C 单双周性能对比 ================\n");
-        table.append("[全ALL基线 vs 混合(30%ODD+30%EVEN+40%ALL) | 同种子 | 退火预算 ")
+        table.append("\n================ V9 weekType benchmark ================\n");
+        table.append("[all baseline vs mixed(30%ODD+30%EVEN+40%ALL) | same seed | optimize budget ")
                 .append(SOLVER_OPTIMIZE_TIME_BUDGET_MS)
                 .append("ms]\n");
         table.append(String.format("%-4s %-18s %-8s %-10s %-10s %-10s %-12s%n",
-                "规模", "数据集", "未排", "排下率", "引擎ms", "回溯ms", "退火步数"));
+                "scale", "dataset", "unassigned", "rate", "engineMs", "btMs", "steps"));
         return table;
     }
 
     private String formatGate(ScaleComparison sc) {
-        return String.format("%-4s 回溯成功率: 混合%.1f%%≥%.0f%%%s | 退火步数比: 混合/基线=%.2f %s%n",
-                sc.label,
+        return String.format(Locale.ROOT, "%-4s scheduleRate: mixed %.1f%% >= %.0f%% %s | stepRatio mixed/all=%.2f %s%n",
+                sc.scale,
                 sc.mixed.scheduleRate() * 100, BACKTRACK_SUCCESS_RATE_GATE * 100,
                 sc.mixed.scheduleRate() >= BACKTRACK_SUCCESS_RATE_GATE ? "PASS" : "FAIL",
                 sc.stepRatio(),
                 sc.stepRatio() >= (1 / STEP_TIME_INCREASE_GATE) ? "PASS" : "FAIL");
     }
 
-    private ScaleComparison runScale(String label, int taskCount, int teacherCount, int classCount, int roomCount) {
+    private ScaleComparison runScale(ScaleSpec scale) {
+        String dataset = selectedDataset();
+        RunMetrics allBaseline = null;
+        RunMetrics mixed = null;
         // 全 ALL 基线：同一 seed、同一资源量，仅 weekType 全 ALL
-        RunMetrics allBaseline = runOneDataset(label + "_ALL", taskCount, teacherCount, classCount, roomCount, 1.0, 0.0, 0.0);
+        if ("all".equals(dataset) || "both".equals(dataset)) {
+            allBaseline = runOneDataset(scale.scale + "_ALL", scale.taskCount, scale.teacherCount,
+                    scale.classCount, scale.roomCount, 1.0, 0.0, 0.0);
+        }
         // 混合：30% ODD + 30% EVEN + 40% ALL
-        RunMetrics mixed = runOneDataset(label + "_MIX", taskCount, teacherCount, classCount, roomCount, 0.4, 0.3, 0.3);
-        ScaleComparison comparison = new ScaleComparison(label, allBaseline, mixed);
-        System.out.print(benchmarkHeader()
-                .append(formatRun(label, "全ALL基线", allBaseline))
-                .append(formatRun(label, "混合weekType", mixed))
-                .append(formatGate(comparison))
-                .append("===========================================================\n"));
+        if ("mixed".equals(dataset) || "both".equals(dataset)) {
+            mixed = runOneDataset(scale.scale + "_MIX", scale.taskCount, scale.teacherCount,
+                    scale.classCount, scale.roomCount, 0.4, 0.3, 0.3);
+            assertTrue(mixed.scheduleRate() >= BACKTRACK_SUCCESS_RATE_GATE,
+                    "[" + scale.scale + "] 混合数据排下率 " + (mixed.scheduleRate() * 100)
+                            + "% 低于 " + (BACKTRACK_SUCCESS_RATE_GATE * 100) + "% 门槛（R2 回溯成功率）");
+        }
+        ScaleComparison comparison = new ScaleComparison(scale.scale, allBaseline, mixed);
+        StringBuilder table = benchmarkHeader();
+        if (allBaseline != null) {
+            table.append(formatRun(scale.scale, "all-baseline", allBaseline));
+        }
+        if (mixed != null) {
+            table.append(formatRun(scale.scale, "mixed-weekType", mixed));
+        }
+        if (comparison.hasBothDatasets()) {
+            table.append(formatGate(comparison));
+        }
+        System.out.print(table.append("===========================================================\n"));
         System.out.flush();
         return comparison;
     }
@@ -230,6 +279,17 @@ class V9WeekTypeBenchmarkTest {
 
             RunMetrics metrics = new RunMetrics(unscheduledCount, scheduleRate, engineMs, backtrackMs, annealingSteps);
             System.out.print(formatRun(tag, "dataset", metrics));
+            System.out.printf(Locale.ROOT,
+                    "RESULT scale=%s taskCount=%d dataset=%s unscheduled=%d scheduleRate=%.4f engineMs=%d backtrackMs=%d annealingSteps=%d optimizeBudgetMs=%d%n",
+                    tag.contains("_") ? tag.substring(0, tag.indexOf('_')) : tag,
+                    taskCount,
+                    tag.endsWith("_ALL") ? "all" : "mixed",
+                    unscheduledCount,
+                    scheduleRate,
+                    engineMs,
+                    backtrackMs,
+                    annealingSteps,
+                    SOLVER_OPTIMIZE_TIME_BUDGET_MS);
             System.out.flush();
             return metrics;
         } finally {
@@ -406,10 +466,20 @@ class V9WeekTypeBenchmarkTest {
     private record RunMetrics(int unscheduledCount, double scheduleRate, long engineMs,
                               long backtrackMs, int annealingSteps) {}
 
-    private record ScaleComparison(String label, RunMetrics allBaseline, RunMetrics mixed) {
+    private record ScaleSpec(String scale, int taskCount, int teacherCount,
+                             int classCount, int roomCount) {}
+
+    private record ScaleComparison(String scale, RunMetrics allBaseline, RunMetrics mixed) {
+        boolean hasBothDatasets() {
+            return allBaseline != null && mixed != null;
+        }
+
         /** 退火步数比：mixed/baseline。相同墙钟预算下，步数比 = baseline每步耗时 / mixed每步耗时。
          *  步数比 ≥ 1/1.5 ≈ 0.667 ⟺ 每步耗时增幅 ≤50%。 */
         double stepRatio() {
+            if (!hasBothDatasets()) {
+                return 1.0;
+            }
             if (allBaseline.annealingSteps() <= 0) {
                 return 1.0;
             }
