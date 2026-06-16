@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.common.response.Result;
 import com.paike.scheduler.entity.ScheduleRegressionTest;
 import com.paike.scheduler.service.V6RegressionTestService;
+import com.paike.scheduler.service.vo.V6RegressionRunResultVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,6 +40,15 @@ public class V6RegressionTestController {
     @GetMapping("/{id}")
     public Result<ScheduleRegressionTest> getById(@PathVariable Long id) {
         return Result.success(regressionTestService.getById(id));
+    }
+
+    /**
+     * 执行回归自检：对指定学期（不传取当前学期）正式课表跑一致性扫描并落库。
+     * 写操作，经 AuthInterceptor 校验需 ADMIN。
+     */
+    @PostMapping("/run")
+    public Result<V6RegressionRunResultVo> run(@RequestParam(required = false) Long semesterId) {
+        return Result.success(regressionTestService.run(semesterId));
     }
 }
 

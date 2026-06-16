@@ -285,11 +285,6 @@ const routes: RouteRecordRaw[] = [
         name: 'ClassroomTimetable',
         component: () => import('../views/timetable/ClassroomTimetableView.vue'),
       },
-      {
-        path: 'placeholder/:module',
-        name: 'Placeholder',
-        component: () => import('../views/PlaceholderView.vue'),
-      },
     ],
   },
   {

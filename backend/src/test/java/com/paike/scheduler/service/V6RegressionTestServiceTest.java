@@ -3,6 +3,7 @@ package com.paike.scheduler.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.paike.scheduler.entity.ScheduleRegressionTest;
+import com.paike.scheduler.mapper.ScheduleMapper;
 import com.paike.scheduler.mapper.ScheduleRegressionTestMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,7 +23,7 @@ class V6RegressionTestServiceTest {
     @BeforeEach
     void setUp() {
         regressionTestMapper = mock(ScheduleRegressionTestMapper.class);
-        service = new V6RegressionTestService(regressionTestMapper);
+        service = new V6RegressionTestService(regressionTestMapper, mock(ScheduleMapper.class), mock(SemesterService.class));
     }
 
     @Test

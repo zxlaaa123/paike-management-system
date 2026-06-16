@@ -44,3 +44,21 @@ export function getRegressionTestById(id: number) {
   })
 }
 
+export interface RegressionRunResult {
+  semesterId: number | null
+  total: number
+  passed: number
+  failed: number
+  durationMs: number | null
+  summary: string
+  records: RegressionTestRecord[]
+}
+
+export function runRegressionSelfCheck(semesterId?: number) {
+  const params = semesterId != null ? { semesterId } : {}
+  return request.post<ApiResponse<RegressionRunResult>>('/v6/regression-tests/run', null, { params }).then((r) => {
+    if (!r.data) throw new Error('响应数据为空')
+    return r.data.data
+  })
+}
+
