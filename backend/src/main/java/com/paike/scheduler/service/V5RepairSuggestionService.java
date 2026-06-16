@@ -49,10 +49,36 @@ public class V5RepairSuggestionService {
     private final V5CandidatePositionService candidatePositionService;
     private final V4ScheduleRiskService riskService;
     private final ObjectMapper objectMapper;
+    private final SystemAuditLogService auditLogService;
 
     @Transactional(rollbackFor = Exception.class)
     public List<V5RepairSuggestionVo> generate(Long taskId, V5RepairSuggestionGenerateRequest request) {
         ScheduleRepairTask task = requireTask(taskId);
+        try {
+            List<V5RepairSuggestionVo> result = doGenerate(task, request);
+            auditLogService.recordSuccess(
+                    SystemAuditLogService.ACTION_GENERATE_REPAIR_SUGGESTION,
+                    SystemAuditLogService.TARGET_REPAIR_TASK,
+                    task.getId(),
+                    task.getSemesterId(),
+                    task.getPlanId(),
+                    "生成修复建议成功：任务 " + task.getId() + "，建议 " + result.size() + " 条");
+            return result;
+        } catch (RuntimeException ex) {
+            auditLogService.recordFailure(
+                    SystemAuditLogService.ACTION_GENERATE_REPAIR_SUGGESTION,
+                    SystemAuditLogService.TARGET_REPAIR_TASK,
+                    task.getId(),
+                    task.getSemesterId(),
+                    task.getPlanId(),
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage());
+            throw ex;
+        }
+    }
+
+    private List<V5RepairSuggestionVo> doGenerate(ScheduleRepairTask task, V5RepairSuggestionGenerateRequest request) {
+        Long taskId = task.getId();
         if (isCancelledOrFailed(task.getStatus())) {
             throw new BusinessException("已取消或失败任务不能生成建议");
         }
@@ -118,17 +144,36 @@ public class V5RepairSuggestionService {
     @Transactional(rollbackFor = Exception.class)
     public V5RepairSuggestionVo markForSimulation(Long taskId, Long suggestionId) {
         ScheduleRepairTask task = requireTask(taskId);
-        if (isCancelledOrFailed(task.getStatus())) {
-            throw new BusinessException("任务已结束，不能进入试算");
+        try {
+            if (isCancelledOrFailed(task.getStatus())) {
+                throw new BusinessException("任务已结束，不能进入试算");
+            }
+            ScheduleRepairSuggestion s = requireSuggestion(taskId, suggestionId);
+            s.setStatus(V5SuggestionStatus.ACCEPTED.getCode());
+            suggestionMapper.updateById(s);
+            if (!V5RepairTaskStatus.SIMULATED.is(task.getStatus())) {
+                task.setStatus(V5RepairTaskStatus.SUGGESTED.getCode());
+                repairTaskMapper.updateById(task);
+            }
+            auditLogService.recordSuccess(
+                    SystemAuditLogService.ACTION_MARK_REPAIR_SUGGESTION,
+                    SystemAuditLogService.TARGET_REPAIR_SUGGESTION,
+                    s.getId(),
+                    task.getSemesterId(),
+                    task.getPlanId(),
+                    "采纳修复建议进入试算：任务 " + task.getId() + "，建议 " + s.getId());
+            return toVo(s, loadClassroomNames(List.of(s)));
+        } catch (RuntimeException ex) {
+            auditLogService.recordFailure(
+                    SystemAuditLogService.ACTION_MARK_REPAIR_SUGGESTION,
+                    SystemAuditLogService.TARGET_REPAIR_SUGGESTION,
+                    suggestionId,
+                    task.getSemesterId(),
+                    task.getPlanId(),
+                    SystemAuditLogService.auditErrorCode(ex),
+                    ex.getMessage());
+            throw ex;
         }
-        ScheduleRepairSuggestion s = requireSuggestion(taskId, suggestionId);
-        s.setStatus(V5SuggestionStatus.ACCEPTED.getCode());
-        suggestionMapper.updateById(s);
-        if (!V5RepairTaskStatus.SIMULATED.is(task.getStatus())) {
-            task.setStatus(V5RepairTaskStatus.SUGGESTED.getCode());
-            repairTaskMapper.updateById(task);
-        }
-        return toVo(s, loadClassroomNames(List.of(s)));
     }
 
     private List<ScheduleRepairSuggestion> buildSuggestions(

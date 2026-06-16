@@ -32,12 +32,16 @@ public class SystemAuditLogService {
     public static final String ACTION_GENERATE_SIMULATION_PLAN = "GENERATE_SIMULATION_PLAN";
     public static final String ACTION_GENERATE_LOCAL_REPLAN_SIMULATION = "GENERATE_LOCAL_REPLAN_SIMULATION";
     public static final String ACTION_RUN_AUTO_SCHEDULE = "RUN_AUTO_SCHEDULE";
+    public static final String ACTION_GENERATE_REPAIR_SUGGESTION = "GENERATE_REPAIR_SUGGESTION";
+    public static final String ACTION_MARK_REPAIR_SUGGESTION = "MARK_REPAIR_SUGGESTION";
     public static final String ERROR_BUSINESS = "BUSINESS_ERROR";
     public static final String ERROR_SYSTEM = "SYSTEM_ERROR";
     public static final String TARGET_SCHEDULE_PLAN = "SCHEDULE_PLAN";
     public static final String TARGET_SCHEDULE_PLAN_ITEM = "SCHEDULE_PLAN_ITEM";
     public static final String TARGET_SCHEDULE = "SCHEDULE";
     public static final String TARGET_AUTO_SCHEDULE_BATCH = "AUTO_SCHEDULE_BATCH";
+    public static final String TARGET_REPAIR_TASK = "REPAIR_TASK";
+    public static final String TARGET_REPAIR_SUGGESTION = "REPAIR_SUGGESTION";
 
     private final SystemAuditLogMapper auditLogMapper;
 

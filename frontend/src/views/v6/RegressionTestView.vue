@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import {
   getRegressionTestById,
   getRegressionTestList,
+  runRegressionSelfCheck,
   type RegressionTestRecord,
 } from '../../api/regressionTest'
 
 const loading = ref(false)
+const running = ref(false)
 const detailLoading = ref(false)
 const records = ref<RegressionTestRecord[]>([])
 const currentRecord = ref<RegressionTestRecord | null>(null)
@@ -87,6 +90,24 @@ function handleSearch() {
   fetchRecords()
 }
 
+async function handleRunSelfCheck() {
+  running.value = true
+  try {
+    const result = await runRegressionSelfCheck(emptyToUndefined(searchForm.semesterId))
+    if (result.failed > 0) {
+      ElMessage.warning(result.summary)
+    } else {
+      ElMessage.success(result.summary)
+    }
+    pagination.page = 1
+    await fetchRecords()
+  } catch {
+    ElMessage.error('执行自检失败')
+  } finally {
+    running.value = false
+  }
+}
+
 function handleReset() {
   searchForm.testStage = ''
   searchForm.testSuite = ''
@@ -121,7 +142,10 @@ onMounted(fetchRecords)
     <el-card>
       <div class="page-header">
         <div class="page-title">回归测试中心</div>
-        <el-button type="primary" :loading="loading" @click="fetchRecords">刷新</el-button>
+        <div class="header-actions">
+          <el-button type="success" :loading="running" @click="handleRunSelfCheck">执行自检</el-button>
+          <el-button type="primary" :loading="loading" @click="fetchRecords">刷新</el-button>
+        </div>
       </div>
 
       <el-form class="search-form" :model="searchForm" inline>
@@ -241,6 +265,11 @@ onMounted(fetchRecords)
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .page-title,
