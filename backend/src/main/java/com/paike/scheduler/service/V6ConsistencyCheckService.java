@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paike.scheduler.entity.ScheduleConsistencyCheck;
 import com.paike.scheduler.mapper.ScheduleConsistencyCheckMapper;
 import com.paike.scheduler.service.vo.V5ConsistencyCheckReportVo;
-import com.paike.scheduler.service.vo.V5ConsistencyIssueVo;
 import com.paike.scheduler.service.vo.V6ConsistencyCheckDetailVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

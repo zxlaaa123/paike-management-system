@@ -13,7 +13,6 @@ import com.paike.scheduler.service.scheduling.DeltaPenaltyScorer;
 import com.paike.scheduler.service.scheduling.ScoringFunctions;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
