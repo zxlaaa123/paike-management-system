@@ -50,12 +50,16 @@ class ScheduleRuleWeightServiceTest {
 
         service.initDefaultRules(1L, "CLASS_BALANCE");
 
-        List<ScheduleRuleWeight> inserted = captureInsertedRules(7);
+        List<ScheduleRuleWeight> inserted = captureInsertedRules(8);
         Map<String, ScheduleRuleWeight> byCode = byRuleCode(inserted);
 
         assertTrue(byCode.containsKey("MORNING_THEORY_PRIORITY"));
         assertEquals(new BigDecimal("25"), byCode.get("MORNING_THEORY_PRIORITY").getWeight());
         assertEquals("SOFT", byCode.get("MORNING_THEORY_PRIORITY").getRuleType());
+        // CLASS_GAP_PENALTY 是 CLASS_BALANCE 策略的学生中心维度，默认权重 30
+        assertTrue(byCode.containsKey("CLASS_GAP_PENALTY"));
+        assertEquals(new BigDecimal("30"), byCode.get("CLASS_GAP_PENALTY").getWeight());
+        assertEquals("SOFT", byCode.get("CLASS_GAP_PENALTY").getRuleType());
     }
 
     private List<ScheduleRuleWeight> captureInsertedRules(int count) {

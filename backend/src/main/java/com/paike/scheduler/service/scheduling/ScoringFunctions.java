@@ -321,4 +321,75 @@ public final class ScoringFunctions {
         }
         return BigDecimal.valueOf(penalty / sampleCount).setScale(4, RoundingMode.HALF_UP);
     }
+
+    /**
+     * β 版（weekType 独立计数）：班级每日空堂（gap）平均惩罚。
+     * 与 {@link #penaltyContinuousBeta} 对称——continuous 罚『挨太紧』，gap 罚『空太开』。
+     * <p>每个 (class, weekType, day) 样本：课按 startPeriod 排序，相邻对空档
+     * {@code Σ max(0, nextStart - prevStart - 2)}（每节占 2 period，相邻大节 Δ=2 无空档），
+     * 样本惩罚 {@code min(1, totalGap / 4)}（约 2 个大节空档封顶），对所有样本求均值。范围 [0, 1]。
+     * 空集统一返 ZERO。
+     */
+    public static BigDecimal penaltyClassGapBeta(Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> classDayItemsWeek) {
+        if (classDayItemsWeek.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        double penalty = 0D;
+        int sampleCount = 0;
+        for (Map<Integer, List<SchedulePlanItem>> dayItems : classDayItemsWeek.values()) {
+            for (List<SchedulePlanItem> items : dayItems.values()) {
+                sampleCount++;
+                penalty += classDayGapSamplePenalty(items.stream()
+                        .map(SchedulePlanItem::getStartPeriod)
+                        .toList());
+            }
+        }
+        if (sampleCount == 0) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf(penalty / sampleCount).setScale(4, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 单个 (class, day) 样本的空堂惩罚：startPeriod 排序后相邻对空档求和，归一 {@code min(1, gap/4)}。
+     * 在线/离线/引擎增量三方共用，保证 gap 公式同源。
+     */
+    public static double classDayGapSamplePenalty(List<Integer> startPeriods) {
+        if (startPeriods == null || startPeriods.size() <= 1) {
+            return 0D;
+        }
+        List<Integer> sorted = startPeriods.stream().sorted().toList();
+        int totalGap = 0;
+        for (int i = 1; i < sorted.size(); i++) {
+            totalGap += Math.max(0, sorted.get(i) - sorted.get(i - 1) - 2);
+        }
+        return Math.min(1D, totalGap / 4D);
+    }
+
+    /**
+     * 班级空堂（在线）：候选课加入后，与同班同天已排课形成的新增空档越小越好。
+     * 返回 {@code 1 / (1 + 新增空档)}，范围 (0, 1]；同班同天首节或紧邻填充返 1（最优）。
+     * 在线为贪心偏好信号（双轨制，公式与离线 β 不必逐位一致，见 ScoringDimensions）。
+     */
+    public static double candidateClassGap(
+            List<SchedulePlanItem> generatedItems,
+            Long classId,
+            int dayOfWeek,
+            int candidateStartPeriod
+    ) {
+        List<Integer> starts = generatedItems.stream()
+                .filter(item -> Objects.equals(item.getClassId(), classId))
+                .filter(item -> Objects.equals(item.getWeekday(), dayOfWeek))
+                .map(SchedulePlanItem::getStartPeriod)
+                .toList();
+        if (starts.isEmpty()) {
+            return 1D;
+        }
+        double before = classDayGapSamplePenalty(starts);
+        List<Integer> after = new java.util.ArrayList<>(starts);
+        after.add(candidateStartPeriod);
+        double afterPenalty = classDayGapSamplePenalty(after);
+        double introduced = Math.max(0D, afterPenalty - before);
+        return 1D / (1D + introduced);
+    }
 }

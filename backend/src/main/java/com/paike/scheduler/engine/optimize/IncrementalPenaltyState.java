@@ -42,6 +42,7 @@ final class IncrementalPenaltyState {
     private final Map<WeekOwner, Map<Integer, Long>> teacherDayCounts;
     private final Map<String, Long> courseDayCounts;
     private final Map<WeekOwner, Map<Integer, List<Integer>>> teacherDayStarts;
+    private final Map<WeekOwner, Map<Integer, List<Integer>>> classDayStarts;
     private final Map<Long, Long> roomUseCounts;
     private long afternoonCount;
 
@@ -51,6 +52,7 @@ final class IncrementalPenaltyState {
     private BigDecimal penaltyContinuous;
     private BigDecimal penaltyClassroomUtil;
     private BigDecimal penaltyMorning;
+    private BigDecimal penaltyClassGap;
     private BigDecimal totalPenalty;
 
     private IncrementalPenaltyState(
@@ -62,6 +64,7 @@ final class IncrementalPenaltyState {
             Map<WeekOwner, Map<Integer, Long>> teacherDayCounts,
             Map<String, Long> courseDayCounts,
             Map<WeekOwner, Map<Integer, List<Integer>>> teacherDayStarts,
+            Map<WeekOwner, Map<Integer, List<Integer>>> classDayStarts,
             Map<Long, Long> roomUseCounts,
             long afternoonCount,
             BigDecimal penaltyClassBalance,
@@ -70,6 +73,7 @@ final class IncrementalPenaltyState {
             BigDecimal penaltyContinuous,
             BigDecimal penaltyClassroomUtil,
             BigDecimal penaltyMorning,
+            BigDecimal penaltyClassGap,
             BigDecimal totalPenalty
     ) {
         this.ctx = ctx;
@@ -80,6 +84,7 @@ final class IncrementalPenaltyState {
         this.teacherDayCounts = teacherDayCounts;
         this.courseDayCounts = courseDayCounts;
         this.teacherDayStarts = teacherDayStarts;
+        this.classDayStarts = classDayStarts;
         this.roomUseCounts = roomUseCounts;
         this.afternoonCount = afternoonCount;
         this.penaltyClassBalance = penaltyClassBalance;
@@ -88,6 +93,7 @@ final class IncrementalPenaltyState {
         this.penaltyContinuous = penaltyContinuous;
         this.penaltyClassroomUtil = penaltyClassroomUtil;
         this.penaltyMorning = penaltyMorning;
+        this.penaltyClassGap = penaltyClassGap;
         this.totalPenalty = totalPenalty;
     }
 
@@ -97,6 +103,7 @@ final class IncrementalPenaltyState {
         Map<WeekOwner, Map<Integer, Long>> teacherDayCounts = nestedDayCountsBeta(items, SchedulePlanItem::getTeacherId);
         Map<String, Long> courseDayCounts = courseDayCountsBeta(items);
         Map<WeekOwner, Map<Integer, List<Integer>>> teacherDayStarts = teacherDayStartsBeta(items);
+        Map<WeekOwner, Map<Integer, List<Integer>>> classDayStarts = classDayStartsBeta(items);
         Map<Long, Long> roomUseCounts = activeRoomUseCounts(ctx, items);
         long afternoonCount = items.stream()
                 .filter(it -> it.getStartPeriod() >= ctx.afternoonStartPeriod())
@@ -109,14 +116,15 @@ final class IncrementalPenaltyState {
         BigDecimal pcu = ScoringFunctions.penaltyClassroomUtilization(roomUseCounts, items.size());
         BigDecimal pmn = BigDecimal.valueOf(items.isEmpty() ? 0D : (double) afternoonCount / items.size())
                 .setScale(4, RoundingMode.HALF_UP);
-        BigDecimal total = weightedTotal(fn, pcb, ptl, pcd, pcn, pcu, pmn);
+        BigDecimal pcg = ScoringFunctions.penaltyClassGapBeta(classDayStartsAsItemsBeta(items));
+        BigDecimal total = weightedTotal(fn, pcb, ptl, pcd, pcn, pcu, pmn, pcg);
 
         return new IncrementalPenaltyState(
                 ctx, fn, ctx.afternoonStartPeriod(),
                 initial.size(),
                 classDayCounts, teacherDayCounts, courseDayCounts,
-                teacherDayStarts, roomUseCounts, afternoonCount,
-                pcb, ptl, pcd, pcn, pcu, pmn, total);
+                teacherDayStarts, classDayStarts, roomUseCounts, afternoonCount,
+                pcb, ptl, pcd, pcn, pcu, pmn, pcg, total);
     }
 
     int currentSize() {
@@ -135,6 +143,7 @@ final class IncrementalPenaltyState {
         penalties.put(DeltaPenaltyScorer.CONTINUOUS_PERIOD_LIMIT, penaltyContinuous);
         penalties.put(DeltaPenaltyScorer.CLASSROOM_UTILIZATION, penaltyClassroomUtil);
         penalties.put(DeltaPenaltyScorer.MORNING_THEORY_PRIORITY, penaltyMorning);
+        penalties.put(DeltaPenaltyScorer.CLASS_GAP_PENALTY, penaltyClassGap);
         return new ObjectiveFunction.ObjectiveValue(totalPenalty, score(totalPenalty), penalties);
     }
 
@@ -187,8 +196,9 @@ final class IncrementalPenaltyState {
         penaltyClassroomUtil = ScoringFunctions.penaltyClassroomUtilization(roomUseCounts, currentSize);
         penaltyMorning = BigDecimal.valueOf(currentSize == 0 ? 0D : (double) afternoonCount / currentSize)
                 .setScale(4, RoundingMode.HALF_UP);
+        penaltyClassGap = ScoringFunctions.penaltyClassGapBeta(classDayStartsAsItemsFromCurrentMap());
         totalPenalty = weightedTotal(objectiveFunction, penaltyClassBalance, penaltyTeacherLoad,
-                penaltyCourseDist, penaltyContinuous, penaltyClassroomUtil, penaltyMorning);
+                penaltyCourseDist, penaltyContinuous, penaltyClassroomUtil, penaltyMorning, penaltyClassGap);
     }
 
     private SchedulePlanItem toItem(Assignment a) {
@@ -218,6 +228,20 @@ final class IncrementalPenaltyState {
                     }
                 }
             }
+            WeekOwner classKey = new WeekOwner(it.getClassId(), wt);
+            Map<Integer, List<Integer>> classDays = classDayStarts.get(classKey);
+            if (classDays != null) {
+                List<Integer> starts = classDays.get(it.getWeekday());
+                if (starts != null) {
+                    starts.remove(Integer.valueOf(it.getStartPeriod()));
+                    if (starts.isEmpty()) {
+                        classDays.remove(it.getWeekday());
+                        if (classDays.isEmpty()) {
+                            classDayStarts.remove(classKey);
+                        }
+                    }
+                }
+            }
         }
         decrementRoomCount(it.getClassroomId());
     }
@@ -228,6 +252,9 @@ final class IncrementalPenaltyState {
             incrementNestedCount(teacherDayCounts, new WeekOwner(it.getTeacherId(), wt), it.getWeekday());
             incrementFlatCount(courseDayCounts, it.getClassId() + "_" + it.getCourseId() + "_" + it.getWeekday() + "_" + wt);
             teacherDayStarts.computeIfAbsent(new WeekOwner(it.getTeacherId(), wt), k -> new HashMap<>())
+                    .computeIfAbsent(it.getWeekday(), k -> new ArrayList<>())
+                    .add(it.getStartPeriod());
+            classDayStarts.computeIfAbsent(new WeekOwner(it.getClassId(), wt), k -> new HashMap<>())
                     .computeIfAbsent(it.getWeekday(), k -> new ArrayList<>())
                     .add(it.getStartPeriod());
         }
@@ -399,10 +426,53 @@ final class IncrementalPenaltyState {
         return result;
     }
 
+    /** β 版：班级空堂按 (class × weekType × day) 分桶，仅存 startPeriod（from 时一次性构造）。 */
+    private static Map<WeekOwner, Map<Integer, List<Integer>>> classDayStartsBeta(List<SchedulePlanItem> items) {
+        Map<WeekOwner, Map<Integer, List<Integer>>> result = new HashMap<>();
+        for (SchedulePlanItem it : items) {
+            for (String wt : WeekTypeSupport.countableWeekTypes(it.getWeekType())) {
+                result.computeIfAbsent(new WeekOwner(it.getClassId(), wt), k -> new HashMap<>())
+                        .computeIfAbsent(it.getWeekday(), k -> new ArrayList<>())
+                        .add(it.getStartPeriod());
+            }
+        }
+        return result;
+    }
+
+    /** β 版：班级空堂按 (class × weekType × day) 分桶到 items（from 时给 penaltyClassGapBeta 用）。 */
+    private static Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> classDayStartsAsItemsBeta(List<SchedulePlanItem> items) {
+        Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> result = new HashMap<>();
+        for (SchedulePlanItem it : items) {
+            for (String wt : WeekTypeSupport.countableWeekTypes(it.getWeekType())) {
+                result.computeIfAbsent(new WeekOwner(it.getClassId(), wt), k -> new HashMap<>())
+                        .computeIfAbsent(it.getWeekday(), k -> new ArrayList<>())
+                        .add(it);
+            }
+        }
+        return result;
+    }
+
+    /** 从增量维护的 classDayStarts 重建 items（每次 apply/revert 后，供 penaltyClassGapBeta）。 */
+    private Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> classDayStartsAsItemsFromCurrentMap() {
+        Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> result = new HashMap<>();
+        for (Map.Entry<WeekOwner, Map<Integer, List<Integer>>> classEntry : classDayStarts.entrySet()) {
+            WeekOwner classKey = classEntry.getKey();
+            for (Map.Entry<Integer, List<Integer>> dayEntry : classEntry.getValue().entrySet()) {
+                Integer day = dayEntry.getKey();
+                List<SchedulePlanItem> items = new ArrayList<>();
+                for (Integer start : dayEntry.getValue()) {
+                    items.add(buildSyntheticItem(classKey.ownerId(), day, start));
+                }
+                result.computeIfAbsent(classKey, k -> new HashMap<>()).put(day, items);
+            }
+        }
+        return result;
+    }
+
     private static BigDecimal weightedTotal(
             ObjectiveFunction fn,
             BigDecimal pcb, BigDecimal ptl, BigDecimal pcd,
-            BigDecimal pcn, BigDecimal pcu, BigDecimal pmn) {
+            BigDecimal pcn, BigDecimal pcu, BigDecimal pmn, BigDecimal pcg) {
         BigDecimal sum = BigDecimal.ZERO;
         for (String code : DeltaPenaltyScorer.SOFT_RULE_CODES) {
             BigDecimal w = fn.weightFor(code);
@@ -413,6 +483,7 @@ final class IncrementalPenaltyState {
                 case DeltaPenaltyScorer.CONTINUOUS_PERIOD_LIMIT -> pcn;
                 case DeltaPenaltyScorer.CLASSROOM_UTILIZATION -> pcu;
                 case DeltaPenaltyScorer.MORNING_THEORY_PRIORITY -> pmn;
+                case DeltaPenaltyScorer.CLASS_GAP_PENALTY -> pcg;
                 default -> BigDecimal.ZERO;
             };
             sum = sum.add(w.multiply(p));

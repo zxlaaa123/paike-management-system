@@ -160,6 +160,7 @@ public class ScheduleScoreService {
             case "COURSE_DISTRIBUTION" -> buildSoftMetric(weight, context.courseDistributionPenalty(), "课程分布均衡");
             case "CLASSROOM_UTILIZATION" -> buildSoftMetric(weight, context.classroomUtilizationPenalty(), "教室利用率");
             case "MORNING_THEORY_PRIORITY" -> buildSoftMetric(weight, context.morningPriorityPenalty(), "理论课优先上午");
+            case "CLASS_GAP_PENALTY" -> buildSoftMetric(weight, context.classGapPenalty(), "班级空堂惩罚");
             default -> new MetricResult(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), 0, "无评分逻辑，按 0 处理");
         };
     }
@@ -232,6 +233,7 @@ public class ScheduleScoreService {
         BigDecimal teacherLoadPenalty = ScoringFunctions.penaltyVarianceBeta(teacherDayCounts);
         BigDecimal courseDistributionPenalty = ScoringFunctions.penaltyDuplicateCourse(courseDayCounts);
         BigDecimal continuousPenalty = ScoringFunctions.penaltyContinuousBeta(teacherDayItems);
+        BigDecimal classGapPenalty = ScoringFunctions.penaltyClassGapBeta(nestedDayItemsBeta(items, SchedulePlanItem::getClassId));
         BigDecimal classroomUtilizationPenalty = ScoringFunctions.penaltyClassroomUtilization(roomUseCounts, items.size());
         BigDecimal morningPriorityPenalty = ScoringFunctions.penaltyMorningPriority(items, thresholds.getAfternoonStartPeriod());
 
@@ -248,6 +250,7 @@ public class ScheduleScoreService {
                 courseDistributionPenalty,
                 classroomUtilizationPenalty,
                 morningPriorityPenalty,
+                classGapPenalty,
                 plan.getUnscheduledCount() == null ? 0 : plan.getUnscheduledCount()
         );
     }
@@ -411,6 +414,7 @@ public class ScheduleScoreService {
             BigDecimal courseDistributionPenalty,
             BigDecimal classroomUtilizationPenalty,
             BigDecimal morningPriorityPenalty,
+            BigDecimal classGapPenalty,
             int unscheduledCount
     ) {
     }
