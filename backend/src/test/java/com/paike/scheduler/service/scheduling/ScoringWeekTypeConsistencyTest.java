@@ -242,6 +242,90 @@ class ScoringWeekTypeConsistencyTest {
     }
 
     // ============================================================
+    // 4. CLASS_GAP_PENALTY（班级空堂）：公式 + β 语义 + delta 对拍
+    // ============================================================
+
+    /**
+     * gap 公式：单 (class,day) 样本 startPeriod 排序后相邻对 Σmax(0,Δ-2)，归一 min(1,gap/4)。
+     * - [1,3]（紧邻大节 Δ=2）→ gap 0 → 0
+     * - [1,7]（中间空两个大节，Δ=6）→ gap 4 → min(1,4/4)=1
+     * - [1,5]（空一个大节，Δ=4）→ gap 2 → 0.5
+     * - 单节/空 → 0
+     */
+    @Test
+    void classGap_sampleFormula() {
+        assertEquals(0D, ScoringFunctions.classDayGapSamplePenalty(List.of(1, 3)), 1e-9);
+        assertEquals(1D, ScoringFunctions.classDayGapSamplePenalty(List.of(1, 7)), 1e-9);
+        assertEquals(0.5D, ScoringFunctions.classDayGapSamplePenalty(List.of(1, 5)), 1e-9);
+        assertEquals(0D, ScoringFunctions.classDayGapSamplePenalty(List.of(3)), 1e-9);
+        assertEquals(0D, ScoringFunctions.classDayGapSamplePenalty(List.of()), 1e-9);
+        // 乱序输入应先排序：[7,1,3] → 等价 [1,3,7] → (3-1-2)+(7-3-2)=0+2=2 → 0.5
+        assertEquals(0.5D, ScoringFunctions.classDayGapSamplePenalty(List.of(7, 1, 3)), 1e-9);
+    }
+
+    /**
+     * β 语义：同班 ODD 早+晚 / EVEN 早+晚 共槽，各自周次桶独立算 gap。
+     * c1 ODD 桶 {周一:[1,7]} gap=1，EVEN 桶 {周一:[1,7]} gap=1 → 均值 1。
+     */
+    @Test
+    void classGapBeta_oddEvenIndependent() {
+        List<SchedulePlanItem> items = List.of(
+                item(1L, 1L, 1L, 1L, 1, 1, "ODD"),
+                item(1L, 1L, 2L, 1L, 1, 7, "ODD"),
+                item(1L, 1L, 3L, 1L, 1, 1, "EVEN"),
+                item(1L, 1L, 4L, 1L, 1, 7, "EVEN"));
+        BigDecimal penalty = ScoringFunctions.penaltyClassGapBeta(
+                aggregateDayItemsBeta(items, SchedulePlanItem::getClassId));
+        assertEquals(new BigDecimal("1.0000"), penalty, "ODD/EVEN 各 gap=1，均值应 1.0000");
+    }
+
+    /** 纯 ALL 数据 gap：ALL 展开 ODD+EVEN 两对称桶，均值与单桶相同（零回归语义）。 */
+    @Test
+    void classGapBeta_pureAllSymmetric() {
+        List<SchedulePlanItem> items = List.of(
+                item(1L, 1L, 1L, 1L, 1, 1, "ALL"),
+                item(1L, 1L, 2L, 1L, 1, 5, "ALL"));
+        // 单桶 [1,5] gap=2 → 0.5；ALL 展开两份对称 → 仍 0.5
+        BigDecimal penalty = ScoringFunctions.penaltyClassGapBeta(
+                aggregateDayItemsBeta(items, SchedulePlanItem::getClassId));
+        assertEquals(new BigDecimal("0.5000"), penalty, "纯 ALL gap 应与单桶一致（对称）");
+    }
+
+    /**
+     * delta 对拍：把 CLASS_GAP_PENALTY 纳入增量 delta 累加 vs 全量差值，scale=4 一致。
+     * 验证 DeltaPenaltyScorer 的 classGapPenaltyAfterBeta 与 ScoringFunctions.penaltyClassGapBeta 一致。
+     */
+    @Test
+    void classGapDelta_incrementalMatchesFull() {
+        List<SchedulePlanItem> base = List.of(
+                item(1L, 1L, 1L, 1L, 1, 1, "ALL"));
+        List<SchedulePlanItem> toAdd = List.of(
+                item(1L, 1L, 2L, 1L, 1, 7, "ALL"),   // 同班同天拉出 gap
+                item(1L, 1L, 3L, 1L, 2, 1, "ODD"),
+                item(1L, 1L, 4L, 1L, 2, 5, "EVEN"));
+        int afternoonStart = 5;
+        Map<String, BigDecimal> weightMap = Map.of(DeltaPenaltyScorer.CLASS_GAP_PENALTY, BigDecimal.ONE);
+
+        List<SchedulePlanItem> current = new java.util.ArrayList<>(base);
+        BigDecimal incrementalSum = BigDecimal.ZERO;
+        for (SchedulePlanItem candidate : toAdd) {
+            DeltaPenaltyScorer.PenaltyContext ctx = DeltaPenaltyScorer.context(current, List.of(), afternoonStart);
+            incrementalSum = incrementalSum.add(DeltaPenaltyScorer.weightedSoftDeltaPenalty(weightMap, ctx, candidate));
+            current.add(candidate);
+        }
+
+        List<SchedulePlanItem> all = new java.util.ArrayList<>(base);
+        all.addAll(toAdd);
+        BigDecimal fullDelta = ScoringFunctions.penaltyClassGapBeta(aggregateDayItemsBeta(all, SchedulePlanItem::getClassId))
+                .subtract(ScoringFunctions.penaltyClassGapBeta(aggregateDayItemsBeta(base, SchedulePlanItem::getClassId)));
+
+        assertEquals(
+                fullDelta.setScale(4, RoundingMode.HALF_UP),
+                incrementalSum.setScale(4, RoundingMode.HALF_UP),
+                "CLASS_GAP_PENALTY 增量累加应与全量差值一致（scale=4）");
+    }
+
+    // ============================================================
     // helpers
     // ============================================================
 

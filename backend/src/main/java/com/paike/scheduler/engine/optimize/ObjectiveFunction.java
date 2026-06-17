@@ -120,6 +120,8 @@ public final class ObjectiveFunction {
                 ScoringFunctions.penaltyDuplicateCourse(courseDayCountsBeta(items)));
         result.put(DeltaPenaltyScorer.CONTINUOUS_PERIOD_LIMIT,
                 ScoringFunctions.penaltyContinuousBeta(nestedDayItemsBeta(items, SchedulePlanItem::getTeacherId)));
+        result.put(DeltaPenaltyScorer.CLASS_GAP_PENALTY,
+                ScoringFunctions.penaltyClassGapBeta(nestedDayItemsBeta(items, SchedulePlanItem::getClassId)));
         result.put(DeltaPenaltyScorer.CLASSROOM_UTILIZATION,
                 ScoringFunctions.penaltyClassroomUtilization(roomUseCounts(items), items.size()));
         result.put(DeltaPenaltyScorer.MORNING_THEORY_PRIORITY,

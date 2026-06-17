@@ -29,6 +29,7 @@ public final class DeltaPenaltyScorer {
     public static final String CONTINUOUS_PERIOD_LIMIT = "CONTINUOUS_PERIOD_LIMIT";
     public static final String CLASSROOM_UTILIZATION = "CLASSROOM_UTILIZATION";
     public static final String MORNING_THEORY_PRIORITY = "MORNING_THEORY_PRIORITY";
+    public static final String CLASS_GAP_PENALTY = "CLASS_GAP_PENALTY";
 
     public static final List<String> SOFT_RULE_CODES = List.of(
             CLASS_DAILY_BALANCE,
@@ -36,7 +37,8 @@ public final class DeltaPenaltyScorer {
             COURSE_DISTRIBUTION,
             CONTINUOUS_PERIOD_LIMIT,
             CLASSROOM_UTILIZATION,
-            MORNING_THEORY_PRIORITY
+            MORNING_THEORY_PRIORITY,
+            CLASS_GAP_PENALTY
     );
 
     private DeltaPenaltyScorer() {}
@@ -62,6 +64,7 @@ public final class DeltaPenaltyScorer {
                 nestedDayCountsBeta(items, SchedulePlanItem::getTeacherId),
                 courseDayCountsBeta(items),
                 nestedDayItemsBeta(items, SchedulePlanItem::getTeacherId),
+                nestedDayItemsBeta(items, SchedulePlanItem::getClassId),
                 roomUseCounts(items, activeClassroomIds)
         );
     }
@@ -148,12 +151,15 @@ public final class DeltaPenaltyScorer {
         private final Map<ScoringFunctions.WeekOwner, Map<Integer, Long>> teacherDayCounts;
         private final Map<String, Long> courseDayCounts;
         private final Map<ScoringFunctions.WeekOwner, Map<Integer, List<SchedulePlanItem>>> teacherDayItems;
+        private final Map<ScoringFunctions.WeekOwner, Map<Integer, List<SchedulePlanItem>>> classDayItems;
         private final Map<Long, Long> roomUseCounts;
         private final double classVariancePenaltySum;
         private final double teacherVariancePenaltySum;
         private final long duplicateCourseDays;
         private final double continuousPenaltySum;
         private final int continuousSampleCount;
+        private final double classGapPenaltySum;
+        private final int classGapSampleCount;
         private final long roomUseSumSquares;
         private final BigDecimal classDailyBalancePenalty;
         private final BigDecimal teacherDailyLoadPenalty;
@@ -161,6 +167,7 @@ public final class DeltaPenaltyScorer {
         private final BigDecimal continuousPeriodLimitPenalty;
         private final BigDecimal classroomUtilizationPenalty;
         private final BigDecimal morningTheoryPriorityPenalty;
+        private final BigDecimal classGapPenalty;
 
         private PenaltyContext(
                 int afternoonStartPeriod,
@@ -170,6 +177,7 @@ public final class DeltaPenaltyScorer {
                 Map<ScoringFunctions.WeekOwner, Map<Integer, Long>> teacherDayCounts,
                 Map<String, Long> courseDayCounts,
                 Map<ScoringFunctions.WeekOwner, Map<Integer, List<SchedulePlanItem>>> teacherDayItems,
+                Map<ScoringFunctions.WeekOwner, Map<Integer, List<SchedulePlanItem>>> classDayItems,
                 Map<Long, Long> roomUseCounts
         ) {
             this.afternoonStartPeriod = afternoonStartPeriod;
@@ -179,12 +187,15 @@ public final class DeltaPenaltyScorer {
             this.teacherDayCounts = teacherDayCounts;
             this.courseDayCounts = courseDayCounts;
             this.teacherDayItems = teacherDayItems;
+            this.classDayItems = classDayItems;
             this.roomUseCounts = roomUseCounts;
             this.classVariancePenaltySum = variancePenaltySum(classDayCounts);
             this.teacherVariancePenaltySum = variancePenaltySum(teacherDayCounts);
             this.duplicateCourseDays = courseDayCounts.values().stream().filter(count -> count > 1).count();
             this.continuousPenaltySum = continuousPenaltySum(teacherDayItems);
             this.continuousSampleCount = continuousSampleCount(teacherDayItems);
+            this.classGapPenaltySum = classGapPenaltySum(classDayItems);
+            this.classGapSampleCount = continuousSampleCount(classDayItems);
             this.roomUseSumSquares = roomUseCounts.values().stream()
                     .mapToLong(count -> count * count)
                     .sum();
@@ -194,6 +205,7 @@ public final class DeltaPenaltyScorer {
             this.continuousPeriodLimitPenalty = continuousPenalty(continuousPenaltySum, continuousSampleCount);
             this.classroomUtilizationPenalty = classroomPenalty(itemCount, roomUseCounts.size(), roomUseSumSquares);
             this.morningTheoryPriorityPenalty = morningPenalty(itemCount, afternoonCount);
+            this.classGapPenalty = continuousPenalty(classGapPenaltySum, classGapSampleCount);
         }
 
         /**
@@ -224,6 +236,8 @@ public final class DeltaPenaltyScorer {
                         .subtract(courseDistributionPenalty);
                 case CONTINUOUS_PERIOD_LIMIT -> continuousPenaltyAfterBeta(candidate)
                         .subtract(continuousPeriodLimitPenalty);
+                case CLASS_GAP_PENALTY -> classGapPenaltyAfterBeta(candidate)
+                        .subtract(classGapPenalty);
                 case CLASSROOM_UTILIZATION -> classroomPenaltyAfter(candidate)
                         .subtract(classroomUtilizationPenalty);
                 case MORNING_THEORY_PRIORITY -> morningPenalty(
@@ -300,6 +314,27 @@ public final class DeltaPenaltyScorer {
             return continuousPenalty(afterSum, afterSampleCount);
         }
 
+        /**
+         * β 版：candidate 展开到每个 countableWeekType，对每个 (class,wt) 桶的该 day sample 算 before/after。
+         * 与 continuousPenaltyAfterBeta 对称，仅 owner 换成 classId、样本公式换成 gap。
+         */
+        private BigDecimal classGapPenaltyAfterBeta(SchedulePlanItem candidate) {
+            double afterSum = classGapPenaltySum;
+            int afterSampleCount = classGapSampleCount;
+            for (String wt : WeekTypeSupport.countableWeekTypes(candidate.getWeekType())) {
+                ScoringFunctions.WeekOwner key = new ScoringFunctions.WeekOwner(candidate.getClassId(), wt);
+                Map<Integer, List<SchedulePlanItem>> dayMap = classDayItems.getOrDefault(key, Map.of());
+                List<SchedulePlanItem> beforeItems = dayMap.get(candidate.getWeekday());
+                double beforeSamplePenalty = classGapSamplePenalty(beforeItems);
+                double afterSamplePenalty = classGapSamplePenaltyAfter(beforeItems, candidate);
+                afterSum = afterSum - beforeSamplePenalty + afterSamplePenalty;
+                if (beforeItems == null) {
+                    afterSampleCount++;
+                }
+            }
+            return continuousPenalty(afterSum, afterSampleCount);
+        }
+
         private BigDecimal classroomPenaltyAfter(SchedulePlanItem candidate) {
             long beforeCount = roomUseCounts.getOrDefault(candidate.getClassroomId(), 0L);
             int afterRoomCount = roomUseCounts.size() + (beforeCount == 0L ? 1 : 0);
@@ -320,6 +355,7 @@ public final class DeltaPenaltyScorer {
             case TEACHER_DAILY_LOAD -> ScoringFunctions.penaltyVarianceBeta(nestedDayCountsBeta(items, SchedulePlanItem::getTeacherId));
             case COURSE_DISTRIBUTION -> ScoringFunctions.penaltyDuplicateCourse(courseDayCountsBeta(items));
             case CONTINUOUS_PERIOD_LIMIT -> ScoringFunctions.penaltyContinuousBeta(nestedDayItemsBeta(items, SchedulePlanItem::getTeacherId));
+            case CLASS_GAP_PENALTY -> ScoringFunctions.penaltyClassGapBeta(nestedDayItemsBeta(items, SchedulePlanItem::getClassId));
             case CLASSROOM_UTILIZATION -> ScoringFunctions.penaltyClassroomUtilization(
                     roomUseCounts(items, activeClassroomIds),
                     items.size());
@@ -487,6 +523,31 @@ public final class DeltaPenaltyScorer {
             }
         }
         return Math.min(1D, consecutiveChains / 2D);
+    }
+
+    private static double classGapPenaltySum(Map<ScoringFunctions.WeekOwner, Map<Integer, List<SchedulePlanItem>>> classDayItems) {
+        return classDayItems.values().stream()
+                .flatMap(dayItems -> dayItems.values().stream())
+                .mapToDouble(DeltaPenaltyScorer::classGapSamplePenalty)
+                .sum();
+    }
+
+    private static double classGapSamplePenalty(List<SchedulePlanItem> items) {
+        if (items == null || items.isEmpty()) {
+            return 0D;
+        }
+        return ScoringFunctions.classDayGapSamplePenalty(items.stream()
+                .map(SchedulePlanItem::getStartPeriod)
+                .toList());
+    }
+
+    private static double classGapSamplePenaltyAfter(List<SchedulePlanItem> beforeItems, SchedulePlanItem candidate) {
+        List<Integer> starts = new ArrayList<>();
+        if (beforeItems != null) {
+            starts.addAll(beforeItems.stream().map(SchedulePlanItem::getStartPeriod).toList());
+        }
+        starts.add(candidate.getStartPeriod());
+        return ScoringFunctions.classDayGapSamplePenalty(starts);
     }
 
     private static BigDecimal classroomPenalty(int totalItems, int roomCount, long sumSquares) {

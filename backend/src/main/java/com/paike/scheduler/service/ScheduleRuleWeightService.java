@@ -99,6 +99,7 @@ public class ScheduleRuleWeightService {
                 addRule(rules, semesterId, strategyType, "COURSE_DISTRIBUTION", "课程分布均衡", "SOFT", new java.math.BigDecimal("45"), "同一课程不要过度集中");
                 addRule(rules, semesterId, strategyType, "CONTINUOUS_PERIOD_LIMIT", "连续上课限制", "SOFT", new java.math.BigDecimal("40"), "连续上课节次不宜过长");
                 addRule(rules, semesterId, strategyType, "MORNING_THEORY_PRIORITY", "理论课优先上午", "SOFT", new java.math.BigDecimal("25"), "理论课尽量安排在上午");
+                addRule(rules, semesterId, strategyType, "CLASS_GAP_PENALTY", "班级空堂惩罚", "SOFT", new java.math.BigDecimal("30"), "班级一天的课尽量紧凑，减少中间空堂");
                 addRule(rules, semesterId, strategyType, "TEACHER_DAILY_LOAD", "教师每日负载", "SOFT", new java.math.BigDecimal("20"), "教师每天上课数量尽量合理");
                 addRule(rules, semesterId, strategyType, "CLASSROOM_UTILIZATION", "教室利用率", "SOFT", new java.math.BigDecimal("10"), "尽量提高教室使用率");
                 break;

@@ -97,7 +97,13 @@ public final class ScoringDimensions {
                     "理论课优先上午",
                     "理论课（非 EXPERIMENT/COMPUTER）&& periodNo<=2 ? 1 : 0",
                     "{0, 1}",
-                    "COMPREHENSIVE 策略默认权重表无此项，相当于在线维度失效；CLASS_BALANCE 等策略有"));
+                    "COMPREHENSIVE 策略默认权重表无此项，相当于在线维度失效；CLASS_BALANCE 等策略有"),
+            new OnlineSoft(
+                    "CLASS_GAP_PENALTY",
+                    "班级空堂惩罚",
+                    "候选加入后新增空档 introduced，返回 1 / (1 + introduced)，越不增空档越好",
+                    "(0, 1]",
+                    "在线偏好『填紧不留空堂』；离线惩罚『班级每日空档均值』。与 CONTINUOUS 对称"));
 
     /**
      * 6 个离线软维度 —— 用于离线 rescore 写库的罚分文档对照。
@@ -138,7 +144,13 @@ public final class ScoringDimensions {
                     "理论课优先上午",
                     "全部下午课占比（不区分课程类型！）—— 离线公式更粗",
                     "[0, 1]",
-                    "COMPREHENSIVE 策略默认权重表无此项，相当于在线维度失效；CLASS_BALANCE 等策略有"));
+                    "COMPREHENSIVE 策略默认权重表无此项，相当于在线维度失效；CLASS_BALANCE 等策略有"),
+            new OfflineSoft(
+                    "CLASS_GAP_PENALTY",
+                    "班级空堂惩罚",
+                    "每 (班级,weekType,天) 样本：startPeriod 排序相邻对 Σmax(0,Δstart-2) 求和，min(1, gap/4)，对样本求均值",
+                    "[0, 1]",
+                    "在线偏好『填紧不留空堂』；离线惩罚『班级每日空档均值』。与 CONTINUOUS 对称（一罚挨太紧、一罚空太开）"));
 
     /**
      * 6 个离线硬维度 —— 只在离线 rescore 出现，违规一次扣 weight × 1。
