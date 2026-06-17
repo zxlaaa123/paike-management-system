@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -55,6 +56,7 @@ class ControllerNotFoundStatusTest {
         );
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody(), "响应体不应为 null");
         assertEquals(404, response.getBody().getCode());
         assertEquals("资源不存在", response.getBody().getMessage());
     }
@@ -68,6 +70,7 @@ class ControllerNotFoundStatusTest {
         );
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody(), "响应体不应为 null");
         assertEquals(404, response.getBody().getCode());
         assertEquals("接口不存在：/api/semesters", response.getBody().getMessage());
     }
