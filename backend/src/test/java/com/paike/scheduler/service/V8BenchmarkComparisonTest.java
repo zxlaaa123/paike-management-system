@@ -91,7 +91,6 @@ class V8BenchmarkComparisonTest {
 
     @Autowired private V3ScheduleGenerateService generateService;
     @Autowired private EngineContextLoader engineContextLoader;
-    @Autowired private ScheduleThresholdProperties thresholdProperties;
     @Autowired private SemesterMapper semesterMapper;
     @Autowired private TeacherMapper teacherMapper;
     @Autowired private ClassInfoMapper classInfoMapper;
@@ -183,7 +182,6 @@ class V8BenchmarkComparisonTest {
 
             seedComprehensiveWeights(semesterId);
 
-            Random rng = new Random(DATA_SEED + (long) label.hashCode());
             teacherIds.addAll(createTeachers(teacherCount, suffix));
             classIds.addAll(createClasses(classCount, suffix));
             int courseCount = Math.max(teacherCount, taskCount / 3);
@@ -315,7 +313,6 @@ class V8BenchmarkComparisonTest {
                 roomUseCounts.merge(item.getClassroomId(), 1L, Long::sum);
             }
         }
-        int afternoonStart = thresholdProperties.getAfternoonStartPeriod();
 
         BigDecimal penalty = BigDecimal.ZERO;
         penalty = penalty.add(W_CLASS_DAILY.multiply(minOne(ScoringFunctions.penaltyVariance(classDayCounts))));

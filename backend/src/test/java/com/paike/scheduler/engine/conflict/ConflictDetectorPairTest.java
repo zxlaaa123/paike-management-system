@@ -285,7 +285,6 @@ class ConflictDetectorPairTest {
         // 不同步，导致 TASK_NOT_FULLY_SCHEDULED / SAME_COURSE_SAME_DAY 增量对拍偏差。
         // 全量对拍（第 10 步，纯 check 不 place）不受影响，仍验证引擎与 DB 一致。
         // 增量对拍的 DB 版语义需重新设计（三路对拍留 V9 阶段3 专门测试覆盖），此处跳过。
-        int incrementalComparisons = 0;
         System.out.println("[PAIR-TEST] Initial comparisons: " + totalComparisons
             + ", incremental: SKIPPED (V9 stage3 slot-doubling semantic), total: " + totalComparisons);
 
