@@ -620,7 +620,6 @@ public class SchedulePlanService {
     ) {
         List<String> reasons = new ArrayList<>();
         TeachingTask task = taskMap.get(item.getTeachingTaskId());
-        Teacher teacher = teacherMap.get(item.getTeacherId());
         ClassInfo classInfo = classMap.get(item.getClassId());
         Classroom room = roomMap.get(item.getClassroomId());
         Course course = courseMap.get(item.getCourseId());

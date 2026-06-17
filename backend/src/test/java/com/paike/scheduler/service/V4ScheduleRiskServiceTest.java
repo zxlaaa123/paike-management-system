@@ -11,7 +11,6 @@ import com.paike.scheduler.mapper.SchedulePlanMapper;
 import com.paike.scheduler.mapper.TeacherMapper;
 import com.paike.scheduler.mapper.TeachingTaskMapper;
 import com.paike.scheduler.mapper.TimeSlotMapper;
-import com.paike.scheduler.service.vo.ScheduleRiskIssueVo;
 import com.paike.scheduler.service.vo.ScheduleRiskListVo;
 import org.junit.jupiter.api.Test;
 

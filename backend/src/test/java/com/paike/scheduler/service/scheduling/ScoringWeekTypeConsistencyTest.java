@@ -12,7 +12,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * V9 阶段 2A T5：β 评分（独立计数）一致性对拍与语义断言。

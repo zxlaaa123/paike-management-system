@@ -10,7 +10,6 @@ import com.paike.scheduler.entity.ClassInfo;
 import com.paike.scheduler.entity.Classroom;
 import com.paike.scheduler.entity.Course;
 import com.paike.scheduler.entity.PerformanceBaselineRecord;
-import com.paike.scheduler.entity.SchedulePlan;
 import com.paike.scheduler.entity.SchedulePlanItem;
 import com.paike.scheduler.entity.ScheduleRuleWeight;
 import com.paike.scheduler.entity.ScheduleUnassignedTask;
