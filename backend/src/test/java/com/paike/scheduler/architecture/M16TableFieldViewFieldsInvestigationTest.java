@@ -75,7 +75,7 @@ class M16TableFieldViewFieldsInvestigationTest {
     private Map<String, Long> countByEntity(List<FieldHit> hits) {
         Map<String, Long> byEntity = new LinkedHashMap<>();
         for (FieldHit hit : hits) {
-            byEntity.merge(hit.entityName(), 1L, Long::sum);
+            byEntity.merge(hit.entityName(), 1L, (left, right) -> left + right);
         }
         return byEntity;
     }
@@ -101,4 +101,3 @@ class M16TableFieldViewFieldsInvestigationTest {
     private record FieldHit(String entityName, String declaration) {
     }
 }
-

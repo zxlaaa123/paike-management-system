@@ -460,6 +460,7 @@ public class TimetableService {
     }
 
     /** 单条重载（保留原方法名，M15 架构测试要求；委托给 List 版）。 */
+    @SuppressWarnings("unused")
     private String buildCellText(TimetableVo item, TimetableViewType viewType) {
         return buildCellText(List.of(item), viewType);
     }

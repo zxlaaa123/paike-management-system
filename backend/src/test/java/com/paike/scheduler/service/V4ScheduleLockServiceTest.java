@@ -60,7 +60,7 @@ class V4ScheduleLockServiceTest {
         timeSlotMapper = mock(TimeSlotMapper.class);
         auditLogService = mock(SystemAuditLogService.class);
         TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
-        when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+        when(transactionTemplate.execute(transactionCallback())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(mock(TransactionStatus.class));
         });
@@ -175,5 +175,10 @@ class V4ScheduleLockServiceTest {
         String period = service.listPlanLocks(11L).getItems().get(0).getPeriod();
 
         assertEquals("3-4", period);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static TransactionCallback<Object> transactionCallback() {
+        return any(TransactionCallback.class);
     }
 }

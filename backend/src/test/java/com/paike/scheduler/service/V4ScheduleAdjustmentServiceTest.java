@@ -5,6 +5,7 @@ import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.service.dto.SchedulePlanItemAdjustRequest;
 import com.paike.scheduler.service.dto.V4ScheduleAdjustmentRequest;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -36,9 +37,9 @@ class V4ScheduleAdjustmentServiceTest {
     @Test
     void applyAdjustment_recordsFailureAuditWhenRejected() {
         TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
-        when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+        when(transactionTemplate.execute(transactionCallback())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
-            return callback.doInTransaction(null);
+            return callback.doInTransaction(mock(TransactionStatus.class));
         });
         SystemAuditLogService auditLogService = mock(SystemAuditLogService.class);
         V4ScheduleAdjustmentService service = newService(transactionTemplate, auditLogService);
@@ -76,5 +77,10 @@ class V4ScheduleAdjustmentServiceTest {
                 mock(TeacherUnavailableTimeService.class),
                 transactionTemplate,
                 auditLogService);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static TransactionCallback<Object> transactionCallback() {
+        return any(TransactionCallback.class);
     }
 }

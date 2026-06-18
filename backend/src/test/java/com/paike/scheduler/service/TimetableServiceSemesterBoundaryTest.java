@@ -37,8 +37,8 @@ class TimetableServiceSemesterBoundaryTest {
 
         service.listTeacherTimetable(20L, 3L);
 
-        ArgumentCaptor<LambdaQueryWrapper<TeachingTask>> taskCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
-        ArgumentCaptor<LambdaQueryWrapper<Schedule>> scheduleCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        ArgumentCaptor<LambdaQueryWrapper<TeachingTask>> taskCaptor = teachingTaskWrapperCaptor();
+        ArgumentCaptor<LambdaQueryWrapper<Schedule>> scheduleCaptor = scheduleWrapperCaptor();
         verify(teachingTaskMapper).selectList(taskCaptor.capture());
         verify(scheduleMapper).selectList(scheduleCaptor.capture());
         assertWrapperContains(taskCaptor.getValue(), TeachingTask.class, "teacher_id", 20L);
@@ -59,7 +59,7 @@ class TimetableServiceSemesterBoundaryTest {
 
         service.listClassroomTimetable(30L, null);
 
-        ArgumentCaptor<LambdaQueryWrapper<Schedule>> scheduleCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        ArgumentCaptor<LambdaQueryWrapper<Schedule>> scheduleCaptor = scheduleWrapperCaptor();
         verify(scheduleMapper).selectList(scheduleCaptor.capture());
         assertWrapperContains(scheduleCaptor.getValue(), Schedule.class, "classroom_id", 30L);
         assertWrapperContains(scheduleCaptor.getValue(), Schedule.class, "semester_id", 4L);
@@ -92,5 +92,15 @@ class TimetableServiceSemesterBoundaryTest {
         if (TableInfoHelper.getTableInfo(entityType) == null) {
             TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), entityType);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ArgumentCaptor<LambdaQueryWrapper<TeachingTask>> teachingTaskWrapperCaptor() {
+        return ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ArgumentCaptor<LambdaQueryWrapper<Schedule>> scheduleWrapperCaptor() {
+        return ArgumentCaptor.forClass(LambdaQueryWrapper.class);
     }
 }

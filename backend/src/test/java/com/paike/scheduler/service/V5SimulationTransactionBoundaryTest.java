@@ -22,6 +22,7 @@ class V5SimulationTransactionBoundaryTest {
         assertTrue(source.contains("return detail;"));
         assertTrue(source.contains("LocalReplanResult result = runInTransaction(() -> localReplanInTransaction(taskId, request));"));
         assertTrue(source.contains("V5SimulationPlanDetailVo detail = detail(taskId, result.planId());"));
-        assertTrue(source.contains("return new TransactionTemplate(transactionManager).execute(status -> action.get());"));
+        assertTrue(source.contains(
+                "return new TransactionTemplate(Objects.requireNonNull(transactionManager)).execute(status -> action.get());"));
     }
 }

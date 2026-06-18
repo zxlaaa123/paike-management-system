@@ -1,7 +1,6 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.paike.scheduler.config.ScheduleThresholdProperties;
 import com.paike.scheduler.engine.model.EngineContext;
 import com.paike.scheduler.engine.model.EngineSolution;
 import com.paike.scheduler.engine.solver.EngineFacade;

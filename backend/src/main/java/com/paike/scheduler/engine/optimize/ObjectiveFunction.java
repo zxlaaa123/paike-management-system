@@ -183,11 +183,11 @@ public final class ObjectiveFunction {
     private Map<Long, Long> roomUseCounts(List<SchedulePlanItem> items) {
         Map<Long, Long> counts = activeClassroomIds.stream()
                 .distinct()
-                .collect(Collectors.toMap(Function.identity(), id -> 0L, Long::sum, LinkedHashMap::new));
+                .collect(Collectors.toMap(Function.identity(), id -> 0L, (left, right) -> left + right, LinkedHashMap::new));
         items.stream()
                 .map(SchedulePlanItem::getClassroomId)
                 .filter(Objects::nonNull)
-                .forEach(roomId -> counts.merge(roomId, 1L, Long::sum));
+                .forEach(roomId -> counts.merge(roomId, 1L, (left, right) -> left + right));
         return counts;
     }
 

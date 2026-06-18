@@ -450,7 +450,7 @@ class SchedulePlanServiceTest {
 
         service.applyPlan(10L);
 
-        ArgumentCaptor<LambdaQueryWrapper<Schedule>> deleteCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        ArgumentCaptor<LambdaQueryWrapper<Schedule>> deleteCaptor = scheduleWrapperCaptor();
         ArgumentCaptor<Schedule> insertCaptor = ArgumentCaptor.forClass(Schedule.class);
         InOrder order = inOrder(scheduleMapper);
         order.verify(scheduleMapper).selectList(any());
@@ -536,5 +536,10 @@ class SchedulePlanServiceTest {
         slot.setDayOfWeek(dayOfWeek);
         slot.setPeriodNo(periodNo);
         return slot;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ArgumentCaptor<LambdaQueryWrapper<Schedule>> scheduleWrapperCaptor() {
+        return ArgumentCaptor.forClass(LambdaQueryWrapper.class);
     }
 }

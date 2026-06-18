@@ -29,7 +29,7 @@ class V6RegressionTestServiceTest {
     @Test
     void list_appliesPaginationAndReturnsMapperResult() {
         Page<ScheduleRegressionTest> expected = new Page<>(2, 20);
-        when(regressionTestMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(expected);
+        when(regressionTestMapper.selectPage(anyPage(), anyWrapper())).thenReturn(expected);
 
         Page<ScheduleRegressionTest> result = service.list(
                 " V5_STAGE11 ",
@@ -41,8 +41,8 @@ class V6RegressionTestServiceTest {
                 20);
 
         assertEquals(expected, result);
-        ArgumentCaptor<Page<ScheduleRegressionTest>> pageCaptor = ArgumentCaptor.forClass(Page.class);
-        verify(regressionTestMapper).selectPage(pageCaptor.capture(), any(LambdaQueryWrapper.class));
+        ArgumentCaptor<Page<ScheduleRegressionTest>> pageCaptor = pageCaptor();
+        verify(regressionTestMapper).selectPage(pageCaptor.capture(), anyWrapper());
         assertEquals(2, pageCaptor.getValue().getCurrent());
         assertEquals(20, pageCaptor.getValue().getSize());
     }
@@ -58,5 +58,19 @@ class V6RegressionTestServiceTest {
         assertEquals(expected, result);
         verify(regressionTestMapper).selectById(7L);
     }
-}
 
+    @SuppressWarnings("unchecked")
+    private static Page<ScheduleRegressionTest> anyPage() {
+        return any(Page.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static LambdaQueryWrapper<ScheduleRegressionTest> anyWrapper() {
+        return any(LambdaQueryWrapper.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ArgumentCaptor<Page<ScheduleRegressionTest>> pageCaptor() {
+        return ArgumentCaptor.forClass(Page.class);
+    }
+}

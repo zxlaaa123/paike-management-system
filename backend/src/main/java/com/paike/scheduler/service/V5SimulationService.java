@@ -1489,7 +1489,7 @@ public class V5SimulationService {
     }
 
     private <T> T runInTransaction(Supplier<T> action) {
-        return new TransactionTemplate(transactionManager).execute(status -> action.get());
+        return new TransactionTemplate(Objects.requireNonNull(transactionManager)).execute(status -> action.get());
     }
 
     private record SuggestionMove(Long targetClassroomId, Integer targetWeekday, Integer targetStartPeriod, Integer targetEndPeriod) {

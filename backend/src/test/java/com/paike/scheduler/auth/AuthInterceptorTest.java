@@ -5,6 +5,7 @@ import com.paike.scheduler.common.exception.BusinessException;
 import com.paike.scheduler.entity.SysUser;
 import com.paike.scheduler.mapper.SysUserMapper;
 import io.jsonwebtoken.Claims;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,7 @@ class AuthInterceptorTest {
         MockHttpServletRequest request = bearerRequest("POST", "/api/v4/schedule-reports/plans/1/generate");
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> interceptor.preHandle(request, new MockHttpServletResponse(), new Object()));
+                () -> interceptor.preHandle(servletRequest(request), new MockHttpServletResponse(), new Object()));
 
         assertEquals(403, ex.getCode());
     }
@@ -52,7 +53,7 @@ class AuthInterceptorTest {
         mockTokenUser(user("ADMIN"));
         MockHttpServletRequest request = bearerRequest("POST", "/api/v4/schedule-reports/plans/1/generate");
 
-        assertTrue(interceptor.preHandle(request, new MockHttpServletResponse(), new Object()));
+        assertTrue(interceptor.preHandle(servletRequest(request), new MockHttpServletResponse(), new Object()));
         assertEquals("ADMIN", AuthUserContext.get().getRole());
     }
 
@@ -60,12 +61,12 @@ class AuthInterceptorTest {
     void preHandle_allowsNonAdminReadAndLogoutRequests() {
         mockTokenUser(user("USER"));
         MockHttpServletRequest readRequest = bearerRequest("GET", "/api/v4/schedule-reports/plans/1");
-        assertTrue(interceptor.preHandle(readRequest, new MockHttpServletResponse(), new Object()));
-        interceptor.afterCompletion(readRequest, new MockHttpServletResponse(), new Object(), null);
+        assertTrue(interceptor.preHandle(servletRequest(readRequest), new MockHttpServletResponse(), new Object()));
+        interceptor.afterCompletion(servletRequest(readRequest), new MockHttpServletResponse(), new Object(), null);
 
         mockTokenUser(user("USER"));
         MockHttpServletRequest logoutRequest = bearerRequest("POST", "/api/auth/logout");
-        assertTrue(interceptor.preHandle(logoutRequest, new MockHttpServletResponse(), new Object()));
+        assertTrue(interceptor.preHandle(servletRequest(logoutRequest), new MockHttpServletResponse(), new Object()));
     }
 
     @SuppressWarnings("unchecked")
@@ -79,6 +80,11 @@ class AuthInterceptorTest {
     private MockHttpServletRequest bearerRequest(String method, String path) {
         MockHttpServletRequest request = new MockHttpServletRequest(method, path);
         request.addHeader("Authorization", "Bearer token");
+        return request;
+    }
+
+    @SuppressWarnings("null")
+    private HttpServletRequest servletRequest(MockHttpServletRequest request) {
         return request;
     }
 

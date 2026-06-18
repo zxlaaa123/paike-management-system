@@ -33,13 +33,13 @@ class PerformanceBaselineServiceTest {
     @Test
     void list_appliesPaginationAndReturnsMapperResult() {
         Page<PerformanceBaselineRecord> expected = new Page<>(2, 20);
-        when(performanceMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(expected);
+        when(performanceMapper.selectPage(anyPage(), anyWrapper())).thenReturn(expected);
 
         Page<PerformanceBaselineRecord> result = service.list("AUTO_SCHEDULE", 1L, 2L, true, 2, 20);
 
         assertEquals(expected, result);
-        ArgumentCaptor<Page<PerformanceBaselineRecord>> captor = ArgumentCaptor.forClass(Page.class);
-        verify(performanceMapper).selectPage(captor.capture(), any(LambdaQueryWrapper.class));
+        ArgumentCaptor<Page<PerformanceBaselineRecord>> captor = pageCaptor();
+        verify(performanceMapper).selectPage(captor.capture(), anyWrapper());
         assertEquals(2, captor.getValue().getCurrent());
         assertEquals(20, captor.getValue().getSize());
     }
@@ -77,7 +77,7 @@ class PerformanceBaselineServiceTest {
         second.setOperationType("AUTO_SCHEDULE");
         second.setDurationMs(300L);
         second.setSuccess(0);
-        when(performanceMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(first, second));
+        when(performanceMapper.selectList(anyWrapper())).thenReturn(List.of(first, second));
 
         List<PerformanceSummaryVo> result = service.summary();
 
@@ -95,7 +95,7 @@ class PerformanceBaselineServiceTest {
         PerformanceBaselineRecord latest = record(3L, "AUTO_SCHEDULE", 6000L, 1, LocalDateTime.parse("2026-06-08T10:10:00"));
         PerformanceBaselineRecord previous = record(2L, "AUTO_SCHEDULE", 3000L, 1, LocalDateTime.parse("2026-06-08T10:00:00"));
         PerformanceBaselineRecord other = record(1L, "V5_LOCAL_REPLAN", 1000L, 1, LocalDateTime.parse("2026-06-08T09:00:00"));
-        when(performanceMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(latest, previous, other));
+        when(performanceMapper.selectList(anyWrapper())).thenReturn(List.of(latest, previous, other));
 
         List<PerformanceTrendVo> result = service.trends(null, 20);
 
@@ -119,5 +119,20 @@ class PerformanceBaselineServiceTest {
         record.setSuccess(success);
         record.setCreatedAt(createdAt);
         return record;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Page<PerformanceBaselineRecord> anyPage() {
+        return any(Page.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static LambdaQueryWrapper<PerformanceBaselineRecord> anyWrapper() {
+        return any(LambdaQueryWrapper.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ArgumentCaptor<Page<PerformanceBaselineRecord>> pageCaptor() {
+        return ArgumentCaptor.forClass(Page.class);
     }
 }

@@ -200,7 +200,7 @@ class AnnealingOptimizerTest {
                 .collect(Collectors.toMap(Function.identity(), id -> 0L));
         items.stream()
                 .map(SchedulePlanItem::getClassroomId)
-                .forEach(roomId -> counts.merge(roomId, 1L, Long::sum));
+                .forEach(roomId -> counts.merge(roomId, 1L, (left, right) -> left + right));
         return counts;
     }
 }

@@ -37,13 +37,13 @@ class V6ConsistencyCheckServiceTest {
     @Test
     void list_appliesPaginationAndReturnsMapperResult() {
         Page<ScheduleConsistencyCheck> expected = new Page<>(2, 20);
-        when(consistencyCheckMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(expected);
+        when(consistencyCheckMapper.selectPage(anyPage(), anyWrapper())).thenReturn(expected);
 
         Page<ScheduleConsistencyCheck> result = service.list(" fail ", " V5_SIMULATION ", 3L, 9L, 2, 20);
 
         assertEquals(expected, result);
-        ArgumentCaptor<Page<ScheduleConsistencyCheck>> pageCaptor = ArgumentCaptor.forClass(Page.class);
-        verify(consistencyCheckMapper).selectPage(pageCaptor.capture(), any(LambdaQueryWrapper.class));
+        ArgumentCaptor<Page<ScheduleConsistencyCheck>> pageCaptor = pageCaptor();
+        verify(consistencyCheckMapper).selectPage(pageCaptor.capture(), anyWrapper());
         assertEquals(2, pageCaptor.getValue().getCurrent());
         assertEquals(20, pageCaptor.getValue().getSize());
     }
@@ -79,5 +79,19 @@ class V6ConsistencyCheckServiceTest {
         assertEquals(expected, result);
         verify(v5ConsistencyCheckService).check(4L, 8L, true);
     }
-}
 
+    @SuppressWarnings("unchecked")
+    private static Page<ScheduleConsistencyCheck> anyPage() {
+        return any(Page.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static LambdaQueryWrapper<ScheduleConsistencyCheck> anyWrapper() {
+        return any(LambdaQueryWrapper.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ArgumentCaptor<Page<ScheduleConsistencyCheck>> pageCaptor() {
+        return ArgumentCaptor.forClass(Page.class);
+    }
+}

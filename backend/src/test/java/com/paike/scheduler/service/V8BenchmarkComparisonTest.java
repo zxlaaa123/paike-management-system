@@ -1,7 +1,6 @@
 package com.paike.scheduler.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.paike.scheduler.config.ScheduleThresholdProperties;
 import com.paike.scheduler.engine.model.EngineContext;
 import com.paike.scheduler.engine.model.EngineSolution;
 import com.paike.scheduler.engine.solver.EngineFacade;
@@ -310,7 +309,7 @@ class V8BenchmarkComparisonTest {
         Map<Long, Long> roomUseCounts = activeClassroomUseCounts();
         for (SchedulePlanItem item : items) {
             if (item.getClassroomId() != null) {
-                roomUseCounts.merge(item.getClassroomId(), 1L, Long::sum);
+                roomUseCounts.merge(item.getClassroomId(), 1L, (left, right) -> left + right);
             }
         }
 

@@ -56,9 +56,10 @@ class ControllerNotFoundStatusTest {
         );
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        assertNotNull(response.getBody(), "响应体不应为 null");
-        assertEquals(404, response.getBody().getCode());
-        assertEquals("资源不存在", response.getBody().getMessage());
+        Result<Void> body = response.getBody();
+        assertNotNull(body, "响应体不应为 null");
+        assertEquals(404, body.getCode());
+        assertEquals("资源不存在", body.getMessage());
     }
 
     @Test
@@ -66,12 +67,18 @@ class ControllerNotFoundStatusTest {
         GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
         ResponseEntity<Result<Void>> response = handler.handleNoResourceFound(
-                new NoResourceFoundException(HttpMethod.GET, "/api/semesters")
+                new NoResourceFoundException(httpGet(), "/api/semesters")
         );
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        assertNotNull(response.getBody(), "响应体不应为 null");
-        assertEquals(404, response.getBody().getCode());
-        assertEquals("接口不存在：/api/semesters", response.getBody().getMessage());
+        Result<Void> body = response.getBody();
+        assertNotNull(body, "响应体不应为 null");
+        assertEquals(404, body.getCode());
+        assertEquals("接口不存在：/api/semesters", body.getMessage());
+    }
+
+    @SuppressWarnings("null")
+    private static HttpMethod httpGet() {
+        return HttpMethod.GET;
     }
 }

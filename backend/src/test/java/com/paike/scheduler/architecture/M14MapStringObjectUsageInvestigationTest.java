@@ -78,7 +78,7 @@ class M14MapStringObjectUsageInvestigationTest {
     private Map<String, Long> countByFile(List<Hit> hits) {
         Map<String, Long> byFile = new HashMap<>();
         for (Hit hit : hits) {
-            byFile.merge(hit.path(), 1L, Long::sum);
+            byFile.merge(hit.path(), 1L, (left, right) -> left + right);
         }
         return byFile;
     }
@@ -98,4 +98,3 @@ class M14MapStringObjectUsageInvestigationTest {
     private record Hit(String path, String line) {
     }
 }
-

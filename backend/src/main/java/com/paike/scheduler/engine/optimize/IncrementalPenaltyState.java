@@ -274,7 +274,7 @@ final class IncrementalPenaltyState {
     }
 
     private static <K> void incrementFlatCount(Map<K, Long> map, K key) {
-        map.merge(key, 1L, Long::sum);
+        map.merge(key, 1L, (left, right) -> left + right);
     }
 
     private static <K1, K2> void decrementNestedCount(Map<K1, Map<K2, Long>> map, K1 k1, K2 k2) {
@@ -297,7 +297,7 @@ final class IncrementalPenaltyState {
     }
 
     private static <K1, K2> void incrementNestedCount(Map<K1, Map<K2, Long>> map, K1 k1, K2 k2) {
-        map.computeIfAbsent(k1, k -> new HashMap<>()).merge(k2, 1L, Long::sum);
+        map.computeIfAbsent(k1, k -> new HashMap<>()).merge(k2, 1L, (left, right) -> left + right);
     }
 
     /**
@@ -325,7 +325,7 @@ final class IncrementalPenaltyState {
         if (roomId == null) {
             return;
         }
-        roomUseCounts.merge(roomId, 1L, Long::sum);
+        roomUseCounts.merge(roomId, 1L, (left, right) -> left + right);
     }
 
     /**
@@ -370,7 +370,7 @@ final class IncrementalPenaltyState {
         for (SchedulePlanItem it : items) {
             for (String wt : WeekTypeSupport.countableWeekTypes(it.getWeekType())) {
                 result.computeIfAbsent(new WeekOwner(ownerExtractor.apply(it), wt), k -> new HashMap<>())
-                        .merge(it.getWeekday(), 1L, Long::sum);
+                        .merge(it.getWeekday(), 1L, (left, right) -> left + right);
             }
         }
         return result;
@@ -380,7 +380,8 @@ final class IncrementalPenaltyState {
         Map<String, Long> result = new HashMap<>();
         for (SchedulePlanItem it : items) {
             for (String wt : WeekTypeSupport.countableWeekTypes(it.getWeekType())) {
-                result.merge(it.getClassId() + "_" + it.getCourseId() + "_" + it.getWeekday() + "_" + wt, 1L, Long::sum);
+                result.merge(it.getClassId() + "_" + it.getCourseId() + "_" + it.getWeekday() + "_" + wt, 1L,
+                        (left, right) -> left + right);
             }
         }
         return result;
@@ -407,7 +408,7 @@ final class IncrementalPenaltyState {
         }
         for (SchedulePlanItem it : items) {
             if (it.getClassroomId() != null) {
-                counts.merge(it.getClassroomId(), 1L, Long::sum);
+                counts.merge(it.getClassroomId(), 1L, (left, right) -> left + right);
             }
         }
         return counts;
