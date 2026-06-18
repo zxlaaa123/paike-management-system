@@ -158,6 +158,107 @@ class TimetableExportWeekTypeTest {
     }
 
     // ============================================================
+    // C3 补齐：CLASS 视图与 CLASSROOM 视图的 weekType 导出覆盖
+    // 原测试 4 个用例全部针对 TEACHER 视图；CLASS/CLASSROOM 零覆盖。
+    // 实现层三视图共用同一 buildCellText，viewType 仅影响 switch 分支的次要信息，
+    // 但“实现一致”不等于“已验证不变”——补测试防止未来 switch 分支被改后静默回归。
+    // ============================================================
+
+    /**
+     * CLASS 视图共槽：班级周一1-2节 ODD体育 + EVEN思政，
+     * 导出 cell 含两门课 + [单]/[双] 标记，且次要信息为教师名 + 教室名（不含班级名，因高亮=class）。
+     */
+    @Test
+    void exportClassTimetable_oddEvenSharedSlotBothVisible() throws Exception {
+        Schedule oddSchedule = schedule(101L, 201L, "ODD");
+        Schedule evenSchedule = schedule(102L, 202L, "EVEN");
+        ScheduleServiceFixture fix = new ScheduleServiceFixture(
+                List.of(oddSchedule, evenSchedule),
+                Map.of(201L, teachingTask(201L, 301L, 401L, 501L, 601L),
+                        202L, teachingTask(202L, 302L, 402L, 501L, 601L)),
+                Map.of(301L, course(301L, "体育"), 302L, course(302L, "思政")),
+                Map.of(401L, teacher(401L, "张老师"), 402L, teacher(402L, "李老师")),
+                Map.of(501L, classInfo(501L, "高三1班")),
+                Map.of(201L, timeSlot(201L, 1, 1), 202L, timeSlot(202L, 1, 1)),
+                Map.of(601L, classroom(601L, "操场")));
+
+        TimetableService service = fix.buildForExport();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        HttpServletResponse response = mockResponse(baos);
+
+        service.exportClassTimetable(501L, 2L, response);
+
+        String cellText = readCellText(baos, 2, 1);
+        assertTrue(cellText.contains("体育"), "CLASS 视图 cell 应含体育课，实际: " + cellText);
+        assertTrue(cellText.contains("思政"), "CLASS 视图 cell 应含思政课（不被覆盖），实际: " + cellText);
+        assertTrue(cellText.contains("[单]"), "CLASS 视图 ODD 课应加 [单] 标记，实际: " + cellText);
+        assertTrue(cellText.contains("[双]"), "CLASS 视图 EVEN 课应加 [双] 标记，实际: " + cellText);
+        assertTrue(cellText.contains("张老师"), "CLASS 视图应含教师名，实际: " + cellText);
+        assertTrue(cellText.contains("操场"), "CLASS 视图应含教室名，实际: " + cellText);
+        assertFalse(cellText.contains("高三1班"), "CLASS 视图不应含班级名（高亮=class），实际: " + cellText);
+    }
+
+    /**
+     * CLASSROOM 视图共槽：教室周一1-2节 ODD体育 + EVEN思政，
+     * 导出 cell 含两门课 + [单]/[双] 标记，且次要信息为教师名 + 班级名（不含教室名，因高亮=classroom）。
+     */
+    @Test
+    void exportClassroomTimetable_oddEvenSharedSlotBothVisible() throws Exception {
+        Schedule oddSchedule = schedule(101L, 201L, "ODD");
+        Schedule evenSchedule = schedule(102L, 202L, "EVEN");
+        ScheduleServiceFixture fix = new ScheduleServiceFixture(
+                List.of(oddSchedule, evenSchedule),
+                Map.of(201L, teachingTask(201L, 301L, 401L, 501L, 601L),
+                        202L, teachingTask(202L, 302L, 402L, 502L, 601L)),
+                Map.of(301L, course(301L, "体育"), 302L, course(302L, "思政")),
+                Map.of(401L, teacher(401L, "张老师"), 402L, teacher(402L, "李老师")),
+                Map.of(501L, classInfo(501L, "高三1班"), 502L, classInfo(502L, "高三2班")),
+                Map.of(201L, timeSlot(201L, 1, 1), 202L, timeSlot(202L, 1, 1)),
+                Map.of(601L, classroom(601L, "操场")));
+
+        TimetableService service = fix.buildForExport();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        HttpServletResponse response = mockResponse(baos);
+
+        service.exportClassroomTimetable(601L, 2L, response);
+
+        String cellText = readCellText(baos, 2, 1);
+        assertTrue(cellText.contains("体育"), "CLASSROOM 视图 cell 应含体育课，实际: " + cellText);
+        assertTrue(cellText.contains("思政"), "CLASSROOM 视图 cell 应含思政课（不被覆盖），实际: " + cellText);
+        assertTrue(cellText.contains("[单]"), "CLASSROOM 视图 ODD 课应加 [单] 标记，实际: " + cellText);
+        assertTrue(cellText.contains("[双]"), "CLASSROOM 视图 EVEN 课应加 [双] 标记，实际: " + cellText);
+        assertTrue(cellText.contains("张老师"), "CLASSROOM 视图应含教师名，实际: " + cellText);
+        assertTrue(cellText.contains("高三1班"), "CLASSROOM 视图应含班级名，实际: " + cellText);
+        assertFalse(cellText.contains("操场"), "CLASSROOM 视图不应含教室名（高亮=classroom），实际: " + cellText);
+    }
+
+    /**
+     * CLASS 视图 ALL 课无标记：与 TEACHER 视图对称，确认 ALL 不加 [单]/[双]/[全]。
+     */
+    @Test
+    void exportClassTimetable_allCourseNoMarker() throws Exception {
+        Schedule allSchedule = schedule(101L, 201L, "ALL");
+        ScheduleServiceFixture fix = new ScheduleServiceFixture(
+                List.of(allSchedule),
+                Map.of(201L, teachingTask(201L, 301L, 401L, 501L, 601L)),
+                Map.of(301L, course(301L, "数学")),
+                Map.of(401L, teacher(401L, "王老师")),
+                Map.of(501L, classInfo(501L, "高三1班")),
+                Map.of(201L, timeSlot(201L, 1, 1)),
+                Map.of(601L, classroom(601L, "A101")));
+
+        TimetableService service = fix.buildForExport();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        HttpServletResponse response = mockResponse(baos);
+
+        service.exportClassTimetable(501L, 2L, response);
+
+        String cellText = readCellText(baos, 2, 1);
+        assertTrue(cellText.contains("数学"), "CLASS 视图 cell 应含数学课，实际: " + cellText);
+        assertFalse(cellText.contains("["), "CLASS 视图 ALL 课不应有任何周次标记，实际: " + cellText);
+    }
+
+    // ============================================================
     // helpers：实体构造
     // ============================================================
 
