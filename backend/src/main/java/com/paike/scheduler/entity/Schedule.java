@@ -38,6 +38,12 @@ public class Schedule {
     /** 周次类型：ALL全周、ODD单周、EVEN双周（V9 单双周支持） */
     private String weekType;
 
+    /** 连续周段起始周（闭区间，默认1，V10 连续周段支持） */
+    private Integer startWeek;
+
+    /** 连续周段结束周（闭区间，默认20，V10 连续周段支持） */
+    private Integer endWeek;
+
     private Long classroomId;
 
     private String sourceType;

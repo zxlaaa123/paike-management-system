@@ -30,6 +30,10 @@ public class TeachingTaskVo {
     private Integer weeklyHours;
     /** 周次类型：ALL全周、ODD单周、EVEN双周（V9 单双周支持） */
     private String weekType;
+    /** 连续周段起始周（闭区间，默认1，V10 连续周段支持） */
+    private Integer startWeek;
+    /** 连续周段结束周（闭区间，默认20，V10 连续周段支持） */
+    private Integer endWeek;
     private Integer needContinuous;
     private Integer status;
     private String remark;
@@ -64,6 +68,8 @@ public class TeachingTaskVo {
         vo.setClassId(entity.getClassId());
         vo.setWeeklyHours(entity.getWeeklyHours());
         vo.setWeekType(entity.getWeekType());
+        vo.setStartWeek(entity.getStartWeek());
+        vo.setEndWeek(entity.getEndWeek());
         vo.setNeedContinuous(entity.getNeedContinuous());
         vo.setStatus(entity.getStatus());
         vo.setRemark(entity.getRemark());

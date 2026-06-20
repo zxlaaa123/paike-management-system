@@ -55,6 +55,12 @@ public class SchedulePlanItemVo {
 
     private String weekType;
 
+    /** 连续周段起始周（闭区间，默认1，V10 连续周段支持） */
+    private Integer startWeek;
+
+    /** 连续周段结束周（闭区间，默认20，V10 连续周段支持） */
+    private Integer endWeek;
+
     private BigDecimal score;
 
     private Integer conflictFlag;
@@ -100,6 +106,8 @@ public class SchedulePlanItemVo {
         vo.setStartPeriod(entity.getStartPeriod());
         vo.setEndPeriod(entity.getEndPeriod());
         vo.setWeekType(entity.getWeekType());
+        vo.setStartWeek(entity.getStartWeek());
+        vo.setEndWeek(entity.getEndWeek());
         vo.setScore(entity.getScore());
         vo.setConflictFlag(entity.getConflictFlag());
         vo.setConflictReason(entity.getConflictReason());
