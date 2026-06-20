@@ -7,6 +7,8 @@ import java.util.List;
  *
  * @param weekType V9 阶段3：周次类型 ALL/ODD/EVEN，决定该任务可占用的翻倍 slot 子集
  *                 （ODD→只能占 ODD slot，EVEN→EVEN slot，ALL→两者皆可）
+ * @param startWeek V10 连续周段起始周（闭区间，默认1）
+ * @param endWeek V10 连续周段结束周（闭区间，默认20）
  */
 public record EngineTask(
     int index,
@@ -18,5 +20,7 @@ public record EngineTask(
     String courseType,
     int studentCount,
     List<Integer> candidateClassroomIndices,
-    String weekType
+    String weekType,
+    int startWeek,
+    int endWeek
 ) {}

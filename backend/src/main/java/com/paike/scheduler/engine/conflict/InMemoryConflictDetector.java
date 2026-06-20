@@ -3,6 +3,7 @@ package com.paike.scheduler.engine.conflict;
 import com.paike.scheduler.engine.model.Assignment;
 import com.paike.scheduler.engine.model.EngineContext;
 import com.paike.scheduler.engine.model.EngineTask;
+import com.paike.scheduler.service.WeekPatternSupport;
 import com.paike.scheduler.service.WeekTypeSupport;
 
 import java.util.ArrayList;
@@ -108,15 +109,22 @@ public class InMemoryConflictDetector {
         }
 
         // 7-9. Per-record iteration: teacher → class → room (matches DB version)
+        // V10 连续周段：实际自然周集合相交才算冲突（ALL 1-8 与 ALL 9-16 共槽合法）
         for (Assignment existing : slotAssignments.get(slotIdx)) {
             EngineTask existingTask = ctx.tasks().get(existing.taskIndex());
-            if (existingTask.teacherIndex() == teacherIdx) {
+            if (existingTask.teacherIndex() == teacherIdx
+                    && WeekPatternSupport.overlap(task.weekType(), task.startWeek(), task.endWeek(),
+                            existingTask.weekType(), existingTask.startWeek(), existingTask.endWeek())) {
                 return "TEACHER_CONFLICT";
             }
-            if (existingTask.classIndex() == classIdx) {
+            if (existingTask.classIndex() == classIdx
+                    && WeekPatternSupport.overlap(task.weekType(), task.startWeek(), task.endWeek(),
+                            existingTask.weekType(), existingTask.startWeek(), existingTask.endWeek())) {
                 return "CLASS_CONFLICT";
             }
-            if (existing.classroomIndex() == roomIdx) {
+            if (existing.classroomIndex() == roomIdx
+                    && WeekPatternSupport.overlap(task.weekType(), task.startWeek(), task.endWeek(),
+                            existingTask.weekType(), existingTask.startWeek(), existingTask.endWeek())) {
                 return "ROOM_CONFLICT";
             }
         }

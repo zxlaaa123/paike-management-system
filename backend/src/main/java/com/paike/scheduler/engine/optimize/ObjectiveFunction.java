@@ -76,6 +76,8 @@ public final class ObjectiveFunction {
         item.setStartPeriod(slotToStartPeriod(slot));
         item.setEndPeriod(slotToStartPeriod(slot) + 1);
         item.setWeekType(task.weekType());
+        item.setStartWeek(task.startWeek());
+        item.setEndWeek(task.endWeek());
         item.setConflictFlag(0);
         item.setSourceType("AUTO");
         return item;
@@ -101,6 +103,8 @@ public final class ObjectiveFunction {
         item.setStartPeriod(slotToStartPeriod(slot));
         item.setEndPeriod(slotToStartPeriod(slot) + 1);
         item.setWeekType(task.weekType());
+        item.setStartWeek(task.startWeek());
+        item.setEndWeek(task.endWeek());
         item.setConflictFlag(0);
         item.setSourceType("AUTO");
         return item;
