@@ -73,7 +73,64 @@ class V6RegressionTestServiceRunTest {
         assertEquals(4, result.getPassed());
     }
 
+    // ============ V10 连续周段红线 ============
+
+    /**
+     * V10：ALL 1-8 与 ALL 9-16 同时段同资源 → 实际周集合不相交 → 全 PASS。
+     */
+    @Test
+    void run_passesWhenDisjointWeekRangeShareSlot() {
+        ScheduleRegressionTestMapper regressionTestMapper = mock(ScheduleRegressionTestMapper.class);
+        ScheduleMapper scheduleMapper = mock(ScheduleMapper.class);
+        SemesterService semesterService = mock(SemesterService.class);
+        Semester semester = new Semester();
+        semester.setId(1L);
+        when(semesterService.getCurrentSemester()).thenReturn(semester);
+        when(scheduleMapper.selectList(any())).thenReturn(List.of(
+                schedule(301L, 10L, 5L, "ALL", 1, 8),
+                schedule(302L, 10L, 5L, "ALL", 9, 16)));
+
+        V6RegressionTestService service = new V6RegressionTestService(regressionTestMapper, scheduleMapper, semesterService);
+        V6RegressionRunResultVo result = service.run(null);
+
+        assertEquals(4, result.getTotal());
+        assertEquals(0, result.getFailed(), "ALL 1-8 与 ALL 9-16 实际周集合不相交，应全 PASS");
+        assertEquals(4, result.getPassed());
+    }
+
+    /**
+     * V10：ALL 1-8 与 ODD 5-12 同时段同资源 → 重叠自然周 5、7 → 教师冲突自检 FAIL。
+     */
+    @Test
+    void run_detectsOverlappingWeekRangeTeacherConflict() {
+        ScheduleRegressionTestMapper regressionTestMapper = mock(ScheduleRegressionTestMapper.class);
+        ScheduleMapper scheduleMapper = mock(ScheduleMapper.class);
+        SemesterService semesterService = mock(SemesterService.class);
+        Semester semester = new Semester();
+        semester.setId(1L);
+        when(semesterService.getCurrentSemester()).thenReturn(semester);
+        when(scheduleMapper.selectList(any())).thenReturn(List.of(
+                schedule(401L, 10L, 5L, "ALL", 1, 8),
+                schedule(402L, 10L, 5L, "ODD", 5, 12)));
+
+        V6RegressionTestService service = new V6RegressionTestService(regressionTestMapper, scheduleMapper, semesterService);
+        V6RegressionRunResultVo result = service.run(null);
+
+        assertTrue(result.getFailed() >= 1, "ALL 1-8 与 ODD 5-12 重叠自然周 5、7，应至少有教师冲突自检项 FAIL");
+        ScheduleRegressionTest teacherScan = result.getRecords().stream()
+                .filter(r -> "TEACHER_CONFLICT_SCAN".equals(r.getTestCase()))
+                .findFirst().orElse(null);
+        assertNotNull(teacherScan);
+        assertEquals("FAIL", teacherScan.getStatus());
+    }
+
     private Schedule schedule(Long id, Long timeSlotId, Long sharedResourceId, String weekType) {
+        return schedule(id, timeSlotId, sharedResourceId, weekType, null, null);
+    }
+
+    /** V10 连续周段：带 startWeek/endWeek 的 schedule 构造 */
+    private Schedule schedule(Long id, Long timeSlotId, Long sharedResourceId, String weekType,
+                              Integer startWeek, Integer endWeek) {
         Schedule s = new Schedule();
         s.setId(id);
         s.setTimeSlotId(timeSlotId);
@@ -82,6 +139,8 @@ class V6RegressionTestServiceRunTest {
         s.setClassroomId(sharedResourceId);
         s.setTeachingTaskId(id);
         s.setWeekType(weekType);
+        s.setStartWeek(startWeek);
+        s.setEndWeek(endWeek);
         return s;
     }
 }

@@ -381,9 +381,10 @@ public class V5ConsistencyCheckService {
             for (SchedulePlanItem current : dayItems) {
                 active.removeIf(item -> item.getEndPeriod() < current.getStartPeriod());
                 for (SchedulePlanItem previous : active) {
-                    // V9 单双周：period overlap 且 weekType overlap 才算真冲突（ODD+EVEN 共槽合法）
+                    // V10 连续周段：period overlap 且实际自然周集合相交才算真冲突
                     if (overlap(previous.getStartPeriod(), previous.getEndPeriod(), current.getStartPeriod(), current.getEndPeriod())
-                            && WeekTypeSupport.overlap(previous.getWeekType(), current.getWeekType())) {
+                            && WeekPatternSupport.overlap(previous.getWeekType(), previous.getStartWeek(), previous.getEndWeek(),
+                                    current.getWeekType(), current.getStartWeek(), current.getEndWeek())) {
                         addHardConflictIssues(previous, current, issues, roomCache, teacherCache, classInfoCache);
                     }
                 }
