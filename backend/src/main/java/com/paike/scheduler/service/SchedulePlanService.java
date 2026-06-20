@@ -691,16 +691,17 @@ public class SchedulePlanService {
                 continue;
             }
             String reason = reasonBuilder.apply(entry.getKey());
-            // V9 单双周：同一资源（教师/班级/教室）同时段多条约冲突，但 ODD 与 EVEN
-            // 共享时段合法（WeekTypeSupport.overlap=false），不标记为冲突。
-            // 即每条 item 只有在组内存在另一条 weekType 与之重叠的 item 时才算冲突。
+            // V10 连续周段：同一资源（教师/班级/教室）同时段多条约冲突，但实际自然周集合
+            // 不相交的 pair 合法（如 ALL 1-8 与 ALL 9-16，或 ODD 1-8 与 EVEN 1-8）。
+            // 每条 item 只有在组内存在另一条 WeekPatternSupport.overlap=true 的 item 时才算冲突。
             for (SchedulePlanItem item : groupItems) {
                 boolean hasOverlapPeer = false;
                 for (SchedulePlanItem other : groupItems) {
                     if (other == item) {
                         continue;
                     }
-                    if (WeekTypeSupport.overlap(item.getWeekType(), other.getWeekType())) {
+                    if (WeekPatternSupport.overlap(item.getWeekType(), item.getStartWeek(), item.getEndWeek(),
+                            other.getWeekType(), other.getStartWeek(), other.getEndWeek())) {
                         hasOverlapPeer = true;
                         break;
                     }

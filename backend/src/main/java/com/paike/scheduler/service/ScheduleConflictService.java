@@ -120,8 +120,10 @@ public class ScheduleConflictService {
         String className = task.getClassName() != null ? task.getClassName() : "";
         Long teacherId = task.getTeacherId();
         Long classId = task.getClassId();
-        // 当前任务的周次类型（V9 单双周支持）；TeachingTaskVo.weekType，null 视为 ALL
+        // 当前任务的周次模式（V10 连续周段：weekType + startWeek + endWeek）；null 视为 ALL 1-20
         String currentWeekType = task.getWeekType();
+        Integer currentStartWeek = task.getStartWeek();
+        Integer currentEndWeek = task.getEndWeek();
 
         // 批量查询所有关联的教学任务,避免 N+1 查询
         List<Long> existingTaskIds = existingSchedules.stream()
@@ -136,21 +138,24 @@ public class ScheduleConflictService {
         for (Schedule s : existingSchedules) {
             TeachingTask existingTask = existingTaskMap.get(s.getTeachingTaskId());
 
-            // 7. 同一教师同一时间不能有两门课（单双周不同周次可共存：ODD∩EVEN 不冲突）
+            // 7. 同一教师同一时间不能有两门课（V10：实际自然周集合相交才冲突）
             if (existingTask != null && Objects.equals(existingTask.getTeacherId(), teacherId)
-                    && WeekTypeSupport.overlap(currentWeekType, existingTask.getWeekType())) {
+                    && WeekPatternSupport.overlap(currentWeekType, currentStartWeek, currentEndWeek,
+                            existingTask.getWeekType(), existingTask.getStartWeek(), existingTask.getEndWeek())) {
                 return tagReason("TEACHER_CONFLICT", "排课失败:" + teacherName + "老师在" + timeLabel + "已有课程");
             }
 
-            // 8. 同一班级同一时间不能有两门课（单双周同上）
+            // 8. 同一班级同一时间不能有两门课（V10 周段同上）
             if (existingTask != null && Objects.equals(existingTask.getClassId(), classId)
-                    && WeekTypeSupport.overlap(currentWeekType, existingTask.getWeekType())) {
+                    && WeekPatternSupport.overlap(currentWeekType, currentStartWeek, currentEndWeek,
+                            existingTask.getWeekType(), existingTask.getStartWeek(), existingTask.getEndWeek())) {
                 return tagReason("CLASS_CONFLICT", "排课失败:" + className + "在" + timeLabel + "已有课程");
             }
 
-            // 9. 同一教室同一时间不能安排两门课（单双周同上，weekType 取自 schedule 行）
+            // 9. 同一教室同一时间不能安排两门课（V10 周段，weekType/startWeek/endWeek 取自 schedule 行）
             if (Objects.equals(s.getClassroomId(), classroomId)
-                    && WeekTypeSupport.overlap(currentWeekType, s.getWeekType())) {
+                    && WeekPatternSupport.overlap(currentWeekType, currentStartWeek, currentEndWeek,
+                            s.getWeekType(), s.getStartWeek(), s.getEndWeek())) {
                 return tagReason("ROOM_CONFLICT", "排课失败:" + classroom.getRoomName() + "教室在" + timeLabel + "已被占用");
             }
         }

@@ -145,6 +145,130 @@ class ScheduleConflictServiceTest {
                 "全周课与单周课同教师同时段应冲突");
     }
 
+    // ============ V10 连续周段红线 ============
+
+    /** V10：当前 ALL 1-8，已有 ALL 9-16，同教师同时段 → 不冲突（实际周集合不相交） */
+    @Test
+    void checkConflict_allWeekRange_1_8_vs_9_16_noConflict() {
+        TeachingTaskVo currentTask = seedActiveResourcesWithWeekType("ALL");
+        currentTask.setStartWeek(1);
+        currentTask.setEndWeek(8);
+        currentTask.setWeeklyHours(4);
+        when(teachingTaskMapper.selectConflictCheckById(1L)).thenReturn(currentTask);
+        when(scheduleMapper.selectCount(any())).thenReturn(0L);
+
+        Schedule existingSchedule = new Schedule();
+        existingSchedule.setTeachingTaskId(9L);
+        existingSchedule.setClassroomId(999L);
+        existingSchedule.setWeekType("ALL");
+        existingSchedule.setStartWeek(9);
+        existingSchedule.setEndWeek(16);
+        TeachingTask existingTask = new TeachingTask();
+        existingTask.setId(9L);
+        existingTask.setTeacherId(10L);
+        existingTask.setClassId(888L);
+        existingTask.setWeekType("ALL");
+        existingTask.setStartWeek(9);
+        existingTask.setEndWeek(16);
+        when(scheduleMapper.selectList(any())).thenReturn(List.of(existingSchedule));
+        when(teachingTaskMapper.selectBatchIds(any())).thenReturn(List.of(existingTask));
+
+        String reason = service.checkConflict(1L, 2L, 3L, null);
+
+        assertEquals(null, reason, "ALL 1-8 与 ALL 9-16 实际周集合不相交，应可共槽");
+    }
+
+    /** V10：当前 ALL 1-8，已有 ODD 5-12，同教师同时段 → 冲突（重叠自然周 5、7） */
+    @Test
+    void checkConflict_all_1_8_vs_odd_5_12_conflict() {
+        TeachingTaskVo currentTask = seedActiveResourcesWithWeekType("ALL");
+        currentTask.setStartWeek(1);
+        currentTask.setEndWeek(8);
+        when(teachingTaskMapper.selectConflictCheckById(1L)).thenReturn(currentTask);
+
+        Schedule existingSchedule = new Schedule();
+        existingSchedule.setTeachingTaskId(9L);
+        existingSchedule.setClassroomId(999L);
+        existingSchedule.setWeekType("ODD");
+        existingSchedule.setStartWeek(5);
+        existingSchedule.setEndWeek(12);
+        TeachingTask existingTask = new TeachingTask();
+        existingTask.setId(9L);
+        existingTask.setTeacherId(10L);
+        existingTask.setClassId(888L);
+        existingTask.setWeekType("ODD");
+        existingTask.setStartWeek(5);
+        existingTask.setEndWeek(12);
+        when(scheduleMapper.selectList(any())).thenReturn(List.of(existingSchedule));
+        when(teachingTaskMapper.selectBatchIds(any())).thenReturn(List.of(existingTask));
+
+        String reason = service.checkConflict(1L, 2L, 3L, null);
+
+        assertTrue(reason != null && reason.startsWith("[TEACHER_CONFLICT]"),
+                "ALL 1-8 与 ODD 5-12 重叠自然周 5、7，应冲突");
+    }
+
+    /** V10：当前 ODD 1-8，已有 EVEN 8-12，同教室同时段 → 不冲突（第 8 周是偶周，ODD 不含 8） */
+    @Test
+    void checkConflict_odd_1_8_vs_even_8_12_noConflict() {
+        TeachingTaskVo currentTask = seedActiveResourcesWithWeekType("ODD");
+        currentTask.setStartWeek(1);
+        currentTask.setEndWeek(8);
+        currentTask.setWeeklyHours(4);
+        when(teachingTaskMapper.selectConflictCheckById(1L)).thenReturn(currentTask);
+        when(scheduleMapper.selectCount(any())).thenReturn(0L);
+
+        Schedule existingSchedule = new Schedule();
+        existingSchedule.setTeachingTaskId(9L);
+        existingSchedule.setClassroomId(3L); // 同教室，触发教室冲突判定
+        existingSchedule.setWeekType("EVEN");
+        existingSchedule.setStartWeek(8);
+        existingSchedule.setEndWeek(12);
+        TeachingTask existingTask = new TeachingTask();
+        existingTask.setId(9L);
+        existingTask.setTeacherId(999L); // 不同教师
+        existingTask.setClassId(888L);   // 不同班级
+        existingTask.setWeekType("EVEN");
+        existingTask.setStartWeek(8);
+        existingTask.setEndWeek(12);
+        when(scheduleMapper.selectList(any())).thenReturn(List.of(existingSchedule));
+        when(teachingTaskMapper.selectBatchIds(any())).thenReturn(List.of(existingTask));
+
+        String reason = service.checkConflict(1L, 2L, 3L, null);
+
+        assertEquals(null, reason, "ODD 1-8 与 EVEN 8-12 实际周集合不相交，应可共槽");
+    }
+
+    /** V10：当前 ODD 1-9，已有 ODD 8-12，同班级同时段 → 冲突（重叠自然周 9） */
+    @Test
+    void checkConflict_odd_1_9_vs_odd_8_12_conflict() {
+        TeachingTaskVo currentTask = seedActiveResourcesWithWeekType("ODD");
+        currentTask.setStartWeek(1);
+        currentTask.setEndWeek(9);
+        when(teachingTaskMapper.selectConflictCheckById(1L)).thenReturn(currentTask);
+
+        Schedule existingSchedule = new Schedule();
+        existingSchedule.setTeachingTaskId(9L);
+        existingSchedule.setClassroomId(999L);
+        existingSchedule.setWeekType("ODD");
+        existingSchedule.setStartWeek(8);
+        existingSchedule.setEndWeek(12);
+        TeachingTask existingTask = new TeachingTask();
+        existingTask.setId(9L);
+        existingTask.setTeacherId(999L);  // 不同教师
+        existingTask.setClassId(20L);     // 同班级（与 seedActiveResources 的 classId=20L 一致）
+        existingTask.setWeekType("ODD");
+        existingTask.setStartWeek(8);
+        existingTask.setEndWeek(12);
+        when(scheduleMapper.selectList(any())).thenReturn(List.of(existingSchedule));
+        when(teachingTaskMapper.selectBatchIds(any())).thenReturn(List.of(existingTask));
+
+        String reason = service.checkConflict(1L, 2L, 3L, null);
+
+        assertTrue(reason != null && reason.startsWith("[CLASS_CONFLICT]"),
+                "ODD 1-9 与 ODD 8-12 重叠自然周 9，应冲突");
+    }
+
     private void seedActiveResources() {
         seedActiveResourcesWithWeekType(null);
     }
