@@ -4,6 +4,7 @@ import com.paike.scheduler.engine.model.Assignment;
 import com.paike.scheduler.engine.model.EngineContext;
 import com.paike.scheduler.engine.model.EngineTask;
 import com.paike.scheduler.entity.SchedulePlanItem;
+import com.paike.scheduler.service.WeekPatternSupport;
 import com.paike.scheduler.service.WeekTypeSupport;
 import com.paike.scheduler.service.scheduling.DeltaPenaltyScorer;
 import com.paike.scheduler.service.scheduling.ScoringFunctions;
@@ -138,7 +139,7 @@ public final class ObjectiveFunction {
         return value == null ? BigDecimal.ZERO : BigDecimal.valueOf(value);
     }
 
-    /** β 版：owner 维度加 weekType，ALL 展开成 ODD+EVEN 两个独立子桶 */
+    /** V10 β 版：owner 维度加 (weekType, weekMask)，ALL 展开成 ODD+EVEN，再按实际自然周 mask 分桶 */
     private static Map<WeekOwner, Map<Integer, Long>> nestedDayCountsBeta(
             List<SchedulePlanItem> items,
             Function<SchedulePlanItem, Long> ownerExtractor
@@ -146,7 +147,7 @@ public final class ObjectiveFunction {
         return items.stream()
                 .flatMap(item -> WeekTypeSupport.countableWeekTypes(item.getWeekType()).stream()
                         .map(wt -> new AbstractMap.SimpleEntry<>(
-                                new WeekOwner(ownerExtractor.apply(item), wt),
+                                weekOwner(ownerExtractor.apply(item), wt, item),
                                 item.getWeekday())))
                 .collect(Collectors.groupingBy(
                         Map.Entry::getKey,
@@ -155,19 +156,20 @@ public final class ObjectiveFunction {
                                 Collectors.counting())));
     }
 
-    /** β 版：courseDayCounts key 加 weekType 维度（ALL 展开后同 item 产生 ODD/EVEN 两个 key） */
+    /** V10 β 版：courseDayCounts key 加 (weekType, weekMask) 维度 */
     private static Map<String, Long> courseDayCountsBeta(List<SchedulePlanItem> items) {
         return items.stream()
                 .flatMap(item -> WeekTypeSupport.countableWeekTypes(item.getWeekType()).stream()
                         .map(wt -> new AbstractMap.SimpleEntry<>(
-                                item.getClassId() + "_" + item.getCourseId() + "_" + item.getWeekday() + "_" + wt,
+                                item.getClassId() + "_" + item.getCourseId() + "_" + item.getWeekday() + "_" + wt
+                                        + "_" + WeekPatternSupport.weekRangeKey(item.getWeekType(), item.getStartWeek(), item.getEndWeek()),
                                 1L)))
                 .collect(Collectors.groupingBy(
                         Map.Entry::getKey,
                         Collectors.summingLong(Map.Entry::getValue)));
     }
 
-    /** β 版：连续上课限制按 (teacher × weekType × day) 分桶 */
+    /** V10 β 版：连续上课限制按 (teacher × weekType × weekMask × day) 分桶 */
     private static Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> nestedDayItemsBeta(
             List<SchedulePlanItem> items,
             Function<SchedulePlanItem, Long> ownerExtractor
@@ -175,13 +177,19 @@ public final class ObjectiveFunction {
         Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> result = new HashMap<>();
         for (SchedulePlanItem item : items) {
             for (String wt : WeekTypeSupport.countableWeekTypes(item.getWeekType())) {
-                WeekOwner key = new WeekOwner(ownerExtractor.apply(item), wt);
+                WeekOwner key = weekOwner(ownerExtractor.apply(item), wt, item);
                 result.computeIfAbsent(key, k -> new HashMap<>())
                         .computeIfAbsent(item.getWeekday(), d -> new ArrayList<>())
                         .add(item);
             }
         }
         return result;
+    }
+
+    /** V10：构造带 weekMask 的 WeekOwner */
+    private static WeekOwner weekOwner(Long ownerId, String weekType, SchedulePlanItem item) {
+        return new WeekOwner(ownerId, weekType,
+                WeekPatternSupport.weekRangeKey(item.getWeekType(), item.getStartWeek(), item.getEndWeek()));
     }
 
     private Map<Long, Long> roomUseCounts(List<SchedulePlanItem> items) {

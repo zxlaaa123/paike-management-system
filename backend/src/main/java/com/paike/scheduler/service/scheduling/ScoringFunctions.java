@@ -247,19 +247,24 @@ public final class ScoringFunctions {
     // ============================================================
 
     /**
-     * β 评分的复合 owner 键：ownerId（教师或班级）× weekType（ODD/EVEN）。
-     * 由调用方聚合时构造，ALL 已在上游展开为 (ownerId, ODD) + (ownerId, EVEN) 两个独立键。
+     * β 评分的复合 owner 键：ownerId（教师或班级）× weekType（ODD/EVEN）× weekRangeKey（周段签名）。
+     * <p>V10 升级：附加 {@code weekRangeKey} 维度（格式 {@code "startWeek-endWeek"}）。
+     * 周段不同的两条 item 进不同桶，互不影响方差评分；周段相同的进同桶，与 V9 行为一致。
+     * <p>纯 ALL 1-20 数据所有 weekRangeKey 相同（"1-20"），分桶结果与 V9 {@code (ownerId, weekType)}
+     * 完全等价（零回归）。ALL 1-20 展开为 ODD/EVEN 后与纯 ODD 1-20 / EVEN 1-20 同周段 → 同桶。
      */
-    public record WeekOwner(Long ownerId, String weekType) {
+    public record WeekOwner(Long ownerId, String weekType, String weekRangeKey) {
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (!(o instanceof WeekOwner that)) return false;
-            return Objects.equals(ownerId, that.ownerId) && Objects.equals(weekType, that.weekType);
+            return Objects.equals(ownerId, that.ownerId)
+                    && Objects.equals(weekType, that.weekType)
+                    && Objects.equals(weekRangeKey, that.weekRangeKey);
         }
         @Override
         public int hashCode() {
-            return Objects.hash(ownerId, weekType);
+            return Objects.hash(ownerId, weekType, weekRangeKey);
         }
     }
 

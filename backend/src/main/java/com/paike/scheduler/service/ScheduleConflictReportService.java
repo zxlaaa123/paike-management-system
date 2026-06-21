@@ -412,13 +412,15 @@ public class ScheduleConflictReportService {
         if (context.teacherDailyLimit <= 0) {
             return;
         }
-        // V10 边界：当前仍按 group.size() 计数，未按实际自然周集合展开。
-        // V9 数据（startWeek/endWeek 均默认 1-20）下行为等价；周段数据的精确日上限计数留给阶段 5 评分链统一处理。
+        // V10：按 (teacher, day) 分组后，组内再按实际自然周集合做最大重叠层数判定。
+        // 周段不相交的两条 schedule 不算同一天超载（如 ALL 1-8 周一 + ALL 9-16 周一 = 各 1 节，不超载）。
+        // V9 数据（startWeek/endWeek 均默认 1-20）下所有 schedule mask 相同，退化为 group.size()（零回归）。
         Map<String, List<Schedule>> grouped = context.schedules.stream()
                 .filter(s -> s.getTeacherId() != null)
                 .collect(Collectors.groupingBy(s -> buildDailyKey(s.getTeacherId(), getDayOfWeek(context.timeSlotMap.get(s.getTimeSlotId())))));
         for (List<Schedule> group : grouped.values()) {
-            if (group.size() <= context.teacherDailyLimit) {
+            int maxOverlap = maxConcurrentOverlap(group);
+            if (maxOverlap <= context.teacherDailyLimit) {
                 continue;
             }
             Schedule sample = group.get(0);
@@ -434,7 +436,7 @@ public class ScheduleConflictReportService {
                     teacherName,
                     null,
                     joinScheduleIds(group),
-                    teacherName + "在" + weekdayText(dayOfWeek) + "共安排了" + group.size() + "个大节，超过规则上限"
+                    teacherName + "在" + weekdayText(dayOfWeek) + "同一周段内最多安排了" + maxOverlap + "个大节，超过规则上限"
                             + context.teacherDailyLimit + "个大节",
                     "建议将其中部分课程调整到其他工作日，减轻教师单日授课压力"
             ));
@@ -445,12 +447,13 @@ public class ScheduleConflictReportService {
         if (context.classDailyLimit <= 0) {
             return;
         }
-        // V10 边界：同 detectTeacherDailyOverload，周段精确计数留给阶段 5。
+        // V10：同 detectTeacherDailyOverload，按实际自然周集合做最大重叠层数判定。
         Map<String, List<Schedule>> grouped = context.schedules.stream()
                 .filter(s -> s.getClassId() != null)
                 .collect(Collectors.groupingBy(s -> buildDailyKey(s.getClassId(), getDayOfWeek(context.timeSlotMap.get(s.getTimeSlotId())))));
         for (List<Schedule> group : grouped.values()) {
-            if (group.size() <= context.classDailyLimit) {
+            int maxOverlap = maxConcurrentOverlap(group);
+            if (maxOverlap <= context.classDailyLimit) {
                 continue;
             }
             Schedule sample = group.get(0);
@@ -466,11 +469,40 @@ public class ScheduleConflictReportService {
                     className,
                     null,
                     joinScheduleIds(group),
-                    className + "在" + weekdayText(dayOfWeek) + "共安排了" + group.size() + "个大节，超过规则上限"
+                    className + "在" + weekdayText(dayOfWeek) + "同一周段内最多安排了" + maxOverlap + "个大节，超过规则上限"
                             + context.classDailyLimit + "个大节",
                     "建议将部分课程调整到其他日期，避免班级当天课程过于集中"
             ));
         }
+    }
+
+    /**
+     * V10：计算一组 schedule 在实际自然周上的最大重叠层数。
+     * 将每条 schedule 的活跃周展开为 week 集合，逐周统计该组有多少条 schedule 在此周活跃，
+     * 取最大值。周段不相交的 schedule 不会在同一周被同时计入。
+     * V9 数据（全 1-20）所有 schedule 活跃周相同，退化为 group.size()（零回归）。
+     */
+    private int maxConcurrentOverlap(List<Schedule> group) {
+        if (group == null || group.isEmpty()) {
+            return 0;
+        }
+        int maxWeek = WeekPatternSupport.DEFAULT_END_WEEK;
+        int[] weekCounts = new int[maxWeek + 1];
+        for (Schedule s : group) {
+            long mask = WeekPatternSupport.activeWeekMask(s.getWeekType(), s.getStartWeek(), s.getEndWeek());
+            for (int w = 1; w <= maxWeek; w++) {
+                if ((mask & (1L << (w - 1))) != 0L) {
+                    weekCounts[w]++;
+                }
+            }
+        }
+        int max = 0;
+        for (int w = 1; w <= maxWeek; w++) {
+            if (weekCounts[w] > max) {
+                max = weekCounts[w];
+            }
+        }
+        return max;
     }
 
     private void fillRelationFields(List<ScheduleConflictReportVo> records) {

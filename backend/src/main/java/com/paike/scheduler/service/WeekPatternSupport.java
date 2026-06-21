@@ -89,6 +89,18 @@ public final class WeekPatternSupport {
         return Long.bitCount(activeWeekMask(weekType, startWeek, endWeek, maxWeek));
     }
 
+    /**
+     * V10 评分链便捷方法：计算 (weekType, startWeek, endWeek) 的周段签名。
+     * 供 {@link com.paike.scheduler.service.scheduling.ScoringFunctions.WeekOwner} 作为第三维 key 使用。
+     * 周段相同的 item 签名相同 → 同桶；周段不同的 item 签名不同 → 不同桶。
+     * 格式 {@code "startWeek-endWeek"}，默认值归一为 {@code "1-20"}。
+     */
+    public static String weekRangeKey(String weekType, Integer startWeek, Integer endWeek) {
+        int start = normalizeStartWeek(startWeek);
+        int end = normalizeEndWeek(endWeek);
+        return start + "-" + end;
+    }
+
     public static String displayLabel(String weekType, Integer startWeek, Integer endWeek) {
         return displayLabel(weekType, startWeek, endWeek, DEFAULT_START_WEEK, DEFAULT_END_WEEK);
     }
