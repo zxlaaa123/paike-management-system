@@ -16,6 +16,10 @@ export interface TimetableItem {
   building: string
   /** 周次类型：ALL全周、ODD单周、EVEN双周（V9 单双周支持）。历史数据可能缺省，按 ALL 处理 */
   weekType?: string
+  /** V10 起始周（默认 1，全学期） */
+  startWeek?: number
+  /** V10 结束周（默认 20，全学期） */
+  endWeek?: number
 }
 
 interface TimetableParams {

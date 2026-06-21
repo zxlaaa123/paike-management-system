@@ -268,8 +268,10 @@ public class TimetableService {
                 vo.setClassName(classInfo.getClassName());
             }
         }
-        // V9 单双周：透传 weekType（之前在此处丢失，导致导出/网格无法区分单双周）
+        // V10 周段：透传 weekType + startWeek/endWeek（之前在此处丢失，导致导出/网格无法显示周段标签）
         vo.setWeekType(WeekTypeSupport.normalize(schedule.getWeekType()));
+        vo.setStartWeek(schedule.getStartWeek());
+        vo.setEndWeek(schedule.getEndWeek());
         return vo;
     }
 
@@ -424,16 +426,20 @@ public class TimetableService {
     }
 
     /**
-     * V9 阶段 2B：同 cell 多条课程（单双周共槽）拼接，每条课程名加 [单]/[双] 标记（ALL 不加）。
-     * 多条之间用 "---" 分隔；每条内部仍按 viewType 附次要信息（教师/班级/教室）换行。
-     * 单条时退化到原有格式（ALL 课无标记，视觉与改造前一致，零回归）。
+     * V10 周段：同 cell 多条课程（单双周共槽/不同周段共槽）拼接，每条课程名加周段标签。
+     * 标签由 {@link WeekPatternSupport#displayLabel} 生成：
+     * - 默认全学期（1-20）+ ALL → 无标签
+     * - 非默认周段 → [1-8周]
+     * - 周段+单双周 → [5-12周/单]
+     * 多条之间用 "---" 分隔；每条内部按 viewType 附次要信息换行。
+     * 单条默认周段时退化到无标签格式（零回归）。
      */
     private String buildCellText(List<TimetableVo> cellItems, TimetableViewType viewType) {
         List<String> blocks = new ArrayList<>();
         for (TimetableVo item : cellItems) {
             List<String> lines = new ArrayList<>();
             String courseName = defaultString(item.getCourseName());
-            String label = WeekTypeSupport.displayLabel(item.getWeekType());
+            String label = WeekPatternSupport.displayLabel(item.getWeekType(), item.getStartWeek(), item.getEndWeek());
             lines.add(label.isEmpty() ? courseName : courseName + "[" + label + "]");
             switch (viewType) {
                 case CLASS -> {
