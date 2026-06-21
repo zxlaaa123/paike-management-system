@@ -168,6 +168,9 @@ public class EngineContextLoader {
 
             // V9 阶段3：移除 stub 拒绝，单双周任务正常进引擎（weekType 透传，方案 X 翻倍 slot 支持共槽）
             String taskWeekType = WeekTypeSupport.normalize(t.getWeekType());
+            // V10 连续周段：透传 startWeek/endWeek（null 用默认 1/20，与 WeekPatternSupport 一致）
+            int taskStartWeek = WeekPatternSupport.normalizeStartWeek(t.getStartWeek());
+            int taskEndWeek = WeekPatternSupport.normalizeEndWeek(t.getEndWeek());
 
             int weeklyHours = t.getWeeklyHours() != null ? t.getWeeklyHours() : 0;
             int requiredSlots = (int) Math.ceil(weeklyHours / 2.0);
@@ -188,7 +191,7 @@ public class EngineContextLoader {
 
             int engineTaskIndex = engineTasks.size();
             engineTasks.add(new EngineTask(engineTaskIndex, t.getId(), tIdx, cIdx, coIdx, requiredSlots,
-                courseType, studentCount, candidateRooms, taskWeekType));
+                courseType, studentCount, candidateRooms, taskWeekType, taskStartWeek, taskEndWeek));
         }
 
         // 8. Load existing schedules as initial occupancy

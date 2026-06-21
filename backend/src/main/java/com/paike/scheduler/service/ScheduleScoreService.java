@@ -204,13 +204,15 @@ public class ScheduleScoreService {
         Map<String, List<SchedulePlanItem>> classSlotMap = groupBy(items, item -> item.getClassId() + "_" + item.getWeekday() + "_" + item.getStartPeriod());
         Map<String, List<SchedulePlanItem>> roomSlotMap = groupBy(items, item -> item.getClassroomId() + "_" + item.getWeekday() + "_" + item.getStartPeriod());
 
-        // β 评分（独立计数）：owner 维度加 weekType，ALL 展开成 ODD+EVEN 两个独立子桶。
+        // β 评分（独立计数）：owner 维度加 (weekType, weekMask)，ALL 展开成 ODD+EVEN 两个独立子桶，
+        // 再按实际自然周 mask 区分（V10：周段不相交 → 不同桶 → 互不影响）。
         Map<WeekOwner, Map<Integer, Long>> classDayCounts = nestedDayCountsBeta(items, SchedulePlanItem::getClassId);
         Map<WeekOwner, Map<Integer, Long>> teacherDayCounts = nestedDayCountsBeta(items, SchedulePlanItem::getTeacherId);
         Map<String, Long> courseDayCounts = items.stream()
                 .flatMap(item -> WeekTypeSupport.countableWeekTypes(item.getWeekType()).stream()
                         .map(wt -> new AbstractMap.SimpleEntry<>(
-                                item.getClassId() + "_" + item.getCourseId() + "_" + item.getWeekday() + "_" + wt,
+                                item.getClassId() + "_" + item.getCourseId() + "_" + item.getWeekday() + "_" + wt
+                                        + "_" + WeekPatternSupport.weekRangeKey(item.getWeekType(), item.getStartWeek(), item.getEndWeek()),
                                 1L)))
                 .collect(Collectors.groupingBy(
                         Map.Entry::getKey,
@@ -274,14 +276,16 @@ public class ScheduleScoreService {
     }
 
     /**
-     * β 版（V9 阶段 2A）：owner 维度加 weekType，ALL 用
-     * {@link WeekTypeSupport#countableWeekTypes(String)} 展开成 ODD+EVEN 两个独立子桶。
+     * V10 β 版：owner 维度加 (weekType, weekMask)，ALL 用
+     * {@link WeekTypeSupport#countableWeekTypes(String)} 展开成 ODD+EVEN 两个独立子桶，
+     * 再按 {@link WeekPatternSupport#weekMask} 区分实际自然周集合。
      * 下游用 {@link ScoringFunctions#penaltyVarianceBeta(Map)}。
      */
     private Map<WeekOwner, Map<Integer, Long>> nestedDayCountsBeta(List<SchedulePlanItem> items, Function<SchedulePlanItem, Long> ownerFunc) {
         return items.stream()
                 .flatMap(item -> WeekTypeSupport.countableWeekTypes(item.getWeekType()).stream()
-                        .map(wt -> new AbstractMap.SimpleEntry<>(new WeekOwner(ownerFunc.apply(item), wt), item.getWeekday())))
+                        .map(wt -> new AbstractMap.SimpleEntry<>(
+                                weekOwner(ownerFunc.apply(item), wt, item), item.getWeekday())))
                 .collect(Collectors.groupingBy(
                         Map.Entry::getKey,
                         Collectors.groupingBy(
@@ -290,14 +294,13 @@ public class ScheduleScoreService {
     }
 
     /**
-     * β 版（V9 阶段 2A）：同 {@link #nestedDayCountsBeta}，连续上课限制按 (teacher × weekType × day) 分桶。
-     * ALL 展开后同一教师同一 day 的 item 会在 ODD 与 EVEN 桶各算一次连续链（对称，纯 ALL 数据数值不变）。
+     * V10 β 版：同 {@link #nestedDayCountsBeta}，连续上课限制按 (teacher × weekType × weekMask × day) 分桶。
      */
     private Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> nestedDayItemsBeta(List<SchedulePlanItem> items, Function<SchedulePlanItem, Long> ownerFunc) {
         Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> result = new HashMap<>();
         for (SchedulePlanItem item : items) {
             for (String wt : WeekTypeSupport.countableWeekTypes(item.getWeekType())) {
-                WeekOwner key = new WeekOwner(ownerFunc.apply(item), wt);
+                WeekOwner key = weekOwner(ownerFunc.apply(item), wt, item);
                 result.computeIfAbsent(key, k -> new HashMap<>())
                         .computeIfAbsent(item.getWeekday(), d -> new ArrayList<>())
                         .add(item);
@@ -306,11 +309,21 @@ public class ScheduleScoreService {
         return result;
     }
 
+    /** V10：构造带 weekMask 的 WeekOwner */
+    private WeekOwner weekOwner(Long ownerId, String weekType, SchedulePlanItem item) {
+        return new WeekOwner(ownerId, weekType,
+                WeekPatternSupport.weekRangeKey(item.getWeekType(), item.getStartWeek(), item.getEndWeek()));
+    }
+
     /**
-     * V9 阶段 2A：硬冲突计数按 weekType overlap 成对判定。
-     * ODD+EVEN 共槽（合法，不冲突）不再被误计；纯 ALL 数据组内全 overlap，结果仍为 size-1（零回归）。
-     * 同一组内 N 条记录中真正冲突数 = 必须移除才能两两 overlap=false 的最小数。
-     * ALL 与任意 overlap，故含 ALL 的组只需保留 1 条；纯 ODD+EVEN 的组按各自周次分别 size-1。
+     * V10：硬冲突计数按 {@link WeekPatternSupport#overlap} 判定。
+     * 同 (owner,day,period) 分组后，组内两两判定实际自然周集合是否相交。
+     * 纯 ALL 1-20 数据组内全 overlap，结果仍为 size-1（零回归）；
+     * ODD+EVEN 共槽（合法）不冲突；周段不相交（如 ALL 1-8 vs ALL 9-16）不冲突。
+     *
+     * <p>同组内 N 条记录中真正冲突数 = 必须移除才能两两 overlap=false 的最小数。
+     * 贪心实现：按 mask 降序（周数多的优先保留），逐条检查与已保留的是否 overlap，
+     * overlap 则计为冲突，否则保留。
      */
     private int countConflicts(Map<String, List<SchedulePlanItem>> grouped) {
         int total = 0;
@@ -318,24 +331,34 @@ public class ScheduleScoreService {
             if (list.size() <= 1) {
                 continue;
             }
-            // 按 weekType 分桶：ODD 一桶、EVEN 一桶、ALL 一桶；ALL 与 ODD/EVEN 都冲突
-            Map<String, List<SchedulePlanItem>> byWeek = new HashMap<>();
-            for (SchedulePlanItem item : list) {
-                byWeek.computeIfAbsent(WeekTypeSupport.normalize(item.getWeekType()), k -> new ArrayList<>()).add(item);
-            }
-            int allCount = byWeek.getOrDefault(WeekTypeSupport.ALL, List.of()).size();
-            int oddCount = byWeek.getOrDefault(WeekTypeSupport.ODD, List.of()).size();
-            int evenCount = byWeek.getOrDefault(WeekTypeSupport.EVEN, List.of()).size();
-            if (allCount > 0) {
-                // 含 ALL：ALL 与 ODD/EVEN 都冲突，ALL 内部相互冲突 → 保留 1 条（ALL 优先），其余全冲突
-                int others = oddCount + evenCount;
-                total += (allCount - 1) + others;
-            } else {
-                // 纯 ODD/EVEN：ODD 内部冲突 + EVEN 内部冲突，ODD vs EVEN 共存
-                total += Math.max(0, oddCount - 1) + Math.max(0, evenCount - 1);
-            }
+            total += countOverlappingConflicts(list);
         }
         return total;
+    }
+
+    /**
+     * V10：组内按 mask 降序贪心，与已保留的任意一条 overlap 即为冲突。
+     */
+    private int countOverlappingConflicts(List<SchedulePlanItem> list) {
+        int conflicts = 0;
+        List<SchedulePlanItem> retained = new ArrayList<>();
+        for (SchedulePlanItem item : list) {
+            boolean overlap = false;
+            for (SchedulePlanItem kept : retained) {
+                if (WeekPatternSupport.overlap(
+                        item.getWeekType(), item.getStartWeek(), item.getEndWeek(),
+                        kept.getWeekType(), kept.getStartWeek(), kept.getEndWeek())) {
+                    overlap = true;
+                    break;
+                }
+            }
+            if (overlap) {
+                conflicts++;
+            } else {
+                retained.add(item);
+            }
+        }
+        return conflicts;
     }
 
     private BigDecimal safeWeight(BigDecimal weight) {

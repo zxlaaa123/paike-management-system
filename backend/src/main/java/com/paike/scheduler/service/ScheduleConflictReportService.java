@@ -181,15 +181,16 @@ public class ScheduleConflictReportService {
                 .filter(s -> s.getTeacherId() != null && s.getTimeSlotId() != null)
                 .collect(Collectors.groupingBy(s -> buildPairKey(s.getTeacherId(), s.getTimeSlotId())));
         for (List<Schedule> group : grouped.values()) {
-            if (group.size() <= 1) {
+            List<Schedule> conflictSchedules = filterWeekOverlapSchedules(group);
+            if (conflictSchedules.size() <= 1) {
                 continue;
             }
-            Schedule sample = group.get(0);
+            Schedule sample = conflictSchedules.get(0);
             Teacher teacher = context.teacherMap.get(sample.getTeacherId());
             TimeSlot slot = context.timeSlotMap.get(sample.getTimeSlotId());
             String teacherName = teacher != null ? teacher.getName() : "未知教师";
             String timeLabel = formatTimeLabel(slot);
-            String courseSummary = summarizeSchedules(group, context);
+            String courseSummary = summarizeSchedules(conflictSchedules, context);
             reports.add(buildReport(
                     baseReportNo,
                     reports.size() + 1,
@@ -198,8 +199,8 @@ public class ScheduleConflictReportService {
                     sample.getTeacherId(),
                     teacherName,
                     sample.getTimeSlotId(),
-                    joinScheduleIds(group),
-                    teacherName + "在" + timeLabel + "存在" + group.size() + "条课程安排：" + courseSummary,
+                    joinScheduleIds(conflictSchedules),
+                    teacherName + "在" + timeLabel + "存在" + conflictSchedules.size() + "条课程安排：" + courseSummary,
                     "建议调整其中一门课程到其他时间段，避免教师同一时间承担多门课程"
             ));
         }
@@ -210,15 +211,16 @@ public class ScheduleConflictReportService {
                 .filter(s -> s.getClassId() != null && s.getTimeSlotId() != null)
                 .collect(Collectors.groupingBy(s -> buildPairKey(s.getClassId(), s.getTimeSlotId())));
         for (List<Schedule> group : grouped.values()) {
-            if (group.size() <= 1) {
+            List<Schedule> conflictSchedules = filterWeekOverlapSchedules(group);
+            if (conflictSchedules.size() <= 1) {
                 continue;
             }
-            Schedule sample = group.get(0);
+            Schedule sample = conflictSchedules.get(0);
             ClassInfo classInfo = context.classMap.get(sample.getClassId());
             TimeSlot slot = context.timeSlotMap.get(sample.getTimeSlotId());
             String className = classInfo != null ? classInfo.getClassName() : "未知班级";
             String timeLabel = formatTimeLabel(slot);
-            String courseSummary = summarizeSchedules(group, context);
+            String courseSummary = summarizeSchedules(conflictSchedules, context);
             reports.add(buildReport(
                     baseReportNo,
                     reports.size() + 1,
@@ -227,8 +229,8 @@ public class ScheduleConflictReportService {
                     sample.getClassId(),
                     className,
                     sample.getTimeSlotId(),
-                    joinScheduleIds(group),
-                    className + "在" + timeLabel + "被安排了" + group.size() + "门课程：" + courseSummary,
+                    joinScheduleIds(conflictSchedules),
+                    className + "在" + timeLabel + "被安排了" + conflictSchedules.size() + "门课程：" + courseSummary,
                     "建议保留最合适的一门课程，其他课程调整到该班级的空闲时间段"
             ));
         }
@@ -239,15 +241,16 @@ public class ScheduleConflictReportService {
                 .filter(s -> s.getClassroomId() != null && s.getTimeSlotId() != null)
                 .collect(Collectors.groupingBy(s -> buildPairKey(s.getClassroomId(), s.getTimeSlotId())));
         for (List<Schedule> group : grouped.values()) {
-            if (group.size() <= 1) {
+            List<Schedule> conflictSchedules = filterWeekOverlapSchedules(group);
+            if (conflictSchedules.size() <= 1) {
                 continue;
             }
-            Schedule sample = group.get(0);
+            Schedule sample = conflictSchedules.get(0);
             Classroom classroom = context.classroomMap.get(sample.getClassroomId());
             TimeSlot slot = context.timeSlotMap.get(sample.getTimeSlotId());
             String roomName = classroom != null ? classroom.getRoomName() : "未知教室";
             String timeLabel = formatTimeLabel(slot);
-            String courseSummary = summarizeSchedules(group, context);
+            String courseSummary = summarizeSchedules(conflictSchedules, context);
             reports.add(buildReport(
                     baseReportNo,
                     reports.size() + 1,
@@ -256,11 +259,41 @@ public class ScheduleConflictReportService {
                     sample.getClassroomId(),
                     roomName,
                     sample.getTimeSlotId(),
-                    joinScheduleIds(group),
-                    roomName + "在" + timeLabel + "被重复占用，共涉及" + group.size() + "条排课：" + courseSummary,
+                    joinScheduleIds(conflictSchedules),
+                    roomName + "在" + timeLabel + "被重复占用，共涉及" + conflictSchedules.size() + "条排课：" + courseSummary,
                     "建议为其中部分课程更换空闲教室，避免同一教室同一时间重复使用"
             ));
         }
+    }
+
+    /**
+     * V10 连续周段：从同资源同时段分组中，筛出参与实际自然周集合重叠的 schedule 行。
+     * 只看 group.size()>1 会误报 ODD+EVEN 共槽、ALL 1-8 与 ALL 9-16 共槽等合法场景。
+     * 返回的列表包含组内任意一条与另一条 WeekPatternSupport.overlap=true 的 schedule；
+     * 若组内无任何重叠 pair，返回空列表。
+     */
+    private List<Schedule> filterWeekOverlapSchedules(List<Schedule> group) {
+        if (group.size() <= 1) {
+            return List.of();
+        }
+        List<Schedule> result = new ArrayList<>();
+        for (Schedule s : group) {
+            boolean hasOverlap = false;
+            for (Schedule other : group) {
+                if (other == s) {
+                    continue;
+                }
+                if (WeekPatternSupport.overlap(s.getWeekType(), s.getStartWeek(), s.getEndWeek(),
+                        other.getWeekType(), other.getStartWeek(), other.getEndWeek())) {
+                    hasOverlap = true;
+                    break;
+                }
+            }
+            if (hasOverlap) {
+                result.add(s);
+            }
+        }
+        return result;
     }
 
     private void detectCapacityIssues(String baseReportNo, Context context, List<ScheduleConflictReport> reports) {
@@ -379,11 +412,15 @@ public class ScheduleConflictReportService {
         if (context.teacherDailyLimit <= 0) {
             return;
         }
+        // V10：按 (teacher, day) 分组后，组内再按实际自然周集合做最大重叠层数判定。
+        // 周段不相交的两条 schedule 不算同一天超载（如 ALL 1-8 周一 + ALL 9-16 周一 = 各 1 节，不超载）。
+        // V9 数据（startWeek/endWeek 均默认 1-20）下所有 schedule mask 相同，退化为 group.size()（零回归）。
         Map<String, List<Schedule>> grouped = context.schedules.stream()
                 .filter(s -> s.getTeacherId() != null)
                 .collect(Collectors.groupingBy(s -> buildDailyKey(s.getTeacherId(), getDayOfWeek(context.timeSlotMap.get(s.getTimeSlotId())))));
         for (List<Schedule> group : grouped.values()) {
-            if (group.size() <= context.teacherDailyLimit) {
+            int maxOverlap = maxConcurrentOverlap(group);
+            if (maxOverlap <= context.teacherDailyLimit) {
                 continue;
             }
             Schedule sample = group.get(0);
@@ -399,7 +436,7 @@ public class ScheduleConflictReportService {
                     teacherName,
                     null,
                     joinScheduleIds(group),
-                    teacherName + "在" + weekdayText(dayOfWeek) + "共安排了" + group.size() + "个大节，超过规则上限"
+                    teacherName + "在" + weekdayText(dayOfWeek) + "同一周段内最多安排了" + maxOverlap + "个大节，超过规则上限"
                             + context.teacherDailyLimit + "个大节",
                     "建议将其中部分课程调整到其他工作日，减轻教师单日授课压力"
             ));
@@ -410,11 +447,13 @@ public class ScheduleConflictReportService {
         if (context.classDailyLimit <= 0) {
             return;
         }
+        // V10：同 detectTeacherDailyOverload，按实际自然周集合做最大重叠层数判定。
         Map<String, List<Schedule>> grouped = context.schedules.stream()
                 .filter(s -> s.getClassId() != null)
                 .collect(Collectors.groupingBy(s -> buildDailyKey(s.getClassId(), getDayOfWeek(context.timeSlotMap.get(s.getTimeSlotId())))));
         for (List<Schedule> group : grouped.values()) {
-            if (group.size() <= context.classDailyLimit) {
+            int maxOverlap = maxConcurrentOverlap(group);
+            if (maxOverlap <= context.classDailyLimit) {
                 continue;
             }
             Schedule sample = group.get(0);
@@ -430,11 +469,40 @@ public class ScheduleConflictReportService {
                     className,
                     null,
                     joinScheduleIds(group),
-                    className + "在" + weekdayText(dayOfWeek) + "共安排了" + group.size() + "个大节，超过规则上限"
+                    className + "在" + weekdayText(dayOfWeek) + "同一周段内最多安排了" + maxOverlap + "个大节，超过规则上限"
                             + context.classDailyLimit + "个大节",
                     "建议将部分课程调整到其他日期，避免班级当天课程过于集中"
             ));
         }
+    }
+
+    /**
+     * V10：计算一组 schedule 在实际自然周上的最大重叠层数。
+     * 将每条 schedule 的活跃周展开为 week 集合，逐周统计该组有多少条 schedule 在此周活跃，
+     * 取最大值。周段不相交的 schedule 不会在同一周被同时计入。
+     * V9 数据（全 1-20）所有 schedule 活跃周相同，退化为 group.size()（零回归）。
+     */
+    private int maxConcurrentOverlap(List<Schedule> group) {
+        if (group == null || group.isEmpty()) {
+            return 0;
+        }
+        int maxWeek = WeekPatternSupport.DEFAULT_END_WEEK;
+        int[] weekCounts = new int[maxWeek + 1];
+        for (Schedule s : group) {
+            long mask = WeekPatternSupport.activeWeekMask(s.getWeekType(), s.getStartWeek(), s.getEndWeek());
+            for (int w = 1; w <= maxWeek; w++) {
+                if ((mask & (1L << (w - 1))) != 0L) {
+                    weekCounts[w]++;
+                }
+            }
+        }
+        int max = 0;
+        for (int w = 1; w <= maxWeek; w++) {
+            if (weekCounts[w] > max) {
+                max = weekCounts[w];
+            }
+        }
+        return max;
     }
 
     private void fillRelationFields(List<ScheduleConflictReportVo> records) {

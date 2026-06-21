@@ -135,7 +135,7 @@ class V3ScheduleGenerateServiceTest {
 
     private EngineContext singleTaskContext() {
         return new EngineContext(
-                List.of(new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0), "ODD")),
+                List.of(new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0), "ODD", 1, 20)),
                 List.of(new EngineContext.TimeSlotData(0, 201L, 1, 1, "ODD")),
                 List.of(new EngineContext.ClassroomData(0, 301L, 60, "NORMAL")),
                 List.of(new EngineContext.TeacherData(0, 401L, "T1", 1)),

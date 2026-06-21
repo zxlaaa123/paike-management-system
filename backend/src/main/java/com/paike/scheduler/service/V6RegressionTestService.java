@@ -144,11 +144,13 @@ public class V6RegressionTestService {
                 for (int j = i + 1; j < group.size(); j++) {
                     Schedule a = group.get(i);
                     Schedule b = group.get(j);
-                    if (WeekTypeSupport.overlap(a.getWeekType(), b.getWeekType())) {
+                    // V10 连续周段：实际自然周集合相交才算冲突
+                    if (WeekPatternSupport.overlap(a.getWeekType(), a.getStartWeek(), a.getEndWeek(),
+                            b.getWeekType(), b.getStartWeek(), b.getEndWeek())) {
                         conflicts.add(resourceLabel + "ID=" + resourceIdGetter.apply(a)
                                 + " 时段ID=" + a.getTimeSlotId()
-                                + " 周次重叠(" + WeekTypeSupport.normalize(a.getWeekType())
-                                + "/" + WeekTypeSupport.normalize(b.getWeekType()) + ")"
+                                + " 周次重叠(" + WeekPatternSupport.displayLabel(a.getWeekType(), a.getStartWeek(), a.getEndWeek())
+                                + "/" + WeekPatternSupport.displayLabel(b.getWeekType(), b.getStartWeek(), b.getEndWeek()) + ")"
                                 + " scheduleId=" + a.getId() + "," + b.getId());
                     }
                 }

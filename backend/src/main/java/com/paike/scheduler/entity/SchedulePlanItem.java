@@ -41,6 +41,12 @@ public class SchedulePlanItem {
 
     private String weekType;
 
+    /** 连续周段起始周（闭区间，默认1，V10 连续周段支持） */
+    private Integer startWeek;
+
+    /** 连续周段结束周（闭区间，默认20，V10 连续周段支持） */
+    private Integer endWeek;
+
     private BigDecimal score;
 
     private Integer conflictFlag;

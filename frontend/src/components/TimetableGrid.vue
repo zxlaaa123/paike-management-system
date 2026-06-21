@@ -45,16 +45,29 @@ function getCells(day: number, period: number) {
   return cells.value[`${day}-${period}`]
 }
 
-/** 与后端 WeekTypeSupport.displayLabel 同语义：ALL→无标记，ODD→单，EVEN→双 */
-function weekLabel(weekType?: string): string {
-  const w = (weekType ?? 'ALL').trim().toUpperCase()
-  if (w === 'ODD') return '单'
-  if (w === 'EVEN') return '双'
-  return ''
+/**
+ * V10 周段标签：与后端 WeekPatternSupport.displayLabel 同语义。
+ * - 默认全学期（1-20）+ ALL → 无标签
+ * - 非默认周段 → "1-8周"
+ * - 周段+单双周 → "5-12周/单"
+ * - 仅单双周（默认周段）→ "单"/"双"
+ */
+function weekRangeLabel(item: TimetableItem): string {
+  const weekType = (item.weekType ?? 'ALL').trim().toUpperCase()
+  const startWeek = item.startWeek ?? 1
+  const endWeek = item.endWeek ?? 20
+  const isDefaultRange = startWeek === 1 && endWeek === 20
+
+  const typeLabel = weekType === 'ODD' ? '单' : weekType === 'EVEN' ? '双' : ''
+  if (isDefaultRange) {
+    return typeLabel
+  }
+  const rangeLabel = `${startWeek}-${endWeek}周`
+  return typeLabel ? `${rangeLabel}/${typeLabel}` : rangeLabel
 }
 
 function courseLabel(item: TimetableItem): string {
-  const label = weekLabel(item.weekType)
+  const label = weekRangeLabel(item)
   return label ? `${item.courseName}[${label}]` : item.courseName
 }
 </script>

@@ -342,6 +342,124 @@ class SchedulePlanServiceTest {
         verify(planItemMapper, times(2)).updateById(any(SchedulePlanItem.class));
     }
 
+    /** V10 连续周段：同教师/班级/教室同时段，ALL 1-8 与 ALL 9-16 实际周集合不相交 → 不冲突 */
+    @Test
+    void refreshPlanConflictState_disjointWeekRangeNoConflict() {
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SchedulePlanItemMapper planItemMapper = mock(SchedulePlanItemMapper.class);
+        CourseMapper courseMapper = mock(CourseMapper.class);
+        TeacherMapper teacherMapper = mock(TeacherMapper.class);
+        ClassInfoMapper classInfoMapper = mock(ClassInfoMapper.class);
+        ClassroomMapper classroomMapper = mock(ClassroomMapper.class);
+        TimeSlotMapper timeSlotMapper = mock(TimeSlotMapper.class);
+        TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
+        SchedulePlanService service = new SchedulePlanService(
+                planMapper,
+                mock(SemesterMapper.class),
+                planItemMapper,
+                mock(ScheduleMapper.class),
+                mock(ScheduleLockedItemMapper.class),
+                mock(ScheduleLockGuardService.class),
+                courseMapper,
+                teacherMapper,
+                classInfoMapper,
+                classroomMapper,
+                timeSlotMapper,
+                teachingTaskMapper,
+                mock(TeacherUnavailableTimeService.class),
+                mock(ScheduleScoreService.class),
+                mock(SchedulePlanExplainService.class),
+                mock(SystemAuditLogService.class));
+
+        SchedulePlanItem a = planItem(1L, 101L, 201L, 301L, 401L, 1, 1, 2);
+        a.setWeekType("ALL");
+        a.setStartWeek(1);
+        a.setEndWeek(8);
+        a.setCourseId(501L);
+        SchedulePlanItem b = planItem(2L, 102L, 201L, 301L, 401L, 1, 1, 2);
+        b.setWeekType("ALL");
+        b.setStartWeek(9);
+        b.setEndWeek(16);
+        b.setCourseId(502L);
+
+        when(planItemMapper.selectList(any())).thenReturn(List.of(a, b));
+        when(teachingTaskMapper.selectBatchIds(any())).thenReturn(List.of(
+                teachingTask(101L, 201L, 301L, 501L),
+                teachingTask(102L, 201L, 301L, 502L)));
+        when(courseMapper.selectBatchIds(any())).thenReturn(List.of());
+        when(teacherMapper.selectBatchIds(any())).thenReturn(List.of(teacher(201L, "张老师")));
+        when(classInfoMapper.selectBatchIds(any())).thenReturn(List.of(classInfo(301L, "一班")));
+        when(classroomMapper.selectBatchIds(any())).thenReturn(List.of(classroom(401L, "A101")));
+        when(timeSlotMapper.selectList(any())).thenReturn(List.of(timeSlot(901L, 1, 1)));
+        SchedulePlan plan = new SchedulePlan();
+        plan.setId(10L);
+        when(planMapper.selectById(10L)).thenReturn(plan);
+
+        int conflictCount = service.refreshPlanConflictState(10L);
+
+        assertEquals(0, conflictCount, "ALL 1-8 与 ALL 9-16 实际周集合不相交，不应报冲突");
+        verify(planItemMapper, never()).updateById(any(SchedulePlanItem.class));
+    }
+
+    /** V10：同教师/班级/教室同时段，ALL 1-8 与 ODD 5-12 重叠自然周 5、7 → 冲突 */
+    @Test
+    void refreshPlanConflictState_overlappingWeekRangeConflicts() {
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SchedulePlanItemMapper planItemMapper = mock(SchedulePlanItemMapper.class);
+        CourseMapper courseMapper = mock(CourseMapper.class);
+        TeacherMapper teacherMapper = mock(TeacherMapper.class);
+        ClassInfoMapper classInfoMapper = mock(ClassInfoMapper.class);
+        ClassroomMapper classroomMapper = mock(ClassroomMapper.class);
+        TimeSlotMapper timeSlotMapper = mock(TimeSlotMapper.class);
+        TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
+        SchedulePlanService service = new SchedulePlanService(
+                planMapper,
+                mock(SemesterMapper.class),
+                planItemMapper,
+                mock(ScheduleMapper.class),
+                mock(ScheduleLockedItemMapper.class),
+                mock(ScheduleLockGuardService.class),
+                courseMapper,
+                teacherMapper,
+                classInfoMapper,
+                classroomMapper,
+                timeSlotMapper,
+                teachingTaskMapper,
+                mock(TeacherUnavailableTimeService.class),
+                mock(ScheduleScoreService.class),
+                mock(SchedulePlanExplainService.class),
+                mock(SystemAuditLogService.class));
+
+        SchedulePlanItem a = planItem(1L, 101L, 201L, 301L, 401L, 1, 1, 2);
+        a.setWeekType("ALL");
+        a.setStartWeek(1);
+        a.setEndWeek(8);
+        a.setCourseId(501L);
+        SchedulePlanItem b = planItem(2L, 102L, 201L, 301L, 401L, 1, 1, 2);
+        b.setWeekType("ODD");
+        b.setStartWeek(5);
+        b.setEndWeek(12);
+        b.setCourseId(502L);
+
+        when(planItemMapper.selectList(any())).thenReturn(List.of(a, b));
+        when(teachingTaskMapper.selectBatchIds(any())).thenReturn(List.of(
+                teachingTask(101L, 201L, 301L, 501L),
+                teachingTask(102L, 201L, 301L, 502L)));
+        when(courseMapper.selectBatchIds(any())).thenReturn(List.of());
+        when(teacherMapper.selectBatchIds(any())).thenReturn(List.of(teacher(201L, "张老师")));
+        when(classInfoMapper.selectBatchIds(any())).thenReturn(List.of(classInfo(301L, "一班")));
+        when(classroomMapper.selectBatchIds(any())).thenReturn(List.of(classroom(401L, "A101")));
+        when(timeSlotMapper.selectList(any())).thenReturn(List.of(timeSlot(901L, 1, 1)));
+        SchedulePlan plan = new SchedulePlan();
+        plan.setId(10L);
+        when(planMapper.selectById(10L)).thenReturn(plan);
+
+        int conflictCount = service.refreshPlanConflictState(10L);
+
+        assertEquals(2, conflictCount, "ALL 1-8 与 ODD 5-12 重叠自然周 5、7，两条 item 都应标记冲突");
+        verify(planItemMapper, times(2)).updateById(any(SchedulePlanItem.class));
+    }
+
     @Test
     void applyPlan_recordsFailureAuditWhenPlanRejected() {
         SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);

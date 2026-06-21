@@ -1,0 +1,290 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] --------------------< com.paike:scheduler-backend >---------------------
+[INFO] Building scheduler-backend 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.12:prepare-agent (prepare-agent) @ scheduler-backend ---
+[INFO] argLine set to -javaagent:C:\\Users\\zxl\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.12\\org.jacoco.agent-0.8.12-runtime.jar=destfile=D:\\paike\\backend\\target\\jacoco.exec
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ scheduler-backend ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 38 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ scheduler-backend ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ scheduler-backend ---
+[INFO] skip non existing resourceDirectory D:\paike\backend\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ scheduler-backend ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ scheduler-backend ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.paike.scheduler.architecture.C09LockTransactionOrderInvestigationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.378 s -- in com.paike.scheduler.architecture.C09LockTransactionOrderInvestigationTest
+[INFO] Running com.paike.scheduler.architecture.M14MapStringObjectUsageInvestigationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.198 s -- in com.paike.scheduler.architecture.M14MapStringObjectUsageInvestigationTest
+[INFO] Running com.paike.scheduler.architecture.M14Phase1VoSerializationTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.760 s -- in com.paike.scheduler.architecture.M14Phase1VoSerializationTest
+[INFO] Running com.paike.scheduler.architecture.M14Phase2VoSerializationTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.406 s -- in com.paike.scheduler.architecture.M14Phase2VoSerializationTest
+[INFO] Running com.paike.scheduler.architecture.M14Phase3VoSerializationTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.464 s -- in com.paike.scheduler.architecture.M14Phase3VoSerializationTest
+[INFO] Running com.paike.scheduler.architecture.M16AdjustLogVoSerializationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.130 s -- in com.paike.scheduler.architecture.M16AdjustLogVoSerializationTest
+[INFO] Running com.paike.scheduler.architecture.M16ConflictReportVoSerializationTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.156 s -- in com.paike.scheduler.architecture.M16ConflictReportVoSerializationTest
+[INFO] Running com.paike.scheduler.architecture.M16PlanItemVoSerializationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.096 s -- in com.paike.scheduler.architecture.M16PlanItemVoSerializationTest
+[INFO] Running com.paike.scheduler.architecture.M16PlanVoSerializationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.121 s -- in com.paike.scheduler.architecture.M16PlanVoSerializationTest
+[INFO] Running com.paike.scheduler.architecture.M16ScheduleVoSerializationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.073 s -- in com.paike.scheduler.architecture.M16ScheduleVoSerializationTest
+[INFO] Running com.paike.scheduler.architecture.M16TableFieldViewFieldsInvestigationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.088 s -- in com.paike.scheduler.architecture.M16TableFieldViewFieldsInvestigationTest
+[INFO] Running com.paike.scheduler.architecture.M16TeachingTaskVoSerializationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.056 s -- in com.paike.scheduler.architecture.M16TeachingTaskVoSerializationTest
+[INFO] Running com.paike.scheduler.architecture.M16UnassignedTaskVoSerializationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.059 s -- in com.paike.scheduler.architecture.M16UnassignedTaskVoSerializationTest
+[INFO] Running com.paike.scheduler.architecture.M16UnavailableTimeVoSerializationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.093 s -- in com.paike.scheduler.architecture.M16UnavailableTimeVoSerializationTest
+[INFO] Running com.paike.scheduler.architecture.M16UnscheduledTaskVoSerializationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.072 s -- in com.paike.scheduler.architecture.M16UnscheduledTaskVoSerializationTest
+[INFO] Running com.paike.scheduler.architecture.M27AiClientConsolidationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.542 s -- in com.paike.scheduler.architecture.M27AiClientConsolidationTest
+[INFO] Running com.paike.scheduler.architecture.M39ManualDeletedUpdateInvestigationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.246 s -- in com.paike.scheduler.architecture.M39ManualDeletedUpdateInvestigationTest
+[INFO] Running com.paike.scheduler.architecture.M41DeletedZeroConditionCleanupTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.518 s -- in com.paike.scheduler.architecture.M41DeletedZeroConditionCleanupTest
+[INFO] Running com.paike.scheduler.auth.AuthInterceptorTest
+WARNING: A Java agent has been loaded dynamically (C:\Users\zxl\.m2\repository\net\bytebuddy\byte-buddy-agent\1.14.19\byte-buddy-agent-1.14.19.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.933 s -- in com.paike.scheduler.auth.AuthInterceptorTest
+[INFO] Running com.paike.scheduler.auth.M52RateLimiterServiceInvestigationTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.104 s -- in com.paike.scheduler.auth.M52RateLimiterServiceInvestigationTest
+[INFO] Running com.paike.scheduler.common.DeletedFlagComparisonTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.846 s -- in com.paike.scheduler.common.DeletedFlagComparisonTest
+[INFO] Running com.paike.scheduler.common.enums.SchedulePlanStatusTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.110 s -- in com.paike.scheduler.common.enums.SchedulePlanStatusTest
+[INFO] Running com.paike.scheduler.common.enums.V5StatusEnumConversionTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.039 s -- in com.paike.scheduler.common.enums.V5StatusEnumConversionTest
+[INFO] Running com.paike.scheduler.common.util.StringSanitizerTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.054 s -- in com.paike.scheduler.common.util.StringSanitizerTest
+[INFO] Running com.paike.scheduler.config.RequestBodySizeLimitFilterTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.208 s -- in com.paike.scheduler.config.RequestBodySizeLimitFilterTest
+[INFO] Running com.paike.scheduler.config.SecurityHeadersFilterTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.027 s -- in com.paike.scheduler.config.SecurityHeadersFilterTest
+[INFO] Running com.paike.scheduler.controller.AuthControllerClientIpTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.032 s -- in com.paike.scheduler.controller.AuthControllerClientIpTest
+[INFO] Running com.paike.scheduler.controller.ControllerNotFoundStatusTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.703 s -- in com.paike.scheduler.controller.ControllerNotFoundStatusTest
+[INFO] Running com.paike.scheduler.controller.ControllerPaginationValidationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.299 s -- in com.paike.scheduler.controller.ControllerPaginationValidationTest
+[INFO] Running com.paike.scheduler.controller.ControllerRequestStringValidationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.045 s -- in com.paike.scheduler.controller.ControllerRequestStringValidationTest
+[INFO] Running com.paike.scheduler.controller.ScheduleControllerTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.140 s -- in com.paike.scheduler.controller.ScheduleControllerTest
+[INFO] Running com.paike.scheduler.db.DatabaseSchemaScriptTest
+[INFO] Tests run: 16, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.184 s -- in com.paike.scheduler.db.DatabaseSchemaScriptTest
+[INFO] Running com.paike.scheduler.db.M25TimestampNamingInvestigationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.173 s -- in com.paike.scheduler.db.M25TimestampNamingInvestigationTest
+[INFO] Running com.paike.scheduler.db.M28M29DatabaseCharsetInvestigationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.116 s -- in com.paike.scheduler.db.M28M29DatabaseCharsetInvestigationTest
+[INFO] Running com.paike.scheduler.db.M30FlywayInitializationStrategyInvestigationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in com.paike.scheduler.db.M30FlywayInitializationStrategyInvestigationTest
+[INFO] Running com.paike.scheduler.db.M32ForeignKeyConstraintInvestigationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.264 s -- in com.paike.scheduler.db.M32ForeignKeyConstraintInvestigationTest
+[INFO] Running com.paike.scheduler.db.M35RelatedScheduleIdsColumnLengthTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.029 s -- in com.paike.scheduler.db.M35RelatedScheduleIdsColumnLengthTest
+[INFO] Running com.paike.scheduler.db.M36ScoreDefaultWeightInitializationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.029 s -- in com.paike.scheduler.db.M36ScoreDefaultWeightInitializationTest
+[INFO] Running com.paike.scheduler.engine.conflict.ConflictDetectorPairTest
+12:35:23.416 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.paike.scheduler.engine.conflict.ConflictDetectorPairTest]: ConflictDetectorPairTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+12:35:24.141 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.paike.scheduler.SchedulerBackendApplication for test class com.paike.scheduler.engine.conflict.ConflictDetectorPairTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.5)
+
+2026-06-21T12:35:27.220+08:00  INFO 9620 --- [scheduler-backend] [           main] c.p.s.e.c.ConflictDetectorPairTest       : Starting ConflictDetectorPairTest using Java 21.0.11 with PID 9620 (started by 周兴龙 in D:\paike\backend)
+2026-06-21T12:35:27.224+08:00  INFO 9620 --- [scheduler-backend] [           main] c.p.s.e.c.ConflictDetectorPairTest       : No active profile set, falling back to 1 default profile: "default"
+ _ _   |_  _ _|_. ___ _ |    _ 
+| | |\/|_)(_| | |_\  |_)||_|_\ 
+     /               |         
+                        3.5.7 
+2026-06-21T12:35:35.260+08:00  INFO 9620 --- [scheduler-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-06-21T12:35:36.180+08:00  INFO 9620 --- [scheduler-backend] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@15f63744
+2026-06-21T12:35:36.187+08:00  INFO 9620 --- [scheduler-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-06-21T12:35:46.110+08:00  INFO 9620 --- [scheduler-backend] [           main] c.p.s.e.c.ConflictDetectorPairTest       : Started ConflictDetectorPairTest in 20.983 seconds (process running for 52.793)
+[PAIR-TEST] Initial comparisons: 1600, incremental: SKIPPED (V9 stage3 slot-doubling semantic), total: 1600
+[PAIR-TEST-SMALL] Total comparisons: 1600
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 43.33 s -- in com.paike.scheduler.engine.conflict.ConflictDetectorPairTest
+[INFO] Running com.paike.scheduler.engine.conflict.InMemoryConflictDetectorTest
+[INFO] Tests run: 20, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.069 s -- in com.paike.scheduler.engine.conflict.InMemoryConflictDetectorTest
+[INFO] Running com.paike.scheduler.engine.conflict.InMemoryConflictDetectorWeekRangeTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.017 s -- in com.paike.scheduler.engine.conflict.InMemoryConflictDetectorWeekRangeTest
+[INFO] Running com.paike.scheduler.engine.conflict.InMemoryConflictDetectorWeekTypeTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.015 s -- in com.paike.scheduler.engine.conflict.InMemoryConflictDetectorWeekTypeTest
+[INFO] Running com.paike.scheduler.engine.EnginePurityTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.093 s -- in com.paike.scheduler.engine.EnginePurityTest
+[INFO] Running com.paike.scheduler.engine.optimize.AnnealingOptimizerTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.946 s -- in com.paike.scheduler.engine.optimize.AnnealingOptimizerTest
+[INFO] Running com.paike.scheduler.engine.optimize.IncrementalPenaltyStateTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.242 s -- in com.paike.scheduler.engine.optimize.IncrementalPenaltyStateTest
+[INFO] Running com.paike.scheduler.engine.solver.BacktrackingSolverTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.044 s -- in com.paike.scheduler.engine.solver.BacktrackingSolverTest
+[INFO] Running com.paike.scheduler.SchedulerBackendApplicationTests
+2026-06-21T12:36:15.774+08:00  INFO 9620 --- [scheduler-backend] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.paike.scheduler.SchedulerBackendApplicationTests]: SchedulerBackendApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-06-21T12:36:15.924+08:00  INFO 9620 --- [scheduler-backend] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.paike.scheduler.SchedulerBackendApplication for test class com.paike.scheduler.SchedulerBackendApplicationTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.187 s -- in com.paike.scheduler.SchedulerBackendApplicationTests
+[INFO] Running com.paike.scheduler.service.AutoScheduleBatchServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.048 s -- in com.paike.scheduler.service.AutoScheduleBatchServiceTest
+[INFO] Running com.paike.scheduler.service.AutoScheduleServiceAuditTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.531 s -- in com.paike.scheduler.service.AutoScheduleServiceAuditTest
+[INFO] Running com.paike.scheduler.service.AutoScheduleServiceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.025 s -- in com.paike.scheduler.service.AutoScheduleServiceTest
+[INFO] Running com.paike.scheduler.service.DatabaseMigrationStatusServiceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.059 s -- in com.paike.scheduler.service.DatabaseMigrationStatusServiceTest
+[INFO] Running com.paike.scheduler.service.EngineWeekTypeIntegrationTest
+2026-06-21T12:36:16.635+08:00  INFO 9620 --- [scheduler-backend] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.paike.scheduler.service.EngineWeekTypeIntegrationTest]: EngineWeekTypeIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-06-21T12:36:16.822+08:00  INFO 9620 --- [scheduler-backend] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.paike.scheduler.SchedulerBackendApplication for test class com.paike.scheduler.service.EngineWeekTypeIntegrationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 9.248 s -- in com.paike.scheduler.service.EngineWeekTypeIntegrationTest
+[INFO] Running com.paike.scheduler.service.ErrorCodeCatalogServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.013 s -- in com.paike.scheduler.service.ErrorCodeCatalogServiceTest
+[INFO] Running com.paike.scheduler.service.M13ControllerMapperInjectionInvestigationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.022 s -- in com.paike.scheduler.service.M13ControllerMapperInjectionInvestigationTest
+[INFO] Running com.paike.scheduler.service.M15TimetableControllerExportComplexityInvestigationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in com.paike.scheduler.service.M15TimetableControllerExportComplexityInvestigationTest
+[INFO] Running com.paike.scheduler.service.M31LogicDeleteEntityCoverageInvestigationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.251 s -- in com.paike.scheduler.service.M31LogicDeleteEntityCoverageInvestigationTest
+[INFO] Running com.paike.scheduler.service.M43SimulationDiscardOrderInvestigationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.547 s -- in com.paike.scheduler.service.M43SimulationDiscardOrderInvestigationTest
+[INFO] Running com.paike.scheduler.service.M49M51ContractClosureTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.310 s -- in com.paike.scheduler.service.M49M51ContractClosureTest
+[INFO] Running com.paike.scheduler.service.M50RequestBodyOptionalityInvestigationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in com.paike.scheduler.service.M50RequestBodyOptionalityInvestigationTest
+[INFO] Running com.paike.scheduler.service.PerformanceBaselineServiceTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.219 s -- in com.paike.scheduler.service.PerformanceBaselineServiceTest
+[INFO] Running com.paike.scheduler.service.ScheduleCompareServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.025 s -- in com.paike.scheduler.service.ScheduleCompareServiceTest
+[INFO] Running com.paike.scheduler.service.ScheduleConflictReportServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.385 s -- in com.paike.scheduler.service.ScheduleConflictReportServiceTest
+[INFO] Running com.paike.scheduler.service.ScheduleConflictServiceTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.261 s -- in com.paike.scheduler.service.ScheduleConflictServiceTest
+[INFO] Running com.paike.scheduler.service.SchedulePlanServiceTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.347 s -- in com.paike.scheduler.service.SchedulePlanServiceTest
+[INFO] Running com.paike.scheduler.service.ScheduleRuleServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.188 s -- in com.paike.scheduler.service.ScheduleRuleServiceTest
+[INFO] Running com.paike.scheduler.service.ScheduleRuleWeightServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in com.paike.scheduler.service.ScheduleRuleWeightServiceTest
+[INFO] Running com.paike.scheduler.service.ScheduleScoreReportServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.195 s -- in com.paike.scheduler.service.ScheduleScoreReportServiceTest
+[INFO] Running com.paike.scheduler.service.ScheduleScoreServiceTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.343 s -- in com.paike.scheduler.service.ScheduleScoreServiceTest
+[INFO] Running com.paike.scheduler.service.ScheduleServiceAuditTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.095 s -- in com.paike.scheduler.service.ScheduleServiceAuditTest
+[INFO] Running com.paike.scheduler.service.ScheduleStatisticsServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.059 s -- in com.paike.scheduler.service.ScheduleStatisticsServiceTest
+[INFO] Running com.paike.scheduler.service.scheduling.DeltaPenaltyScorerTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.108 s -- in com.paike.scheduler.service.scheduling.DeltaPenaltyScorerTest
+[INFO] Running com.paike.scheduler.service.scheduling.SchedulingSupportTest
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.082 s -- in com.paike.scheduler.service.scheduling.SchedulingSupportTest
+[INFO] Running com.paike.scheduler.service.scheduling.ScoringWeekRangeIsolationTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.039 s -- in com.paike.scheduler.service.scheduling.ScoringWeekRangeIsolationTest
+[INFO] Running com.paike.scheduler.service.scheduling.ScoringWeekTypeConsistencyTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.043 s -- in com.paike.scheduler.service.scheduling.ScoringWeekTypeConsistencyTest
+[INFO] Running com.paike.scheduler.service.ServiceTransactionAnnotationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in com.paike.scheduler.service.ServiceTransactionAnnotationTest
+[INFO] Running com.paike.scheduler.service.SystemAuditLogServiceTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.168 s -- in com.paike.scheduler.service.SystemAuditLogServiceTest
+[INFO] Running com.paike.scheduler.service.TeacherUnavailableTimeServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.021 s -- in com.paike.scheduler.service.TeacherUnavailableTimeServiceTest
+[INFO] Running com.paike.scheduler.service.TimetableExportWeekRangeTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.700 s -- in com.paike.scheduler.service.TimetableExportWeekRangeTest
+[INFO] Running com.paike.scheduler.service.TimetableExportWeekTypeTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.843 s -- in com.paike.scheduler.service.TimetableExportWeekTypeTest
+[INFO] Running com.paike.scheduler.service.TimetableServiceSemesterBoundaryTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.034 s -- in com.paike.scheduler.service.TimetableServiceSemesterBoundaryTest
+[INFO] Running com.paike.scheduler.service.TransactionBoundaryInvestigationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.paike.scheduler.service.TransactionBoundaryInvestigationTest
+[INFO] Running com.paike.scheduler.service.UnscheduledTaskServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.207 s -- in com.paike.scheduler.service.UnscheduledTaskServiceTest
+[INFO] Running com.paike.scheduler.service.V3ScheduleGenerateServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.181 s -- in com.paike.scheduler.service.V3ScheduleGenerateServiceTest
+[INFO] Running com.paike.scheduler.service.V4ScheduleAdjustmentServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.341 s -- in com.paike.scheduler.service.V4ScheduleAdjustmentServiceTest
+[INFO] Running com.paike.scheduler.service.V4ScheduleLockServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.067 s -- in com.paike.scheduler.service.V4ScheduleLockServiceTest
+[INFO] Running com.paike.scheduler.service.V4ScheduleReplanServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.186 s -- in com.paike.scheduler.service.V4ScheduleReplanServiceTest
+[INFO] Running com.paike.scheduler.service.V4ScheduleReportServiceTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.545 s -- in com.paike.scheduler.service.V4ScheduleReportServiceTest
+[INFO] Running com.paike.scheduler.service.V4ScheduleRiskServiceTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.085 s -- in com.paike.scheduler.service.V4ScheduleRiskServiceTest
+[INFO] Running com.paike.scheduler.service.V4ScheduleSourceServiceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.149 s -- in com.paike.scheduler.service.V4ScheduleSourceServiceTest
+[INFO] Running com.paike.scheduler.service.V5CandidatePositionServiceTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.066 s -- in com.paike.scheduler.service.V5CandidatePositionServiceTest
+[INFO] Running com.paike.scheduler.service.V5ClassroomBatchLoadingTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in com.paike.scheduler.service.V5ClassroomBatchLoadingTest
+[INFO] Running com.paike.scheduler.service.V5ConsistencyCheckServiceTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.358 s -- in com.paike.scheduler.service.V5ConsistencyCheckServiceTest
+[INFO] Running com.paike.scheduler.service.V5RepairSuggestionServiceAuditTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.166 s -- in com.paike.scheduler.service.V5RepairSuggestionServiceAuditTest
+[INFO] Running com.paike.scheduler.service.V5RepairTaskFlowServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.181 s -- in com.paike.scheduler.service.V5RepairTaskFlowServiceTest
+[INFO] Running com.paike.scheduler.service.V5SimulationServiceAuditTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.045 s -- in com.paike.scheduler.service.V5SimulationServiceAuditTest
+[INFO] Running com.paike.scheduler.service.V5SimulationTransactionBoundaryTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in com.paike.scheduler.service.V5SimulationTransactionBoundaryTest
+[INFO] Running com.paike.scheduler.service.V5Stage1DataServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.159 s -- in com.paike.scheduler.service.V5Stage1DataServiceTest
+[INFO] Running com.paike.scheduler.service.V6ConsistencyCheckServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.210 s -- in com.paike.scheduler.service.V6ConsistencyCheckServiceTest
+[INFO] Running com.paike.scheduler.service.V6RegressionTestServiceRunTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.035 s -- in com.paike.scheduler.service.V6RegressionTestServiceRunTest
+[INFO] Running com.paike.scheduler.service.V6RegressionTestServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.025 s -- in com.paike.scheduler.service.V6RegressionTestServiceTest
+[INFO] Running com.paike.scheduler.service.V8BenchmarkComparisonTest
+[WARNING] Tests run: 1, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0 s -- in com.paike.scheduler.service.V8BenchmarkComparisonTest
+[INFO] Running com.paike.scheduler.service.V8SolverGenerateIntegrationTest
+2026-06-21T12:36:40.533+08:00  INFO 9620 --- [scheduler-backend] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.paike.scheduler.service.V8SolverGenerateIntegrationTest]: V8SolverGenerateIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-06-21T12:36:40.542+08:00  INFO 9620 --- [scheduler-backend] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.paike.scheduler.SchedulerBackendApplication for test class com.paike.scheduler.service.V8SolverGenerateIntegrationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.618 s -- in com.paike.scheduler.service.V8SolverGenerateIntegrationTest
+[INFO] Running com.paike.scheduler.service.V9WeekTypeBenchmarkTest
+[WARNING] Tests run: 1, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0 s -- in com.paike.scheduler.service.V9WeekTypeBenchmarkTest
+[INFO] Running com.paike.scheduler.service.WeekPatternSupportTest
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.307 s -- in com.paike.scheduler.service.WeekPatternSupportTest
+[INFO] Running com.paike.scheduler.service.WeekTypeConflictMatrixTest
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.135 s -- in com.paike.scheduler.service.WeekTypeConflictMatrixTest
+2026-06-21T12:36:45.680+08:00  INFO 9620 --- [scheduler-backend] [ionShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+[INFO] 
+[INFO] Results:
+[INFO] 
+[WARNING] Tests run: 384, Failures: 0, Errors: 0, Skipped: 2
+[INFO] 
+[INFO] 
+[INFO] --- jacoco:0.8.12:report (report) @ scheduler-backend ---
+[INFO] Loading execution data file D:\paike\backend\target\jacoco.exec
+[INFO] Analyzed bundle 'scheduler-backend' with 273 classes
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  02:08 min
+[INFO] Finished at: 2026-06-21T12:36:52+08:00
+[INFO] ------------------------------------------------------------------------

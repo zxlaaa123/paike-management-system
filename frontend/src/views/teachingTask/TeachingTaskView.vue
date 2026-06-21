@@ -43,6 +43,8 @@ const form = reactive<TeachingTaskForm>({
   classId: 0,
   weeklyHours: 4,
   weekType: 'ALL',
+  startWeek: 1,
+  endWeek: 20,
   needContinuous: 0,
   status: 1,
   remark: '',
@@ -127,6 +129,8 @@ function openAdd() {
   form.classId = 0
   form.weeklyHours = 4
   form.weekType = 'ALL'
+  form.startWeek = 1
+  form.endWeek = 20
   form.needContinuous = 0
   form.status = 1
   form.remark = ''
@@ -141,6 +145,8 @@ function openEdit(row: TeachingTask) {
   form.classId = row.classId
   form.weeklyHours = row.weeklyHours
   form.weekType = row.weekType || 'ALL'
+  form.startWeek = row.startWeek ?? 1
+  form.endWeek = row.endWeek ?? 20
   form.needContinuous = row.needContinuous
   form.status = row.status
   form.remark = row.remark || ''
@@ -191,9 +197,16 @@ function weekTypeText(val: string) {
     case 'EVEN':
       return '双周'
     case 'ALL':
-    default:
-      return '全周'
+    default:      return '全周'
   }
+}
+
+/** 周段展示文案：默认 1-20 显示「整学期」，否则显示「1-8周」 */
+function weekRangeText(start: number | undefined, end: number | undefined) {
+  const s = start ?? 1
+  const e = end ?? 20
+  if (s === 1 && e === 20) return '整学期'
+  return `${s}-${e}周`
 }
 
 function getSemesterName(id: number | undefined) {
@@ -288,6 +301,11 @@ onMounted(() => {
             <el-tag :type="row.weekType === 'ALL' ? 'info' : 'warning'">{{ weekTypeText(row.weekType) }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="周段" width="110">
+          <template #default="{ row }">
+            <span>{{ weekRangeText(row.startWeek, row.endWeek) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="已排/需排" width="100">
           <template #default="{ row }">
             <span>{{ row.scheduledSlots }}/{{ row.requiredSlots }}大节</span>
@@ -348,6 +366,11 @@ onMounted(() => {
             <el-option label="单周" value="ODD" />
             <el-option label="双周" value="EVEN" />
           </el-select>
+        </el-form-item>
+        <el-form-item label="起止周" prop="startWeek">
+          <el-input-number v-model="form.startWeek" :min="1" :max="form.endWeek" controls-position="right" />
+          <span style="margin: 0 8px">至</span>
+          <el-input-number v-model="form.endWeek" :min="form.startWeek" :max="63" controls-position="right" />
         </el-form-item>
         <el-form-item label="连续排课" prop="needContinuous">
           <el-switch v-model="form.needContinuous" :active-value="1" :inactive-value="0" />

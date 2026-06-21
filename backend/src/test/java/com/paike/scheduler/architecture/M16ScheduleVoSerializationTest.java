@@ -28,7 +28,8 @@ class M16ScheduleVoSerializationTest {
 
     private static final Set<String> EXPECTED_FIELDS = Set.of(
             "id", "semesterId", "teachingTaskId", "courseId", "teacherId", "classId",
-            "timeSlotId", "weekType", "classroomId", "sourceType", "batchId", "planId",
+            "timeSlotId", "weekType", "startWeek", "endWeek",
+            "classroomId", "sourceType", "batchId", "planId",
             "deleted", "createTime", "updateTime",
             "courseName", "teacherName", "className", "timeLabel",
             "dayOfWeek", "periodNo", "roomName", "building",
@@ -37,7 +38,7 @@ class M16ScheduleVoSerializationTest {
     @Test
     void scheduleVoKeepsAllTwentyFiveFieldsWithRelations() throws Exception {
         JsonNode json = toJson(new ScheduleVo(
-                1L, 2L, 10L, 20L, 30L, 40L, 50L, "ODD", 60L, "manual", 70L, 80L,
+                1L, 2L, 10L, 20L, 30L, 40L, 50L, "ODD", 5, 12, 60L, "manual", 70L, 80L,
                 0,
                 LocalDateTime.of(2026, 6, 3, 10, 0, 0), LocalDateTime.of(2026, 6, 3, 10, 0, 0),
                 "高等数学", "张老师", "计科2401", "周一第一节",
@@ -45,8 +46,10 @@ class M16ScheduleVoSerializationTest {
                 "手动排课", "BATCH-001"));
 
         assertEquals(EXPECTED_FIELDS, fieldNames(json));
-        assertEquals(25, fieldNames(json).size());
+        assertEquals(27, fieldNames(json).size());
         assertEquals(0, json.get("deleted").asInt());
+        assertEquals(5, json.get("startWeek").asInt());
+        assertEquals(12, json.get("endWeek").asInt());
         assertEquals("高等数学", json.get("courseName").asText());
         assertEquals("张老师", json.get("teacherName").asText());
         assertEquals("计科2401", json.get("className").asText());

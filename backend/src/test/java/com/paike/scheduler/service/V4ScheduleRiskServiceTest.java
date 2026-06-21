@@ -92,6 +92,50 @@ class V4ScheduleRiskServiceTest {
         assertEquals(1, teacherConflicts, "ALL+ALL 共槽应报 1 个 TEACHER_CONFLICT（零回归）");
     }
 
+    // ============ V10 连续周段红线 ============
+
+    /**
+     * V10：ALL 1-8 与 ALL 9-16 同教师同槽 → 实际周集合不相交 → 0 TEACHER_CONFLICT。
+     */
+    @Test
+    void getPlanRisks_disjointWeekRangeNotReportedAsConflict() {
+        SchedulePlanItem a = riskItem(1L, 1L, 1L, 1L, 1L, "ALL");
+        a.setStartWeek(1);
+        a.setEndWeek(8);
+        SchedulePlanItem b = riskItem(2L, 2L, 1L, 1L, 1L, "ALL");
+        b.setStartWeek(9);
+        b.setEndWeek(16);
+        V4ScheduleRiskService service = newServiceWithItems(List.of(a, b));
+
+        ScheduleRiskListVo result = service.getPlanRisks(10L, null, null, null);
+
+        long teacherConflicts = result.getRisks().stream()
+                .filter(r -> "TEACHER_CONFLICT".equals(r.getRiskType()))
+                .count();
+        assertEquals(0, teacherConflicts, "ALL 1-8 与 ALL 9-16 实际周集合不相交，不应报冲突");
+    }
+
+    /**
+     * V10：ALL 1-8 与 ODD 5-12 同教师同槽 → 重叠自然周 5、7 → 1 TEACHER_CONFLICT。
+     */
+    @Test
+    void getPlanRisks_overlappingWeekRangeReportedAsConflict() {
+        SchedulePlanItem a = riskItem(1L, 1L, 1L, 1L, 1L, "ALL");
+        a.setStartWeek(1);
+        a.setEndWeek(8);
+        SchedulePlanItem b = riskItem(2L, 2L, 1L, 1L, 1L, "ODD");
+        b.setStartWeek(5);
+        b.setEndWeek(12);
+        V4ScheduleRiskService service = newServiceWithItems(List.of(a, b));
+
+        ScheduleRiskListVo result = service.getPlanRisks(10L, null, null, null);
+
+        long teacherConflicts = result.getRisks().stream()
+                .filter(r -> "TEACHER_CONFLICT".equals(r.getRiskType()))
+                .count();
+        assertEquals(1, teacherConflicts, "ALL 1-8 与 ODD 5-12 重叠自然周 5、7，应报 1 个 TEACHER_CONFLICT");
+    }
+
     private V4ScheduleRiskService newServiceWithItems(List<SchedulePlanItem> items) {
         SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
         SchedulePlanItemMapper itemMapper = mock(SchedulePlanItemMapper.class);

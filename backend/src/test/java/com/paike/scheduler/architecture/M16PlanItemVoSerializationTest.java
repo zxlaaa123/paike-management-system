@@ -34,6 +34,7 @@ class M16PlanItemVoSerializationTest {
     private static final Set<String> EXPECTED_FIELDS = Set.of(
             "id", "planId", "semesterId", "teachingTaskId", "teacherId", "classId",
             "courseId", "classroomId", "weekday", "startPeriod", "endPeriod", "weekType",
+            "startWeek", "endWeek",
             "score", "conflictFlag", "conflictReason", "sourceType", "createdAt", "updatedAt",
             "deleted", "courseName", "teacherName", "className", "roomName", "timeLabel");
 
@@ -41,16 +42,18 @@ class M16PlanItemVoSerializationTest {
     void planItemVoKeepsAllTwentyFourFieldsWithRelations() throws Exception {
         JsonNode json = toJson(new SchedulePlanItemVo(
                 1L, 10L, 2L, 30L, 40L, 50L, 60L, 70L,
-                1, 1, 2, "all",
+                1, 1, 2, "all", 1, 20,
                 new BigDecimal("95.5"), 0, null, "AUTO",
                 LocalDateTime.of(2026, 6, 3, 10, 0, 0), LocalDateTime.of(2026, 6, 3, 10, 0, 0), 0,
                 "高等数学", "张老师", "计科2401", "A101", "周1 第1-2节"));
 
         assertEquals(EXPECTED_FIELDS, fieldNames(json));
-        assertEquals(24, fieldNames(json).size());
+        assertEquals(26, fieldNames(json).size());
         assertEquals(1L, json.get("id").asLong());
         assertEquals(10L, json.get("planId").asLong());
         assertEquals(30L, json.get("teachingTaskId").asLong());
+        assertEquals(1, json.get("startWeek").asInt());
+        assertEquals(20, json.get("endWeek").asInt());
         assertEquals(0, new BigDecimal("95.5").compareTo(json.get("score").decimalValue()));
         assertEquals(0, json.get("conflictFlag").asInt());
         assertEquals(0, json.get("deleted").asInt());

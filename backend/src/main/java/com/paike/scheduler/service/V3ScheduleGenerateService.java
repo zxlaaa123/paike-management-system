@@ -599,6 +599,9 @@ public class V3ScheduleGenerateService {
         item.setEndPeriod(slotToStartPeriod(slot) + 1);
         // V9 阶段3：读 EngineTask 真实 weekType（引擎已支持单双周，slot 翻倍 + ALL 扩散）
         item.setWeekType(task.weekType());
+        // V10 连续周段：透传 EngineTask 的 startWeek/endWeek 到 plan item
+        item.setStartWeek(task.startWeek());
+        item.setEndWeek(task.endWeek());
         item.setScore(null);
         item.setConflictFlag(0);
         item.setConflictReason(null);

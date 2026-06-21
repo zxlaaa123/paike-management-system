@@ -343,11 +343,11 @@ class ScheduleScoreServiceTest {
 
     private EngineContext scoreBaselineContext() {
         List<EngineTask> tasks = List.of(
-                new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1), "ODD"),
-                new EngineTask(1, 102L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1), "ODD"),
-                new EngineTask(2, 103L, 1, 1, 1, 1, "NORMAL", 30, List.of(0, 1), "ODD"),
-                new EngineTask(3, 104L, 1, 1, 1, 1, "NORMAL", 30, List.of(0, 1), "ODD"),
-                new EngineTask(4, 105L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1), "ODD")
+                new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1), "ODD", 1, 20),
+                new EngineTask(1, 102L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1), "ODD", 1, 20),
+                new EngineTask(2, 103L, 1, 1, 1, 1, "NORMAL", 30, List.of(0, 1), "ODD", 1, 20),
+                new EngineTask(3, 104L, 1, 1, 1, 1, "NORMAL", 30, List.of(0, 1), "ODD", 1, 20),
+                new EngineTask(4, 105L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1), "ODD", 1, 20)
         );
         return new EngineContext(
                 tasks,

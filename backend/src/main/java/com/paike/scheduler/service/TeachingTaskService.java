@@ -75,10 +75,13 @@ public class TeachingTaskService {
 
     @Transactional(rollbackFor = Exception.class)
     public TeachingTaskVo create(Long courseId, Long teacherId, Long classId, Integer weeklyHours, String weekType,
-            Integer needContinuous, Integer status, String remark) {
+            Integer startWeek, Integer endWeek, Integer needContinuous, Integer status, String remark) {
         Course course = requireActiveCourse(courseId);
         Teacher teacher = requireActiveTeacher(teacherId);
         ClassInfo classInfo = requireActiveClass(classId);
+
+        String normalizedWeekType = normalizeWeekType(weekType);
+        int[] normalizedRange = normalizeWeekRange(startWeek, endWeek);
 
         TeachingTask task = new TeachingTask();
         task.setSemesterId(semesterService.getCurrentSemester().getId());
@@ -86,7 +89,9 @@ public class TeachingTaskService {
         task.setTeacherId(teacherId);
         task.setClassId(classId);
         task.setWeeklyHours(weeklyHours);
-        task.setWeekType(normalizeWeekType(weekType));
+        task.setWeekType(normalizedWeekType);
+        task.setStartWeek(normalizedRange[0]);
+        task.setEndWeek(normalizedRange[1]);
         task.setNeedContinuous(needContinuous != null ? needContinuous : 0);
         task.setStatus(status != null ? status : 1);
         task.setRemark(remark);
@@ -105,7 +110,7 @@ public class TeachingTaskService {
 
     @Transactional(rollbackFor = Exception.class)
     public TeachingTaskVo update(Long id, Long courseId, Long teacherId, Long classId, Integer weeklyHours,
-            String weekType, Integer needContinuous, Integer status, String remark) {
+            String weekType, Integer startWeek, Integer endWeek, Integer needContinuous, Integer status, String remark) {
         TeachingTask task = teachingTaskMapper.selectById(id);
         if (task == null || Integer.valueOf(1).equals(task.getDeleted())) {
             throw new BusinessException(404, "教学任务不存在");
@@ -115,13 +120,18 @@ public class TeachingTaskService {
         Teacher teacher = requireActiveTeacher(teacherId);
         ClassInfo classInfo = requireActiveClass(classId);
 
+        String normalizedWeekType = weekType != null ? normalizeWeekType(weekType) : task.getWeekType();
+        int[] normalizedRange = weekType != null || startWeek != null || endWeek != null
+                ? normalizeWeekRange(startWeek, endWeek)
+                : new int[] { task.getStartWeek(), task.getEndWeek() };
+
         task.setCourseId(courseId);
         task.setTeacherId(teacherId);
         task.setClassId(classId);
         task.setWeeklyHours(weeklyHours);
-        if (weekType != null) {
-            task.setWeekType(normalizeWeekType(weekType));
-        }
+        task.setWeekType(normalizedWeekType);
+        task.setStartWeek(normalizedRange[0]);
+        task.setEndWeek(normalizedRange[1]);
         task.setNeedContinuous(needContinuous != null ? needContinuous : 0);
         if (status != null) {
             task.setStatus(status);
@@ -240,5 +250,22 @@ public class TeachingTaskService {
             throw new BusinessException(400, "周次类型必须为 ALL/ODD/EVEN");
         }
         return upper;
+    }
+
+    /**
+     * 规范化连续周段：null 用默认值 1/20；非空则走 {@link WeekPatternSupport#validateRange} 校验。
+     * 校验失败抛 400 业务异常，与 weekType 非法值一致。
+     * 返回 int[2] = {startWeek, endWeek}。
+     */
+    private int[] normalizeWeekRange(Integer startWeek, Integer endWeek) {
+        try {
+            WeekPatternSupport.validateRange(startWeek, endWeek);
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(400, e.getMessage());
+        }
+        return new int[] {
+            WeekPatternSupport.normalizeStartWeek(startWeek),
+            WeekPatternSupport.normalizeEndWeek(endWeek)
+        };
     }
 }

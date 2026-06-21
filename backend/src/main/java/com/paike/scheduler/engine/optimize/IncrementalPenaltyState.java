@@ -3,6 +3,7 @@ package com.paike.scheduler.engine.optimize;
 import com.paike.scheduler.engine.model.Assignment;
 import com.paike.scheduler.engine.model.EngineContext;
 import com.paike.scheduler.entity.SchedulePlanItem;
+import com.paike.scheduler.service.WeekPatternSupport;
 import com.paike.scheduler.service.WeekTypeSupport;
 import com.paike.scheduler.service.scheduling.DeltaPenaltyScorer;
 import com.paike.scheduler.service.scheduling.ScoringFunctions;
@@ -211,10 +212,10 @@ final class IncrementalPenaltyState {
      */
     private void decrementAggregates(SchedulePlanItem it) {
         for (String wt : WeekTypeSupport.countableWeekTypes(it.getWeekType())) {
-            decrementNestedCount(classDayCounts, new WeekOwner(it.getClassId(), wt), it.getWeekday());
-            decrementNestedCount(teacherDayCounts, new WeekOwner(it.getTeacherId(), wt), it.getWeekday());
-            decrementFlatCount(courseDayCounts, it.getClassId() + "_" + it.getCourseId() + "_" + it.getWeekday() + "_" + wt);
-            WeekOwner teacherKey = new WeekOwner(it.getTeacherId(), wt);
+            decrementNestedCount(classDayCounts, weekOwner(it.getClassId(), wt, it), it.getWeekday());
+            decrementNestedCount(teacherDayCounts, weekOwner(it.getTeacherId(), wt, it), it.getWeekday());
+            decrementFlatCount(courseDayCounts, courseDayKey(it, wt));
+            WeekOwner teacherKey = weekOwner(it.getTeacherId(), wt, it);
             Map<Integer, List<Integer>> teacherDays = teacherDayStarts.get(teacherKey);
             if (teacherDays != null) {
                 List<Integer> starts = teacherDays.get(it.getWeekday());
@@ -228,7 +229,7 @@ final class IncrementalPenaltyState {
                     }
                 }
             }
-            WeekOwner classKey = new WeekOwner(it.getClassId(), wt);
+            WeekOwner classKey = weekOwner(it.getClassId(), wt, it);
             Map<Integer, List<Integer>> classDays = classDayStarts.get(classKey);
             if (classDays != null) {
                 List<Integer> starts = classDays.get(it.getWeekday());
@@ -248,13 +249,13 @@ final class IncrementalPenaltyState {
 
     private void incrementAggregates(SchedulePlanItem it) {
         for (String wt : WeekTypeSupport.countableWeekTypes(it.getWeekType())) {
-            incrementNestedCount(classDayCounts, new WeekOwner(it.getClassId(), wt), it.getWeekday());
-            incrementNestedCount(teacherDayCounts, new WeekOwner(it.getTeacherId(), wt), it.getWeekday());
-            incrementFlatCount(courseDayCounts, it.getClassId() + "_" + it.getCourseId() + "_" + it.getWeekday() + "_" + wt);
-            teacherDayStarts.computeIfAbsent(new WeekOwner(it.getTeacherId(), wt), k -> new HashMap<>())
+            incrementNestedCount(classDayCounts, weekOwner(it.getClassId(), wt, it), it.getWeekday());
+            incrementNestedCount(teacherDayCounts, weekOwner(it.getTeacherId(), wt, it), it.getWeekday());
+            incrementFlatCount(courseDayCounts, courseDayKey(it, wt));
+            teacherDayStarts.computeIfAbsent(weekOwner(it.getTeacherId(), wt, it), k -> new HashMap<>())
                     .computeIfAbsent(it.getWeekday(), k -> new ArrayList<>())
                     .add(it.getStartPeriod());
-            classDayStarts.computeIfAbsent(new WeekOwner(it.getClassId(), wt), k -> new HashMap<>())
+            classDayStarts.computeIfAbsent(weekOwner(it.getClassId(), wt, it), k -> new HashMap<>())
                     .computeIfAbsent(it.getWeekday(), k -> new ArrayList<>())
                     .add(it.getStartPeriod());
         }
@@ -369,7 +370,7 @@ final class IncrementalPenaltyState {
         Map<WeekOwner, Map<Integer, Long>> result = new HashMap<>();
         for (SchedulePlanItem it : items) {
             for (String wt : WeekTypeSupport.countableWeekTypes(it.getWeekType())) {
-                result.computeIfAbsent(new WeekOwner(ownerExtractor.apply(it), wt), k -> new HashMap<>())
+                result.computeIfAbsent(weekOwner(ownerExtractor.apply(it), wt, it), k -> new HashMap<>())
                         .merge(it.getWeekday(), 1L, (left, right) -> left + right);
             }
         }
@@ -380,7 +381,7 @@ final class IncrementalPenaltyState {
         Map<String, Long> result = new HashMap<>();
         for (SchedulePlanItem it : items) {
             for (String wt : WeekTypeSupport.countableWeekTypes(it.getWeekType())) {
-                result.merge(it.getClassId() + "_" + it.getCourseId() + "_" + it.getWeekday() + "_" + wt, 1L,
+                result.merge(courseDayKey(it, wt), 1L,
                         (left, right) -> left + right);
             }
         }
@@ -391,7 +392,7 @@ final class IncrementalPenaltyState {
         Map<WeekOwner, Map<Integer, List<Integer>>> result = new HashMap<>();
         for (SchedulePlanItem it : items) {
             for (String wt : WeekTypeSupport.countableWeekTypes(it.getWeekType())) {
-                result.computeIfAbsent(new WeekOwner(it.getTeacherId(), wt), k -> new HashMap<>())
+                result.computeIfAbsent(weekOwner(it.getTeacherId(), wt, it), k -> new HashMap<>())
                         .computeIfAbsent(it.getWeekday(), k -> new ArrayList<>())
                         .add(it.getStartPeriod());
             }
@@ -419,7 +420,7 @@ final class IncrementalPenaltyState {
         Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> result = new HashMap<>();
         for (SchedulePlanItem it : items) {
             for (String wt : WeekTypeSupport.countableWeekTypes(it.getWeekType())) {
-                result.computeIfAbsent(new WeekOwner(it.getTeacherId(), wt), k -> new HashMap<>())
+                result.computeIfAbsent(weekOwner(it.getTeacherId(), wt, it), k -> new HashMap<>())
                         .computeIfAbsent(it.getWeekday(), k -> new ArrayList<>())
                         .add(it);
             }
@@ -432,7 +433,7 @@ final class IncrementalPenaltyState {
         Map<WeekOwner, Map<Integer, List<Integer>>> result = new HashMap<>();
         for (SchedulePlanItem it : items) {
             for (String wt : WeekTypeSupport.countableWeekTypes(it.getWeekType())) {
-                result.computeIfAbsent(new WeekOwner(it.getClassId(), wt), k -> new HashMap<>())
+                result.computeIfAbsent(weekOwner(it.getClassId(), wt, it), k -> new HashMap<>())
                         .computeIfAbsent(it.getWeekday(), k -> new ArrayList<>())
                         .add(it.getStartPeriod());
             }
@@ -445,7 +446,7 @@ final class IncrementalPenaltyState {
         Map<WeekOwner, Map<Integer, List<SchedulePlanItem>>> result = new HashMap<>();
         for (SchedulePlanItem it : items) {
             for (String wt : WeekTypeSupport.countableWeekTypes(it.getWeekType())) {
-                result.computeIfAbsent(new WeekOwner(it.getClassId(), wt), k -> new HashMap<>())
+                result.computeIfAbsent(weekOwner(it.getClassId(), wt, it), k -> new HashMap<>())
                         .computeIfAbsent(it.getWeekday(), k -> new ArrayList<>())
                         .add(it);
             }
@@ -494,5 +495,17 @@ final class IncrementalPenaltyState {
 
     private static BigDecimal score(BigDecimal totalPenalty) {
         return new BigDecimal("100.0000").subtract(totalPenalty).setScale(4, RoundingMode.HALF_UP);
+    }
+
+    /** V10：构造带 weekMask 的 WeekOwner */
+    private static WeekOwner weekOwner(Long ownerId, String weekType, SchedulePlanItem item) {
+        return new WeekOwner(ownerId, weekType,
+                WeekPatternSupport.weekRangeKey(item.getWeekType(), item.getStartWeek(), item.getEndWeek()));
+    }
+
+    /** V10：courseDayCounts 的 key 加 weekRangeKey 维度 */
+    private static String courseDayKey(SchedulePlanItem item, String weekType) {
+        String rangeKey = WeekPatternSupport.weekRangeKey(item.getWeekType(), item.getStartWeek(), item.getEndWeek());
+        return item.getClassId() + "_" + item.getCourseId() + "_" + item.getWeekday() + "_" + weekType + "_" + rangeKey;
     }
 }

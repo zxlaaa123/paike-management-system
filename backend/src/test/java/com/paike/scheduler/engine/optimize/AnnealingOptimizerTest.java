@@ -114,10 +114,10 @@ class AnnealingOptimizerTest {
 
     static EngineContext optimizationContext(List<Assignment> locked, List<Assignment> existing) {
         List<EngineTask> tasks = List.of(
-                new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1), "ODD"),
-                new EngineTask(1, 102L, 1, 0, 1, 1, "NORMAL", 30, List.of(0, 1), "ODD"),
-                new EngineTask(2, 103L, 0, 1, 0, 1, "NORMAL", 30, List.of(0, 1), "ODD"),
-                new EngineTask(3, 104L, 1, 1, 1, 1, "NORMAL", 30, List.of(0, 1), "ODD")
+                new EngineTask(0, 101L, 0, 0, 0, 1, "NORMAL", 30, List.of(0, 1), "ODD", 1, 20),
+                new EngineTask(1, 102L, 1, 0, 1, 1, "NORMAL", 30, List.of(0, 1), "ODD", 1, 20),
+                new EngineTask(2, 103L, 0, 1, 0, 1, "NORMAL", 30, List.of(0, 1), "ODD", 1, 20),
+                new EngineTask(3, 104L, 1, 1, 1, 1, "NORMAL", 30, List.of(0, 1), "ODD", 1, 20)
         );
         return new EngineContext(
                 tasks,

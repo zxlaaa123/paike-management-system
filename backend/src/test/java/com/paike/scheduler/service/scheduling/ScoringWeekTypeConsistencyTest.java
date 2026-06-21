@@ -61,10 +61,10 @@ class ScoringWeekTypeConsistencyTest {
                 aggregateDayCountsBeta(items, SchedulePlanItem::getTeacherId);
 
         // t1 周一 ODD 桶 = ALL + ODD = 2
-        long oddLoad = teacherCounts.getOrDefault(new ScoringFunctions.WeekOwner(1L, "ODD"), Map.of())
+        long oddLoad = teacherCounts.getOrDefault(new ScoringFunctions.WeekOwner(1L, "ODD", "1-20"), Map.of())
                 .getOrDefault(1, 0L);
         // t1 周一 EVEN 桶 = ALL + EVEN = 2
-        long evenLoad = teacherCounts.getOrDefault(new ScoringFunctions.WeekOwner(1L, "EVEN"), Map.of())
+        long evenLoad = teacherCounts.getOrDefault(new ScoringFunctions.WeekOwner(1L, "EVEN", "1-20"), Map.of())
                 .getOrDefault(1, 0L);
 
         assertEquals(2L, oddLoad, "ODD 桶应含 ALL+ODD = 2 条");
@@ -88,8 +88,8 @@ class ScoringWeekTypeConsistencyTest {
                 aggregateDayCountsBeta(items, SchedulePlanItem::getTeacherId);
 
         // t1 ODD 桶 {周一:1, 周二:1} → 完全均衡，variance=0
-        Map<Integer, Long> oddDays = teacherCounts.get(new ScoringFunctions.WeekOwner(1L, "ODD"));
-        Map<Integer, Long> evenDays = teacherCounts.get(new ScoringFunctions.WeekOwner(1L, "EVEN"));
+        Map<Integer, Long> oddDays = teacherCounts.get(new ScoringFunctions.WeekOwner(1L, "ODD", "1-20"));
+        Map<Integer, Long> evenDays = teacherCounts.get(new ScoringFunctions.WeekOwner(1L, "EVEN", "1-20"));
         assertEquals(Map.of(1, 1L, 2, 1L), oddDays, "ODD 桶应 {d1:1, d2:1}");
         assertEquals(Map.of(1, 1L, 2, 1L), evenDays, "EVEN 桶应 {d1:1, d2:1}");
 
@@ -148,7 +148,7 @@ class ScoringWeekTypeConsistencyTest {
         Map<String, Long> courseDayCounts = items.stream()
                 .flatMap(it -> WeekTypeSupport.countableWeekTypes(it.getWeekType()).stream()
                         .map(wt -> Map.entry(
-                                it.getClassId() + "_" + it.getCourseId() + "_" + it.getWeekday() + "_" + wt,
+                                it.getClassId() + "_" + it.getCourseId() + "_" + it.getWeekday() + "_" + wt + "_1-20",
                                 1L)))
                 .collect(Collectors.groupingBy(
                         Map.Entry::getKey,
@@ -231,7 +231,7 @@ class ScoringWeekTypeConsistencyTest {
             case DeltaPenaltyScorer.COURSE_DISTRIBUTION -> ScoringFunctions.penaltyDuplicateCourse(
                     items.stream().flatMap(it -> WeekTypeSupport.countableWeekTypes(it.getWeekType()).stream()
                             .map(wt -> Map.entry(
-                                    it.getClassId() + "_" + it.getCourseId() + "_" + it.getWeekday() + "_" + wt,
+                                    it.getClassId() + "_" + it.getCourseId() + "_" + it.getWeekday() + "_" + wt + "_1-20",
                                     1L)))
                             .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingLong(Map.Entry::getValue))));
             case DeltaPenaltyScorer.CONTINUOUS_PERIOD_LIMIT -> ScoringFunctions.penaltyContinuousBeta(
@@ -347,7 +347,7 @@ class ScoringWeekTypeConsistencyTest {
         return items.stream()
                 .flatMap(it -> WeekTypeSupport.countableWeekTypes(it.getWeekType()).stream()
                         .map(wt -> Map.entry(
-                                new ScoringFunctions.WeekOwner(ownerFunc.apply(it), wt),
+                                new ScoringFunctions.WeekOwner(ownerFunc.apply(it), wt, "1-20"),
                                 it.getWeekday())))
                 .collect(Collectors.groupingBy(
                         Map.Entry::getKey,
@@ -359,7 +359,7 @@ class ScoringWeekTypeConsistencyTest {
         java.util.Map<ScoringFunctions.WeekOwner, java.util.Map<Integer, List<SchedulePlanItem>>> result = new java.util.HashMap<>();
         for (SchedulePlanItem it : items) {
             for (String wt : WeekTypeSupport.countableWeekTypes(it.getWeekType())) {
-                ScoringFunctions.WeekOwner key = new ScoringFunctions.WeekOwner(ownerFunc.apply(it), wt);
+                ScoringFunctions.WeekOwner key = new ScoringFunctions.WeekOwner(ownerFunc.apply(it), wt, "1-20");
                 result.computeIfAbsent(key, k -> new java.util.HashMap<>())
                         .computeIfAbsent(it.getWeekday(), d -> new java.util.ArrayList<>())
                         .add(it);

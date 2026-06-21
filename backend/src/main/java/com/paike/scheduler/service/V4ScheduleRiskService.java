@@ -167,12 +167,13 @@ public class V4ScheduleRiskService {
                 .collect(Collectors.groupingBy(item -> ownerIdFunc.apply(item) + "_" + item.getWeekday() + "_" + item.getStartPeriod()));
 
         for (List<SchedulePlanItem> sameSlotItems : grouped.values()) {
-            // V9 单双周：组内过滤出真冲突子集——与组内其他任一项 weekType overlap 的 item。
-            // ODD+EVEN 共槽（合法）不报；ALL+任意 / 同周次 才报。
+            // V10 连续周段：组内过滤出真冲突子集——与组内其他任一项实际自然周集合相交的 item。
+            // ODD+EVEN 共槽、ALL 1-8 与 ALL 9-16 共槽（合法）不报；实际周集合相交才报。
             List<SchedulePlanItem> realConflicts = sameSlotItems.stream()
                     .filter(item -> sameSlotItems.stream()
                             .anyMatch(other -> !Objects.equals(other.getId(), item.getId())
-                                    && WeekTypeSupport.overlap(item.getWeekType(), other.getWeekType())))
+                                    && WeekPatternSupport.overlap(item.getWeekType(), item.getStartWeek(), item.getEndWeek(),
+                                            other.getWeekType(), other.getStartWeek(), other.getEndWeek())))
                     .toList();
             if (realConflicts.size() <= 1) {
                 continue;

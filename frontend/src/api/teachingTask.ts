@@ -14,6 +14,10 @@ export interface TeachingTask {
   className: string
   weeklyHours: number
   weekType: WeekType
+  /** 连续周段起始周（闭区间，默认1，V10 连续周段支持） */
+  startWeek: number
+  /** 连续周段结束周（闭区间，默认20，V10 连续周段支持） */
+  endWeek: number
   needContinuous: number
   status: number
   remark: string
@@ -29,6 +33,10 @@ export interface TeachingTaskForm {
   classId: number
   weeklyHours: number
   weekType: WeekType
+  /** 连续周段起始周（闭区间，默认1，V10 连续周段支持） */
+  startWeek?: number
+  /** 连续周段结束周（闭区间，默认20，V10 连续周段支持） */
+  endWeek?: number
   needContinuous?: number
   status?: number
   remark?: string

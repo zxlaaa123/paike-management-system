@@ -51,7 +51,7 @@ class InMemoryConflictDetectorWeekTypeTest {
     }
 
     private EngineTask task(int idx, long id, String weekType) {
-        return new EngineTask(idx, id, 0, 0, 0, 1, "NORMAL", 30, List.of(0), weekType);
+        return new EngineTask(idx, id, 0, 0, 0, 1, "NORMAL", 30, List.of(0), weekType, 1, 20);
     }
 
     /** ODD+EVEN 共槽（slot 0 vs slot 1，同物理时段不同周次）不冲突 */

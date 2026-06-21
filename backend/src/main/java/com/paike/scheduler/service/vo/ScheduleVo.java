@@ -27,6 +27,10 @@ public class ScheduleVo {
     private Long classId;
     private Long timeSlotId;
     private String weekType;
+    /** 连续周段起始周（闭区间，默认1，V10 连续周段支持） */
+    private Integer startWeek;
+    /** 连续周段结束周（闭区间，默认20，V10 连续周段支持） */
+    private Integer endWeek;
     private Long classroomId;
     private String sourceType;
     private Long batchId;
@@ -57,6 +61,8 @@ public class ScheduleVo {
         vo.setClassId(entity.getClassId());
         vo.setTimeSlotId(entity.getTimeSlotId());
         vo.setWeekType(WeekTypeSupport.normalize(entity.getWeekType()));
+        vo.setStartWeek(entity.getStartWeek());
+        vo.setEndWeek(entity.getEndWeek());
         vo.setClassroomId(entity.getClassroomId());
         vo.setSourceType(entity.getSourceType());
         vo.setBatchId(entity.getBatchId());
