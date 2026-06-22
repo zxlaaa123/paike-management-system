@@ -284,12 +284,12 @@
 
 ### P2
 
-1. 前端请求取消机制。
-2. 分页事件模式统一。
-3. API 响应 unwrap 统一。
-4. `SchedulePlanDetailView.vue` 拆组件。
-5. `EngineContextLoader.load` 分阶段拆分。
-6. RateLimiter 增加容量/过期清理，或替换为 Redis/网关限流。
+1. ~~前端请求取消机制。~~ ✅ 已修复（2026-06-22）
+2. ~~分页事件模式统一。~~ ✅ 已修复（2026-06-22）
+3. ~~API 响应 unwrap 统一。~~ ✅ 已修复（2026-06-22）
+4. ~~`SchedulePlanDetailView.vue` 拆组件。~~ ✅ 已修复（2026-06-22）
+5. ~~`EngineContextLoader.load` 分阶段拆分。~~ ✅ 已修复（2026-06-22）
+6. ~~RateLimiter 增加容量/过期清理，或替换为 Redis/网关限流。~~ ✅ 已修复（2026-06-22）
 
 ### P3
 
