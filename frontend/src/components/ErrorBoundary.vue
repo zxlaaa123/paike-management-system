@@ -31,9 +31,9 @@ function reset() {
 
 function recordLocalError(err: Error) {
   try {
+    // 安全：不持久化完整错误栈，防止敏感信息（组件 trace、内部路径）留存到 sessionStorage。
     const item = {
       message: err.message || '未知错误',
-      stack: err.stack || '',
       path: router.currentRoute.value.fullPath,
       time: new Date().toISOString(),
     }

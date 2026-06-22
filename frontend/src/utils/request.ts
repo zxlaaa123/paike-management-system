@@ -3,15 +3,22 @@ import { ElMessage } from 'element-plus'
 import type { ApiResponse } from '../api/types'
 import router from '../router'
 
-/** 从浏览器 Cookie 中读取指定名称的值 */
+/** 从浏览器 Cookie 中读取指定名称的值（非正则实现，避免 name 注入） */
 function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'))
-  if (!match) return null
-  try {
-    return decodeURIComponent(match[1])
-  } catch {
-    return match[1]
+  const prefix = name + '='
+  const cookies = document.cookie.split(';')
+  for (const raw of cookies) {
+    const trimmed = raw.trimStart()
+    if (trimmed.startsWith(prefix)) {
+      const value = trimmed.substring(prefix.length)
+      try {
+        return decodeURIComponent(value)
+      } catch {
+        return value
+      }
+    }
   }
+  return null
 }
 
 const request = axios.create({

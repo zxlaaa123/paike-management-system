@@ -65,12 +65,39 @@ public class ScheduleConflictService {
             return tagReason("CLASSROOM_NOT_FOUND", "所选教室不存在");
         }
 
+        String basicViolation = checkBasicConstraints(task, timeSlot, classroom);
+        if (basicViolation != null) {
+            return basicViolation;
+        }
+
+        String resourceViolation = checkResourceConflicts(task, timeSlot, classroom, timeSlotId, excludeScheduleId);
+        if (resourceViolation != null) {
+            return resourceViolation;
+        }
+
+        String weeklyViolation = checkWeeklyHourLimit(task, taskId, excludeScheduleId);
+        if (weeklyViolation != null) {
+            return weeklyViolation;
+        }
+
+        String softRuleViolation = checkSoftRules(task, timeSlot, excludeScheduleId);
+        if (softRuleViolation != null) {
+            return softRuleViolation;
+        }
+
+        return null; // 无冲突
+    }
+
+    /**
+     * 基础硬约束：教师/班级/教室状态、教室容量、课程-教室类型匹配。
+     */
+    private String checkBasicConstraints(TeachingTaskVo task, TimeSlot timeSlot, Classroom classroom) {
         // 1. 停用教师不能参与排课
         if (task.getTeacherStatus() != null && !Integer.valueOf(1).equals(task.getTeacherStatus())) {
             return tagReason("TEACHER_DISABLED", "排课失败:" + task.getTeacherName() + "老师已停用,不能参与排课");
         }
-        // 1.5 教师禁排时间检查（teacher 可能因被软删而为 null，需要兜底显示名）
-        if (unavailableTimeService.isUnavailable(task.getTeacherId(), timeSlotId)) {
+        // 1.5 教师禁排时间检查
+        if (unavailableTimeService.isUnavailable(task.getTeacherId(), timeSlot.getId())) {
             String displayName = task.getTeacherName() != null ? task.getTeacherName() + "老师" : "该教师";
             return tagReason("TEACHER_UNAVAILABLE", "排课失败:" + displayName + "在" + timeSlot.getTimeLabel() + "设置了禁排时间");
         }
@@ -104,15 +131,20 @@ public class ScheduleConflictService {
                 && !RoomType.COMPUTER.getCode().equals(classroom.getRoomType())) {
             return tagReason("ROOM_TYPE_MISMATCH", "排课失败:机房课必须安排在机房");
         }
+        return null;
+    }
 
-        // 只查询同一时间段的排课记录,避免全表扫描
+    /**
+     * 资源冲突检测：教师/班级/教室在同一时间段的占用（V10 周段相交判定）。
+     */
+    private String checkResourceConflicts(TeachingTaskVo task, TimeSlot timeSlot, Classroom classroom,
+                                           Long timeSlotId, Long excludeScheduleId) {
         LambdaQueryWrapper<Schedule> baseWrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getTimeSlotId, timeSlotId)
                 .eq(task.getSemesterId() != null, Schedule::getSemesterId, task.getSemesterId());
         if (excludeScheduleId != null) {
             baseWrapper.ne(Schedule::getId, excludeScheduleId);
         }
-
         List<Schedule> existingSchedules = scheduleMapper.selectList(baseWrapper);
 
         String timeLabel = timeSlot.getTimeLabel();
@@ -120,12 +152,11 @@ public class ScheduleConflictService {
         String className = task.getClassName() != null ? task.getClassName() : "";
         Long teacherId = task.getTeacherId();
         Long classId = task.getClassId();
-        // 当前任务的周次模式（V10 连续周段：weekType + startWeek + endWeek）；null 视为 ALL 1-20
         String currentWeekType = task.getWeekType();
         Integer currentStartWeek = task.getStartWeek();
         Integer currentEndWeek = task.getEndWeek();
 
-        // 批量查询所有关联的教学任务,避免 N+1 查询
+        // 批量查询关联教学任务，避免 N+1
         List<Long> existingTaskIds = existingSchedules.stream()
             .map(Schedule::getTeachingTaskId)
             .filter(Objects::nonNull)
@@ -152,16 +183,20 @@ public class ScheduleConflictService {
                 return tagReason("CLASS_CONFLICT", "排课失败:" + className + "在" + timeLabel + "已有课程");
             }
 
-            // 9. 同一教室同一时间不能安排两门课（V10 周段，weekType/startWeek/endWeek 取自 schedule 行）
-            if (Objects.equals(s.getClassroomId(), classroomId)
+            // 9. 同一教室同一时间不能安排两门课（V10 周段）
+            if (Objects.equals(s.getClassroomId(), classroom.getId())
                     && WeekPatternSupport.overlap(currentWeekType, currentStartWeek, currentEndWeek,
                             s.getWeekType(), s.getStartWeek(), s.getEndWeek())) {
                 return tagReason("ROOM_CONFLICT", "排课失败:" + classroom.getRoomName() + "教室在" + timeLabel + "已被占用");
             }
         }
+        return null;
+    }
 
-        // 10. 教学任务不能超过每周课时
-        // 统计该任务已排的大节数
+    /**
+     * 每周课时上限检查。
+     */
+    private String checkWeeklyHourLimit(TeachingTaskVo task, Long taskId, Long excludeScheduleId) {
         LambdaQueryWrapper<Schedule> taskWrapper = new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getTeachingTaskId, taskId)
                 .eq(task.getSemesterId() != null, Schedule::getSemesterId, task.getSemesterId());
@@ -175,47 +210,45 @@ public class ScheduleConflictService {
         if (scheduledSlots + 1 > requiredSlots) {
             return tagReason("TASK_NOT_FULLY_SCHEDULED", "排课失败:该教学任务每周课时为" + weeklyHoursVal + "学时,最多排" + requiredSlots + "个大节,当前已排" + scheduledSlots + "个大节");
         }
+        return null;
+    }
 
-        // 11. 读取软规则。前面的资源占用、容量、类型属于硬约束,这里的每日上限和同课同日属于配置化约束。
+    /**
+     * 软规则：教师每日上限、班级每日上限、同课同日限制。
+     */
+    private String checkSoftRules(TeachingTaskVo task, TimeSlot timeSlot, Long excludeScheduleId) {
         int teacherMaxDailySlots = ruleService.getIntValue("TEACHER_MAX_DAILY_SLOTS");
         int classMaxDailySlots = ruleService.getIntValue("CLASS_MAX_DAILY_SLOTS");
         boolean allowSameCourseSameDay = ruleService.getBoolValue("ALLOW_SAME_COURSE_SAME_DAY");
 
-        // 预加载当天所有时间段 ID,供三条软规则复用
+        // 预加载当天所有时间段 ID
         List<Long> daySlotIds = timeSlotMapper.selectList(
                 new LambdaQueryWrapper<TimeSlot>()
                         .eq(TimeSlot::getDayOfWeek, timeSlot.getDayOfWeek()))
                 .stream().map(TimeSlot::getId).collect(Collectors.toList());
 
-        // 批量统计每日冲突计数,一次查询替代之前的三次 selectCount
-        // V9 单双周：daily limit 按周次独立计数（裁决 β），传入当前任务的 weekType
+        // 批量统计每日冲突计数
         ScheduleDailyConflictCounts dailyCounts = scheduleMapper.selectDailyConflictCounts(
-                teacherId, classId, task.getCourseId(), daySlotIds, task.getSemesterId(), null, excludeScheduleId,
-                WeekTypeSupport.normalize(currentWeekType));
+                task.getTeacherId(), task.getClassId(), task.getCourseId(), daySlotIds, task.getSemesterId(), null, excludeScheduleId,
+                WeekTypeSupport.normalize(task.getWeekType()));
         long teacherDailyCount = dailyCounts == null ? 0L : dailyCounts.teacherDailyOrZero();
         long classDailyCount = dailyCounts == null ? 0L : dailyCounts.classDailyOrZero();
         long sameCourseCount = dailyCounts == null ? 0L : dailyCounts.sameCourseOrZero();
 
-        if (teacherMaxDailySlots > 0) {
-            // 这里用 >=,因为当前待插入的大节尚未入库；一旦已达到上限,本次排课就必须拒绝。
-            if (teacherDailyCount >= teacherMaxDailySlots) {
-                return tagReason("TEACHER_DAILY_LIMIT", "排课失败:" + teacherName + "老师每天最多" + teacherMaxDailySlots + "个大节,当前已排" + teacherDailyCount + "个");
-            }
+        String teacherName = task.getTeacherName() != null ? task.getTeacherName() : "";
+        String className = task.getClassName() != null ? task.getClassName() : "";
+
+        if (teacherMaxDailySlots > 0 && teacherDailyCount >= teacherMaxDailySlots) {
+            return tagReason("TEACHER_DAILY_LIMIT", "排课失败:" + teacherName + "老师每天最多" + teacherMaxDailySlots + "个大节,当前已排" + teacherDailyCount + "个");
         }
 
-        if (classMaxDailySlots > 0) {
-            if (classDailyCount >= classMaxDailySlots) {
-                return tagReason("CLASS_DAILY_LIMIT", "排课失败:" + className + "每天最多" + classMaxDailySlots + "个大节,当前已排" + classDailyCount + "个");
-            }
+        if (classMaxDailySlots > 0 && classDailyCount >= classMaxDailySlots) {
+            return tagReason("CLASS_DAILY_LIMIT", "排课失败:" + className + "每天最多" + classMaxDailySlots + "个大节,当前已排" + classDailyCount + "个");
         }
 
-        if (!allowSameCourseSameDay) {
-            // 这里约束的是"同一班级 + 同一课程 + 同一天",不是简单按教师或时间段去重。
-            if (sameCourseCount > 0) {
-                return tagReason("SAME_COURSE_SAME_DAY", "排课失败:同一课程同一天不允许重复");
-            }
+        if (!allowSameCourseSameDay && sameCourseCount > 0) {
+            return tagReason("SAME_COURSE_SAME_DAY", "排课失败:同一课程同一天不允许重复");
         }
-
-        return null; // 无冲突
+        return null;
     }
 }

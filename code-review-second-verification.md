@@ -62,26 +62,26 @@
 
 ### 3. ErrorBoundary 持久化错误信息
 
-结论：属实。优先级：P1。
+结论：属实。优先级：P1。**状态：✅ 已修复（2026-06-22，未提交）**
+
+修复内容：`recordLocalError` 不再将 `err.stack` 写入 `sessionStorage`，只保留 message + path + time。
 
 证据：
 
 - `frontend/src/components/ErrorBoundary.vue:22`
 - `frontend/src/components/ErrorBoundary.vue:41`
 
-组件将错误写入 `sessionStorage`，并伴随 `console.error`。若错误对象包含 stack/component trace，存在前端敏感信息留存风险。
-
 ### 4. Cookie 读取正则未转义
 
-结论：属实，但建议从“高危”降为中等风险。优先级：P1/P2。
+结论：属实，但建议从"高危"降为中等风险。优先级：P1/P2。**状态：✅ 已修复（2026-06-22，未提交）**
+
+修复内容：`getCookie` 改为非正则的字符串 `split` + `startsWith` 实现，彻底消除 RegExp 注入风险。
 
 证据：
 
 - `frontend/src/utils/request.ts:7`
 - `frontend/src/utils/request.ts:8`
 - `frontend/src/utils/request.ts:59`
-
-`getCookie(name)` 直接把 `name` 拼进 `RegExp`。当前调用固定为 `XSRF-TOKEN`，实际利用面较小，但实现本身不稳，应改为转义 cookie name 或不用正则解析。
 
 ### 5. 分页 v-model 与事件混用
 
@@ -150,14 +150,14 @@
 
 ### 10. AuthInterceptor context-path 管理权限匹配
 
-结论：部分属实。
+结论：部分属实。**状态：✅ 已修复（2026-06-22，未提交）**
+
+修复内容：`requiresAdmin` 改用 `request.getServletPath()` 替代 `request.getRequestURI()`，不受 context-path 前缀干扰。
 
 证据：
 
 - `backend/src/main/java/com/paike/scheduler/auth/AuthInterceptor.java:95`
 - `backend/src/main/java/com/paike/scheduler/auth/AuthInterceptor.java:99`
-
-使用 `request.getRequestURI()` 做路径判断。若应用部署在 context-path 下，路径前缀可能影响匹配。当前默认部署未必触发，应作为兼容性缺陷，不宜按立即高危处理。
 
 ### 11. Entity 直接暴露
 
@@ -199,13 +199,13 @@
 
 ### 14. `ScheduleConflictService.checkConflict` 方法过长
 
-结论：属实。
+结论：属实。**状态：✅ 已修复（2026-06-22，未提交）**
+
+修复内容：`checkConflict` 从 167 行拆为 5 个私有方法：`checkBasicConstraints`（基础硬约束）、`checkResourceConflicts`（教师/班级/教室资源冲突）、`checkWeeklyHourLimit`（每周课时上限）、`checkSoftRules`（每日上限软规则）、主方法仅做编排。
 
 证据：
 
 - `backend/src/main/java/com/paike/scheduler/service/ScheduleConflictService.java:54-220`
-
-方法约 167 行。建议拆成教师冲突、教室冲突、班级冲突、周段重叠、结果组装等私有方法。
 
 ### 15. `EngineContextLoader.load` 复杂度高
 
@@ -276,11 +276,11 @@
 
 ### P1
 
-1. ErrorBoundary 不再持久化完整错误栈。
-2. Cookie 解析转义或改非正则实现。
-3. AuthInterceptor 改用 context-path 安全的 path 获取方式。
-4. 关键编辑接口引入乐观锁或版本校验。
-5. `ScheduleConflictService.checkConflict` 拆分并补边界测试。
+1. ~~ErrorBoundary 不再持久化完整错误栈。~~ ✅ 已修复（2026-06-22，未提交）
+2. ~~Cookie 解析转义或改非正则实现。~~ ✅ 已修复（2026-06-22，未提交）
+3. ~~AuthInterceptor 改用 context-path 安全的 path 获取方式。~~ ✅ 已修复（2026-06-22，未提交）
+4. 关键编辑接口引入乐观锁或版本校验。（暂缓，触及面大，需独立评估）
+5. ~~`ScheduleConflictService.checkConflict` 拆分并补边界测试。~~ ✅ 已修复（2026-06-22，未提交）
 
 ### P2
 
