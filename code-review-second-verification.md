@@ -43,7 +43,13 @@
 
 ### 2. 应用方案会清理旧课表再写入
 
-结论：属实，但“物理删除”说法错误。优先级：P0/P1。
+结论：属实，但“物理删除”说法错误。优先级：P0/P1。**状态：✅ 已修复（2026-06-22，未提交）**
+
+修复内容：
+- **并发保护**：`applyPlanInternal` 入口加 `SemesterMapper.selectByIdForUpdate`（SELECT ... FOR UPDATE）锁定学期行，串行化同学期的方案应用
+- **幂等保护**：获锁后重新读取方案状态，若已被并发应用则拒绝重复执行
+- **审计补全**：新增 `CLEAR_SEMESTER_SCHEDULES` 和 `REVERT_APPLIED_PLAN` 审计动作，记录旧课表清理数量和旧方案回退
+- 测试：新增 4 个测试用例（行锁顺序、学期不存在、重复应用拒绝、旧课表审计），SchedulePlanServiceTest 14/14 全过
 
 证据：
 
@@ -266,7 +272,7 @@
 ### P0
 
 1. ~~`ScheduleService.create` 补齐 `weekType/startWeek/endWeek`，并加手动排课周段测试。~~ ✅ 已修复（2026-06-22，未提交）
-2. 明确 `applyPlanInternal` 覆盖旧课表的业务语义，补幂等/并发/审计保护。
+2. ~~明确 `applyPlanInternal` 覆盖旧课表的业务语义，补幂等/并发/审计保护。~~ ✅ 已修复（2026-06-22，未提交）
 
 ### P1
 

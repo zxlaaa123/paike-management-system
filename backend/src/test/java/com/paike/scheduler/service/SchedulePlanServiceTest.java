@@ -514,9 +514,13 @@ class SchedulePlanServiceTest {
         TeachingTaskMapper teachingTaskMapper = mock(TeachingTaskMapper.class);
         TeacherUnavailableTimeService unavailableTimeService = mock(TeacherUnavailableTimeService.class);
         SystemAuditLogService auditLogService = mock(SystemAuditLogService.class);
+        SemesterMapper semesterMapper = mock(SemesterMapper.class);
+        Semester semester = new Semester();
+        semester.setId(3L);
+        when(semesterMapper.selectByIdForUpdate(3L)).thenReturn(semester);
         SchedulePlanService service = new SchedulePlanService(
                 planMapper,
-                mock(SemesterMapper.class),
+                semesterMapper,
                 planItemMapper,
                 scheduleMapper,
                 scheduleLockedItemMapper,
@@ -573,7 +577,7 @@ class SchedulePlanServiceTest {
         ArgumentCaptor<LambdaQueryWrapper<Schedule>> deleteCaptor = scheduleWrapperCaptor();
         ArgumentCaptor<Schedule> insertCaptor = ArgumentCaptor.forClass(Schedule.class);
         InOrder order = inOrder(scheduleMapper);
-        order.verify(scheduleMapper).selectList(any());
+        order.verify(scheduleMapper, times(2)).selectList(any());
         order.verify(scheduleMapper).delete(deleteCaptor.capture());
         order.verify(scheduleMapper).insert(insertCaptor.capture());
 
@@ -658,6 +662,189 @@ class SchedulePlanServiceTest {
         slot.setDayOfWeek(dayOfWeek);
         slot.setPeriodNo(periodNo);
         return slot;
+    }
+
+    @Test
+    void applyPlan_acquiresSemesterRowLockBeforeMutation() {
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SemesterMapper semesterMapper = mock(SemesterMapper.class);
+        ScheduleMapper scheduleMapper = mock(ScheduleMapper.class);
+        SystemAuditLogService auditLogService = mock(SystemAuditLogService.class);
+        SchedulePlanItemMapper planItemMapper = mock(SchedulePlanItemMapper.class);
+        TimeSlotMapper timeSlotMapper = mock(TimeSlotMapper.class);
+
+        SchedulePlan plan = new SchedulePlan();
+        plan.setId(10L);
+        plan.setSemesterId(3L);
+        plan.setStatus(SchedulePlanStatus.DRAFT.getCode());
+        plan.setScheduledCount(1);
+        when(planMapper.selectById(10L)).thenReturn(plan);
+        when(planMapper.selectList(any())).thenReturn(List.of());
+        when(planMapper.updateById(any(SchedulePlan.class))).thenReturn(1);
+
+        Semester semester = new Semester();
+        semester.setId(3L);
+        when(semesterMapper.selectByIdForUpdate(3L)).thenReturn(semester);
+
+        SchedulePlanItem item = planItem(101L, 201L, 301L, 401L, 501L, 1, 1, 2);
+        item.setCourseId(601L);
+        when(planItemMapper.selectList(any())).thenReturn(List.of(item));
+        when(timeSlotMapper.selectList(any())).thenReturn(List.of(timeSlot(701L, 1, 1)));
+        ScheduleLockedItemMapper lockedItemMapper = mock(ScheduleLockedItemMapper.class);
+        when(lockedItemMapper.selectCount(any())).thenReturn(0L);
+        when(scheduleMapper.selectList(any())).thenReturn(List.of());
+        when(scheduleMapper.delete(any())).thenReturn(0);
+        when(scheduleMapper.insert(any(Schedule.class))).thenReturn(1);
+
+        SchedulePlanService service = new SchedulePlanService(
+                planMapper, semesterMapper, planItemMapper, scheduleMapper,
+                lockedItemMapper, mock(ScheduleLockGuardService.class),
+                mock(CourseMapper.class), mock(TeacherMapper.class), mock(ClassInfoMapper.class),
+                mock(ClassroomMapper.class), timeSlotMapper, mock(TeachingTaskMapper.class),
+                mock(TeacherUnavailableTimeService.class), mock(ScheduleScoreService.class),
+                mock(SchedulePlanExplainService.class), auditLogService);
+
+        service.applyPlan(10L);
+
+        // 验证：学期行锁在 planMapper.selectList 之前获取
+        InOrder order = inOrder(semesterMapper, planMapper, scheduleMapper);
+        order.verify(semesterMapper).selectByIdForUpdate(3L);
+        order.verify(planMapper).selectById(10L);
+    }
+
+    @Test
+    void applyPlan_rejectsWhenSemesterNotFoundAfterLock() {
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SemesterMapper semesterMapper = mock(SemesterMapper.class);
+        SystemAuditLogService auditLogService = mock(SystemAuditLogService.class);
+
+        SchedulePlan plan = new SchedulePlan();
+        plan.setId(10L);
+        plan.setSemesterId(999L);
+        plan.setStatus(SchedulePlanStatus.DRAFT.getCode());
+        plan.setScheduledCount(1);
+        when(planMapper.selectById(10L)).thenReturn(plan);
+        when(semesterMapper.selectByIdForUpdate(999L)).thenReturn(null);
+
+        SchedulePlanService service = new SchedulePlanService(
+                planMapper, semesterMapper, mock(SchedulePlanItemMapper.class),
+                mock(ScheduleMapper.class), mock(ScheduleLockedItemMapper.class),
+                mock(ScheduleLockGuardService.class), mock(CourseMapper.class),
+                mock(TeacherMapper.class), mock(ClassInfoMapper.class), mock(ClassroomMapper.class),
+                mock(TimeSlotMapper.class), mock(TeachingTaskMapper.class),
+                mock(TeacherUnavailableTimeService.class), mock(ScheduleScoreService.class),
+                mock(SchedulePlanExplainService.class), auditLogService);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.applyPlan(10L));
+        assertEquals("学期不存在，无法应用方案", error.getMessage());
+    }
+
+    @Test
+    void applyPlan_rejectsDuplicateApplyAfterLock() {
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SemesterMapper semesterMapper = mock(SemesterMapper.class);
+        SystemAuditLogService auditLogService = mock(SystemAuditLogService.class);
+
+        // 第一次 selectById 返回 DRAFT（通过预检查），获锁后第二次返回 APPLIED（被并发应用了）
+        SchedulePlan draftPlan = new SchedulePlan();
+        draftPlan.setId(10L);
+        draftPlan.setSemesterId(3L);
+        draftPlan.setStatus(SchedulePlanStatus.DRAFT.getCode());
+        draftPlan.setScheduledCount(1);
+
+        SchedulePlan appliedPlan = new SchedulePlan();
+        appliedPlan.setId(10L);
+        appliedPlan.setSemesterId(3L);
+        appliedPlan.setStatus(SchedulePlanStatus.APPLIED.getCode());
+        appliedPlan.setScheduledCount(1);
+
+        when(planMapper.selectById(10L)).thenReturn(draftPlan, appliedPlan);
+        Semester semester = new Semester();
+        semester.setId(3L);
+        when(semesterMapper.selectByIdForUpdate(3L)).thenReturn(semester);
+
+        SchedulePlanService service = new SchedulePlanService(
+                planMapper, semesterMapper, mock(SchedulePlanItemMapper.class),
+                mock(ScheduleMapper.class), mock(ScheduleLockedItemMapper.class),
+                mock(ScheduleLockGuardService.class), mock(CourseMapper.class),
+                mock(TeacherMapper.class), mock(ClassInfoMapper.class), mock(ClassroomMapper.class),
+                mock(TimeSlotMapper.class), mock(TeachingTaskMapper.class),
+                mock(TeacherUnavailableTimeService.class), mock(ScheduleScoreService.class),
+                mock(SchedulePlanExplainService.class), auditLogService);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.applyPlan(10L));
+        assertEquals("该方案已应用，无需重复应用", error.getMessage());
+    }
+
+    @Test
+    void applyPlan_auditsOldScheduleClearanceAndOldPlanRevert() {
+        SchedulePlanMapper planMapper = mock(SchedulePlanMapper.class);
+        SemesterMapper semesterMapper = mock(SemesterMapper.class);
+        ScheduleMapper scheduleMapper = mock(ScheduleMapper.class);
+        ScheduleLockedItemMapper scheduleLockedItemMapper = mock(ScheduleLockedItemMapper.class);
+        SchedulePlanItemMapper planItemMapper = mock(SchedulePlanItemMapper.class);
+        TimeSlotMapper timeSlotMapper = mock(TimeSlotMapper.class);
+        SystemAuditLogService auditLogService = mock(SystemAuditLogService.class);
+
+        SchedulePlan newPlan = new SchedulePlan();
+        newPlan.setId(20L);
+        newPlan.setSemesterId(3L);
+        newPlan.setStatus(SchedulePlanStatus.DRAFT.getCode());
+        newPlan.setScheduledCount(1);
+        when(planMapper.selectById(20L)).thenReturn(newPlan);
+        when(planMapper.updateById(any(SchedulePlan.class))).thenReturn(1);
+
+        // 旧已应用方案
+        SchedulePlan oldPlan = new SchedulePlan();
+        oldPlan.setId(10L);
+        oldPlan.setSemesterId(3L);
+        oldPlan.setStatus(SchedulePlanStatus.APPLIED.getCode());
+        when(planMapper.selectList(any())).thenReturn(List.of(oldPlan));
+
+        Semester semester = new Semester();
+        semester.setId(3L);
+        when(semesterMapper.selectByIdForUpdate(3L)).thenReturn(semester);
+
+        // 旧课表记录
+        Schedule oldSchedule = new Schedule();
+        oldSchedule.setId(88L);
+        oldSchedule.setSemesterId(3L);
+        when(scheduleMapper.selectList(any())).thenReturn(List.of(oldSchedule));
+        when(scheduleLockedItemMapper.selectCount(any())).thenReturn(0L);
+        when(scheduleMapper.delete(any())).thenReturn(1);
+        when(scheduleMapper.insert(any(Schedule.class))).thenReturn(1);
+
+        SchedulePlanItem item = planItem(101L, 201L, 301L, 401L, 501L, 1, 1, 2);
+        item.setCourseId(601L);
+        when(planItemMapper.selectList(any())).thenReturn(List.of(item));
+        when(timeSlotMapper.selectList(any())).thenReturn(List.of(timeSlot(701L, 1, 1)));
+
+        SchedulePlanService service = new SchedulePlanService(
+                planMapper, semesterMapper, planItemMapper, scheduleMapper,
+                scheduleLockedItemMapper, mock(ScheduleLockGuardService.class),
+                mock(CourseMapper.class), mock(TeacherMapper.class), mock(ClassInfoMapper.class),
+                mock(ClassroomMapper.class), timeSlotMapper, mock(TeachingTaskMapper.class),
+                mock(TeacherUnavailableTimeService.class), mock(ScheduleScoreService.class),
+                mock(SchedulePlanExplainService.class), auditLogService);
+
+        service.applyPlan(20L);
+
+        // 验证审计：清理旧课表
+        verify(auditLogService).recordSuccess(
+                eq(SystemAuditLogService.ACTION_CLEAR_SEMESTER_SCHEDULES),
+                eq(SystemAuditLogService.TARGET_SCHEDULE),
+                eq(3L),
+                eq(3L),
+                eq(20L),
+                eq("应用方案前清理旧课表，删除 1 条记录"));
+        // 验证审计：旧方案回退
+        verify(auditLogService).recordSuccess(
+                eq(SystemAuditLogService.ACTION_REVERT_APPLIED_PLAN),
+                eq(SystemAuditLogService.TARGET_SCHEDULE_PLAN),
+                eq(10L),
+                eq(3L),
+                eq(10L),
+                eq("方案被新方案(id=20)覆盖，回退为 DRAFT"));
     }
 
     @SuppressWarnings("unchecked")
