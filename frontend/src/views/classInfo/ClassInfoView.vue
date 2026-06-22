@@ -42,6 +42,11 @@ const {
 
 void formRef
 
+function handleSizeChange() {
+  currentPage.value = 1
+  fetchData()
+}
+
 const rules = {
   className: [{ required: true, message: '请输入班级名称', trigger: 'blur' }],
   studentCount: [{ required: true, message: '请输入班级人数', trigger: 'blur' }],
@@ -127,7 +132,7 @@ async function handleStatusChange(row: ClassInfo) {
         :page-sizes="[10, 20, 50]"
         layout="total, sizes, prev, pager, next, jumper"
         style="margin-top: 16px; justify-content: flex-end"
-        @current-change="fetchData" @size-change="fetchData"
+        @current-change="fetchData" @size-change="handleSizeChange"
       />
     </el-card>
 

@@ -50,6 +50,11 @@ const {
 
 void formRef
 
+function handleSizeChange() {
+  currentPage.value = 1
+  fetchData()
+}
+
 const rules = {
   courseNo: [{ required: true, message: '请输入课程编号', trigger: 'blur' }],
   courseName: [{ required: true, message: '请输入课程名称', trigger: 'blur' }],
@@ -113,7 +118,7 @@ const rules = {
         :page-sizes="[10, 20, 50]"
         layout="total, sizes, prev, pager, next, jumper"
         style="margin-top: 16px; justify-content: flex-end"
-        @current-change="fetchData" @size-change="fetchData"
+        @current-change="fetchData" @size-change="handleSizeChange"
       />
     </el-card>
 
