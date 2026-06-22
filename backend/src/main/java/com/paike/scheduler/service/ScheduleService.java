@@ -116,6 +116,9 @@ public class ScheduleService {
             schedule.setClassId(task.getClassId());
             schedule.setTimeSlotId(timeSlotId);
             schedule.setClassroomId(classroomId);
+            schedule.setWeekType(WeekTypeSupport.normalize(task.getWeekType()));
+            schedule.setStartWeek(WeekPatternSupport.normalizeStartWeek(task.getStartWeek()));
+            schedule.setEndWeek(WeekPatternSupport.normalizeEndWeek(task.getEndWeek()));
             schedule.setSourceType(ScheduleSourceType.MANUAL.getCode());
             schedule.setDeleted(0);
             schedule.setCreateTime(LocalDateTime.now());

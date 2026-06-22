@@ -23,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -45,6 +46,9 @@ class ScheduleServiceAuditTest {
         TeachingTask task = new TeachingTask();
         task.setId(10L);
         task.setSemesterId(3L);
+        task.setWeekType("ODD");
+        task.setStartWeek(3);
+        task.setEndWeek(15);
         when(teachingTaskMapper.selectById(10L)).thenReturn(task);
         when(teachingTaskMapper.selectBatchIds(any())).thenReturn(List.of());
         TimeSlot timeSlot = new TimeSlot();
@@ -61,6 +65,12 @@ class ScheduleServiceAuditTest {
 
         service.create(10L, 20L, 30L);
 
+        ArgumentCaptor<Schedule> scheduleCaptor = ArgumentCaptor.forClass(Schedule.class);
+        verify(scheduleMapper).insert(scheduleCaptor.capture());
+        Schedule inserted = scheduleCaptor.getValue();
+        assertEquals("ODD", inserted.getWeekType());
+        assertEquals(3, inserted.getStartWeek());
+        assertEquals(15, inserted.getEndWeek());
         verify(auditLogService).recordSuccess(
                 eq(SystemAuditLogService.ACTION_CREATE_SCHEDULE),
                 eq(SystemAuditLogService.TARGET_SCHEDULE),

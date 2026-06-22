@@ -429,8 +429,10 @@ public class SchedulePlanService {
             schedule.setClassId(item.getClassId());
             schedule.setClassroomId(item.getClassroomId());
             schedule.setTimeSlotId(timeSlotId);
-            // V9 单双周：plan_item → schedule 透传 weekType（之前 schedule 无此列会丢）
+            // V10 周模式：plan_item -> schedule 透传 weekType/startWeek/endWeek，保证正式课表语义不丢失。
             schedule.setWeekType(WeekTypeSupport.normalize(item.getWeekType()));
+            schedule.setStartWeek(WeekPatternSupport.normalizeStartWeek(item.getStartWeek()));
+            schedule.setEndWeek(WeekPatternSupport.normalizeEndWeek(item.getEndWeek()));
             schedule.setSourceType("PLAN");
             schedule.setDeleted(0);
             schedule.setCreateTime(LocalDateTime.now());

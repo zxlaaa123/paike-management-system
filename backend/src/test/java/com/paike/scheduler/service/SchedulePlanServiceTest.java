@@ -542,8 +542,10 @@ class SchedulePlanServiceTest {
 
         SchedulePlanItem item = planItem(101L, 201L, 301L, 401L, 501L, 1, 1, 2);
         item.setCourseId(601L);
-        // V9 单双周：plan_item 设 ODD，验证透传到正式 schedule
+        // V10 周模式：plan_item 设 ODD + 周段，验证透传到正式 schedule
         item.setWeekType("ODD");
+        item.setStartWeek(3);
+        item.setEndWeek(15);
         when(planItemMapper.selectList(any())).thenReturn(List.of(item));
         when(planItemMapper.updateById(any(SchedulePlanItem.class))).thenReturn(1);
 
@@ -578,8 +580,10 @@ class SchedulePlanServiceTest {
         assertWrapperContains(deleteCaptor.getValue(), Schedule.class, "semester_id", 3L);
         assertEquals(3L, insertCaptor.getValue().getSemesterId());
         assertEquals(10L, insertCaptor.getValue().getPlanId());
-        // V9 单双周：applyPlan 必须把 plan_item.weekType 透传到 schedule（之前会丢）
+        // V10 周模式：applyPlan 必须把 plan_item.weekType/startWeek/endWeek 透传到 schedule（之前会丢）
         assertEquals("ODD", insertCaptor.getValue().getWeekType());
+        assertEquals(3, insertCaptor.getValue().getStartWeek());
+        assertEquals(15, insertCaptor.getValue().getEndWeek());
         verify(auditLogService).recordSuccess(
                 eq(SystemAuditLogService.ACTION_APPLY_PLAN),
                 eq(SystemAuditLogService.TARGET_SCHEDULE_PLAN),
