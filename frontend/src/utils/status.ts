@@ -73,6 +73,35 @@ export function schedulePlanStatusTagType(status: string): string {
   return map[status] || 'info'
 }
 
+/** 排课生成日志级别 Tag 类型映射 */
+export function logLevelTagType(level: string): string {
+  const map: Record<string, string> = { INFO: 'primary', WARN: 'warning', ERROR: 'danger' }
+  return map[level] || 'info'
+}
+
+/** 排课生成日志类型文本映射 */
+export function logTypeText(type: string): string {
+  const map: Record<string, string> = {
+    START_GENERATE: '开始生成',
+    LOAD_TASK: '读取任务',
+    CHECK_TEACHER: '检查教师',
+    CHECK_CLASSROOM: '检查教室',
+    CHECK_CLASS: '检查班级',
+    CALCULATE_SCORE: '计算评分',
+    ASSIGN_SUCCESS: '排课成功',
+    ASSIGN_FAILED: '排课失败',
+    GENERATE_SCORE: '生成评分',
+    FINISH_GENERATE: '生成完成',
+  }
+  return map[type] || type
+}
+
+/** 评分等级 Tag 类型映射 */
+export function scoreLevelTagType(level: string): string {
+  const map: Record<string, string> = { 优秀: 'success', 良好: 'primary', 一般: 'warning', 较差: 'danger', 不推荐: 'danger' }
+  return map[level] || 'info'
+}
+
 export const repairTaskStatusOptions = [
   { label: '待处理', value: 'PENDING' },
   { label: '已创建', value: 'CREATED' },
