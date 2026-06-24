@@ -63,6 +63,10 @@ v5-stage9-continuation-prompt.md
 
 # Bug audit reports (本地审计，不入版控)
 CODE_REVIEW_REPORT.md
+code-review-report.md
+code-review-comprehensive-verification.md
+code-review-report-verification.md
+frontend-code-review-report.md
 20260527bug验证报告.md
 mimo发现的bug.md
 claude-opus-4.7-bug验证报告.md
