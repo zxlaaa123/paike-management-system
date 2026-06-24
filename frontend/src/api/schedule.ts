@@ -19,6 +19,8 @@ export interface Schedule {
   planId?: number
   batchId?: number
   batchNo?: string
+  /** 乐观锁版本号（V25 并发编辑保护），编辑提交时需原样回传。 */
+  version?: number
   createTime: string
   updateTime: string
 }

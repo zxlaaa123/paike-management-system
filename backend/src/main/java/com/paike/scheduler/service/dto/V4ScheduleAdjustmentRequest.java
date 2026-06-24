@@ -35,4 +35,10 @@ public class V4ScheduleAdjustmentRequest {
     private String adjustReason;
 
     private Boolean forceAdjust;
+
+    /**
+     * 正式课表记录（targetType=SCHEDULE）的乐观锁版本号。
+     * 前端查询时拿到、提交时原样回传；为空时退化为按库内最新版本更新（兼容旧前端）。
+     */
+    private Integer version;
 }

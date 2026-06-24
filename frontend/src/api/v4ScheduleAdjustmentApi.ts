@@ -60,6 +60,8 @@ export interface ScheduleAdjustmentPayload {
   newRoomId: number
   adjustReason?: string
   forceAdjust?: boolean
+  /** 正式课表（targetType=SCHEDULE）的乐观锁版本号，查询时拿到、提交时原样回传。 */
+  version?: number
 }
 
 export function checkScheduleAdjustment(payload: ScheduleAdjustmentPayload) {

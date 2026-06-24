@@ -35,6 +35,8 @@ public class ScheduleVo {
     private String sourceType;
     private Long batchId;
     private Long planId;
+    /** 乐观锁版本号（V25 并发编辑保护），前端编辑提交时需原样回传。 */
+    private Integer version;
     private Integer deleted;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
@@ -67,6 +69,7 @@ public class ScheduleVo {
         vo.setSourceType(entity.getSourceType());
         vo.setBatchId(entity.getBatchId());
         vo.setPlanId(entity.getPlanId());
+        vo.setVersion(entity.getVersion());
         vo.setDeleted(entity.getDeleted());
         vo.setCreateTime(entity.getCreateTime());
         vo.setUpdateTime(entity.getUpdateTime());

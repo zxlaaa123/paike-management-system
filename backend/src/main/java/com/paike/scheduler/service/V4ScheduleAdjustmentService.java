@@ -5,6 +5,7 @@ import com.paike.scheduler.common.enums.CourseType;
 import com.paike.scheduler.common.enums.RoomType;
 import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.exception.BusinessException;
+import com.paike.scheduler.common.exception.SystemErrorCode;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.dto.SchedulePlanItemAdjustRequest;
@@ -202,7 +203,15 @@ public class V4ScheduleAdjustmentService {
         schedule.setClassroomId(request.getNewRoomId());
         schedule.setTimeSlotId(newSlot.getId());
         schedule.setUpdateTime(LocalDateTime.now());
-        scheduleMapper.updateById(schedule);
+        // 乐观锁：前端回传 version 时以其为准做并发校验，命中他人已修改则抛冲突；
+        // 旧前端未传 version 时退化为按库内最新版本更新。
+        if (request.getVersion() != null) {
+            schedule.setVersion(request.getVersion());
+        }
+        if (scheduleMapper.updateById(schedule) == 0) {
+            throw new BusinessException(SystemErrorCode.CONCURRENT_MODIFIED.getNumericCode(),
+                    SystemErrorCode.CONCURRENT_MODIFIED.getDefaultMessage());
+        }
 
         ScheduleAdjustLog log = new ScheduleAdjustLog();
         log.setPlanId(schedule.getPlanId());

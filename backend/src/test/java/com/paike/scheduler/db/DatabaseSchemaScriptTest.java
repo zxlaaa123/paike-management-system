@@ -211,6 +211,20 @@ class DatabaseSchemaScriptTest {
     }
 
     @Test
+    void optimisticLockVersionMigrationIsIdempotentAndRegistered() throws IOException {
+        String migration = resource("db/v25_optimistic_lock_schedule_version.sql");
+        String application = resource("application.yml");
+
+        // 幂等模板：information_schema 探测列是否存在后再 PREPARE/EXECUTE。
+        assertTrue(migration.contains("PREPARE stmt FROM @ddl"));
+        assertTrue(migration.contains("EXECUTE stmt"));
+        assertTrue(migration.contains("DEALLOCATE PREPARE stmt"));
+        assertTrue(migration.contains("TABLE_NAME = 'schedule' AND COLUMN_NAME = 'version'"));
+        assertTrue(migration.contains("ADD COLUMN version INT NOT NULL DEFAULT 0"));
+        assertTrue(application.contains("classpath:db/v25_optimistic_lock_schedule_version.sql"));
+    }
+
+    @Test
     void reportBatchSemesterMigrationIsRegistered() throws IOException {
         String schema = resource("db/v2_schema.sql");
         String migration = resource("db/v17_report_batch_semester.sql");
