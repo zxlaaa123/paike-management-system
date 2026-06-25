@@ -6,6 +6,7 @@ import com.paike.scheduler.common.enums.CourseType;
 import com.paike.scheduler.common.enums.RoomType;
 import com.paike.scheduler.common.enums.SchedulePlanStatus;
 import com.paike.scheduler.common.exception.BusinessException;
+import com.paike.scheduler.common.exception.SystemErrorCode;
 import com.paike.scheduler.entity.*;
 import com.paike.scheduler.mapper.*;
 import com.paike.scheduler.service.dto.SchedulePlanItemAdjustRequest;
@@ -812,7 +813,11 @@ public class SchedulePlanService {
         schedule.setClassroomId(after.getClassroomId());
         schedule.setTimeSlotId(newTimeSlotId);
         schedule.setUpdateTime(LocalDateTime.now());
-        scheduleMapper.updateById(schedule);
+        // 乐观锁：schedule 已加 @Version，updateById 返回 0 说明该正式课表行已被他人并发修改。
+        if (scheduleMapper.updateById(schedule) == 0) {
+            throw new BusinessException(SystemErrorCode.CONCURRENT_MODIFIED.getNumericCode(),
+                    SystemErrorCode.CONCURRENT_MODIFIED.getDefaultMessage());
+        }
         return schedule.getId();
     }
 

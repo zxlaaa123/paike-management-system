@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -51,6 +52,10 @@ public class Schedule {
     private Long batchId;
 
     private Long planId;
+
+    /** 乐观锁版本号（V25 并发编辑保护），由 MyBatis-Plus OptimisticLockerInnerInterceptor 自增。 */
+    @Version
+    private Integer version;
 
     @TableLogic
     private Integer deleted;

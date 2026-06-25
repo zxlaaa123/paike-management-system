@@ -258,6 +258,7 @@ const adjustContext = computed(() => {
     currentPeriodStart: startPeriod,
     currentPeriodEnd: endPeriod,
     currentTimeLabel: adjustingSchedule.value.timeLabel,
+    version: adjustingSchedule.value.version ?? null,
   }
 })
 </script>

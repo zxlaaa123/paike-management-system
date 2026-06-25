@@ -26,6 +26,7 @@ interface AdjustDialogContext {
   currentPeriodStart?: number | null
   currentPeriodEnd?: number | null
   currentTimeLabel?: string | null
+  version?: number | null
 }
 
 const props = defineProps<{
@@ -145,6 +146,7 @@ function buildPayload(forceAdjust = false) {
     newRoomId: form.newRoomId,
     adjustReason: form.adjustReason,
     forceAdjust,
+    version: props.context.version ?? undefined,
   }
 }
 

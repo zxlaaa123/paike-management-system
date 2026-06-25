@@ -107,6 +107,10 @@ public enum SystemErrorCode {
             "课程明细字段缺失", "试算方案明细缺少必要字段。", "检查试算方案明细生成逻辑。"),
     FORMAL_SCHEDULE_OVERWRITE("FORMAL_SCHEDULE_OVERWRITE", 409, "CONSISTENCY", 409,
             "正式课表将被覆盖", "应用该方案会覆盖正式课表，需人工确认。", "检查 apply 前的覆盖保护。"),
+
+    // ===== 并发编辑域（409）：乐观锁版本冲突，丢失更新保护 =====
+    CONCURRENT_MODIFIED("CONCURRENT_MODIFIED", 409, "CONFLICT", 409,
+            "数据已被他人修改，请刷新后重试", "数据已被他人修改，请刷新后重试。", "乐观锁版本不一致：客户端提交的 version 落后于库内最新值。"),
     ;
 
     private final String code;
