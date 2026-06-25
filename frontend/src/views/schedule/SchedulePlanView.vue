@@ -51,6 +51,11 @@ async function fetchData() {
   }
 }
 
+function handleSizeChange() {
+  currentPage.value = 1
+  fetchData()
+}
+
 async function fetchOptions() {
   const [semesters, current] = await Promise.all([
     fallback(getAllSemesters(), []),
@@ -242,7 +247,7 @@ onMounted(() => {
         :page-sizes="[10, 20, 50]"
         layout="total, sizes, prev, pager, next, jumper"
         style="margin-top: 16px; justify-content: flex-end"
-        @current-change="fetchData" @size-change="fetchData"
+        @current-change="fetchData" @size-change="handleSizeChange"
       />
     </el-card>
   </div>

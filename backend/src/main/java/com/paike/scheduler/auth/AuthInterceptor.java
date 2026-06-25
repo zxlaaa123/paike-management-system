@@ -96,7 +96,12 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (!isStateChanging(request.getMethod())) {
             return false;
         }
-        String path = request.getRequestURI();
+        // 优先使用 getServletPath（不受 context-path 前缀干扰）；
+        // 回退到 getRequestURI 以兼容未经 DispatcherServlet 路由的请求（如单元测试 MockHttpServletRequest）。
+        String path = request.getServletPath();
+        if (path == null || path.isEmpty()) {
+            path = request.getRequestURI();
+        }
         return !"/api/auth/logout".equals(path);
     }
 

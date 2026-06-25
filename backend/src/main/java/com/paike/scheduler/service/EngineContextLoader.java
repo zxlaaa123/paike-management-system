@@ -38,6 +38,42 @@ public class EngineContextLoader {
     @Transactional(readOnly = true)
     public EngineContext load(Long semesterId) {
         // 1. Load core data
+        CoreData coreData = loadCoreData(semesterId);
+
+        // 2. Build index maps
+        IndexMaps indexMaps = buildIndexMaps(coreData);
+
+        // 3. Disabled flags
+        DisabledFlags disabledFlags = buildDisabledFlags(coreData, indexMaps);
+
+        // 4. Teacher unavailable
+        boolean[][] teacherUnavailable = buildTeacherUnavailable(coreData, indexMaps);
+
+        // 5. Rules
+        // 6. Rule weights
+        Rules rules = loadRules(semesterId);
+
+        // 7. Build engine tasks
+        EngineTasksResult engineTasksResult = buildEngineTasks(coreData, indexMaps);
+
+        // 8. Load existing schedules as initial occupancy
+        ExistingAssignmentsResult existingResult = loadExistingAssignments(semesterId, indexMaps, engineTasksResult);
+
+        // 9. Locked assignments
+        List<Assignment> lockedAssignments = loadLockedAssignments(indexMaps, engineTasksResult);
+
+        return new EngineContext(engineTasksResult.engineTasks(), indexMaps.slotDataList(),
+            indexMaps.roomDataList(), indexMaps.teacherDataList(), indexMaps.classDataList(),
+            indexMaps.courseDataList(), teacherUnavailable, disabledFlags.teacherDisabled(),
+            disabledFlags.classDisabled(), disabledFlags.classroomDisabled(), rules.teacherMaxDailySlots(),
+            rules.classMaxDailySlots(), rules.allowSameCourseSameDay(),
+            thresholdProperties.getAfternoonStartPeriod(), rules.ruleWeights(), lockedAssignments,
+            existingResult.existingAssignments(), existingResult.existingTaskScheduledCount());
+    }
+
+    // ---- Phase 1: Load core data ----
+
+    private CoreData loadCoreData(Long semesterId) {
         List<TeachingTask> tasks = teachingTaskMapper.selectList(
             new LambdaQueryWrapper<TeachingTask>()
                 .eq(TeachingTask::getSemesterId, semesterId)
@@ -54,7 +90,18 @@ public class EngineContextLoader {
         List<ClassInfo> allClasses = classInfoMapper.selectList(new LambdaQueryWrapper<>());
         List<Course> allCourses = courseMapper.selectList(new LambdaQueryWrapper<>());
 
-        // 2. Build index maps
+        return new CoreData(tasks, timeSlots, allClassrooms, allTeachers, allClasses, allCourses);
+    }
+
+    // ---- Phase 2: Build index maps ----
+
+    private IndexMaps buildIndexMaps(CoreData coreData) {
+        List<Teacher> allTeachers = coreData.allTeachers();
+        List<ClassInfo> allClasses = coreData.allClasses();
+        List<Course> allCourses = coreData.allCourses();
+        List<TimeSlot> timeSlots = coreData.timeSlots();
+        List<Classroom> allClassrooms = coreData.allClassrooms();
+
         Map<Long, Integer> teacherIdxMap = new HashMap<>();
         Map<Long, Integer> classIdxMap = new HashMap<>();
         Map<Long, Integer> courseIdxMap = new HashMap<>();
@@ -106,7 +153,18 @@ public class EngineContextLoader {
             roomDataList.add(new EngineContext.ClassroomData(i, r.getId(), r.getCapacity(), r.getRoomType()));
         }
 
-        // 3. Disabled flags
+        return new IndexMaps(teacherIdxMap, classIdxMap, courseIdxMap, slotIdxMap, roomIdxMap,
+            teacherDataList, classDataList, courseDataList, slotDataList, roomDataList);
+    }
+
+    // ---- Phase 3: Disabled flags ----
+
+    private DisabledFlags buildDisabledFlags(CoreData coreData, IndexMaps indexMaps) {
+        List<EngineContext.TeacherData> teacherDataList = indexMaps.teacherDataList();
+        List<EngineContext.ClassData> classDataList = indexMaps.classDataList();
+        List<EngineContext.ClassroomData> roomDataList = indexMaps.roomDataList();
+        List<Classroom> allClassrooms = coreData.allClassrooms();
+
         boolean[] teacherDisabled = new boolean[teacherDataList.size()];
         for (int i = 0; i < teacherDataList.size(); i++) {
             teacherDisabled[i] = teacherDataList.get(i).status() != 1;
@@ -123,7 +181,20 @@ public class EngineContextLoader {
             classroomDisabled[i] = r.getStatus() == null || r.getStatus() != 1;
         }
 
-        // 4. Teacher unavailable —— V9 阶段3：翻倍后物理禁排要标记到 ODD + EVEN 两个逻辑 slot
+        return new DisabledFlags(teacherDisabled, classDisabled, classroomDisabled);
+    }
+
+    // ---- Phase 4: Teacher unavailable ----
+
+    private boolean[][] buildTeacherUnavailable(CoreData coreData, IndexMaps indexMaps) {
+        List<Teacher> allTeachers = coreData.allTeachers();
+        List<TimeSlot> timeSlots = coreData.timeSlots();
+        Map<Long, Integer> teacherIdxMap = indexMaps.teacherIdxMap();
+        Map<Long, Integer> slotIdxMap = indexMaps.slotIdxMap();
+        List<EngineContext.TeacherData> teacherDataList = indexMaps.teacherDataList();
+        List<EngineContext.TimeSlotData> slotDataList = indexMaps.slotDataList();
+
+        // V9 阶段3：翻倍后物理禁排要标记到 ODD + EVEN 两个逻辑 slot
         boolean[][] teacherUnavailable = new boolean[teacherDataList.size()][slotDataList.size()];
         for (Teacher t : allTeachers) {
             Integer tIdx = teacherIdxMap.get(t.getId());
@@ -137,7 +208,12 @@ public class EngineContextLoader {
                 }
             }
         }
+        return teacherUnavailable;
+    }
 
+    // ---- Phase 5+6: Rules and rule weights ----
+
+    private Rules loadRules(Long semesterId) {
         // 5. Rules
         int teacherMaxDailySlots = ruleService.getIntValue("TEACHER_MAX_DAILY_SLOTS");
         int classMaxDailySlots = ruleService.getIntValue("CLASS_MAX_DAILY_SLOTS");
@@ -156,7 +232,20 @@ public class EngineContextLoader {
             }
         }
 
-        // 7. Build engine tasks
+        return new Rules(teacherMaxDailySlots, classMaxDailySlots, allowSameCourseSameDay, ruleWeights);
+    }
+
+    // ---- Phase 7: Build engine tasks ----
+
+    private EngineTasksResult buildEngineTasks(CoreData coreData, IndexMaps indexMaps) {
+        List<TeachingTask> tasks = coreData.tasks();
+        Map<Long, Integer> teacherIdxMap = indexMaps.teacherIdxMap();
+        Map<Long, Integer> classIdxMap = indexMaps.classIdxMap();
+        Map<Long, Integer> courseIdxMap = indexMaps.courseIdxMap();
+        List<EngineContext.ClassroomData> roomDataList = indexMaps.roomDataList();
+        List<EngineContext.CourseData> courseDataList = indexMaps.courseDataList();
+        List<EngineContext.ClassData> classDataList = indexMaps.classDataList();
+
         List<EngineTask> engineTasks = new ArrayList<>();
         for (int i = 0; i < tasks.size(); i++) {
             TeachingTask t = tasks.get(i);
@@ -194,19 +283,30 @@ public class EngineContextLoader {
                 courseType, studentCount, candidateRooms, taskWeekType, taskStartWeek, taskEndWeek));
         }
 
-        // 8. Load existing schedules as initial occupancy
+        // Build taskId → engineTaskIndex map
+        Map<Long, Integer> taskIdToEngineIdx = new HashMap<>();
+        for (int i = 0; i < engineTasks.size(); i++) {
+            taskIdToEngineIdx.put(engineTasks.get(i).originalId(), i);
+        }
+
+        return new EngineTasksResult(engineTasks, taskIdToEngineIdx);
+    }
+
+    // ---- Phase 8: Load existing schedules as initial occupancy ----
+
+    private ExistingAssignmentsResult loadExistingAssignments(Long semesterId, IndexMaps indexMaps,
+                                                              EngineTasksResult engineTasksResult) {
+        Map<Long, Integer> slotIdxMap = indexMaps.slotIdxMap();
+        Map<Long, Integer> roomIdxMap = indexMaps.roomIdxMap();
+        List<EngineTask> engineTasks = engineTasksResult.engineTasks();
+        Map<Long, Integer> taskIdToEngineIdx = engineTasksResult.taskIdToEngineIdx();
+
         List<Schedule> existingSchedules = scheduleMapper.selectList(
             new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getSemesterId, semesterId));
 
         List<Assignment> existingAssignments = new ArrayList<>();
         int[] existingTaskScheduledCount = new int[engineTasks.size()];
-
-        // Build taskId → engineTaskIndex map
-        Map<Long, Integer> taskIdToEngineIdx = new HashMap<>();
-        for (int i = 0; i < engineTasks.size(); i++) {
-            taskIdToEngineIdx.put(engineTasks.get(i).originalId(), i);
-        }
 
         for (Schedule s : existingSchedules) {
             Integer baseSlotIdx = slotIdxMap.get(s.getTimeSlotId());
@@ -228,7 +328,16 @@ public class EngineContextLoader {
             }
         }
 
-        // 9. Locked assignments
+        return new ExistingAssignmentsResult(existingAssignments, existingTaskScheduledCount);
+    }
+
+    // ---- Phase 9: Locked assignments ----
+
+    private List<Assignment> loadLockedAssignments(IndexMaps indexMaps, EngineTasksResult engineTasksResult) {
+        List<EngineContext.TimeSlotData> slotDataList = indexMaps.slotDataList();
+        Map<Long, Integer> roomIdxMap = indexMaps.roomIdxMap();
+        Map<Long, Integer> taskIdToEngineIdx = engineTasksResult.taskIdToEngineIdx();
+
         List<Assignment> lockedAssignments = new ArrayList<>();
         List<ScheduleLockedItem> lockedItems = lockedItemMapper.selectList(
             new LambdaQueryWrapper<ScheduleLockedItem>()
@@ -271,10 +380,7 @@ public class EngineContextLoader {
             lockedAssignments.add(new Assignment(taskIdx, 0, slotIdx, roomIdx));
         }
 
-        return new EngineContext(engineTasks, slotDataList, roomDataList, teacherDataList,
-            classDataList, courseDataList, teacherUnavailable, teacherDisabled, classDisabled,
-            classroomDisabled, teacherMaxDailySlots, classMaxDailySlots, allowSameCourseSameDay,
-            thresholdProperties.getAfternoonStartPeriod(), ruleWeights, lockedAssignments, existingAssignments, existingTaskScheduledCount);
+        return lockedAssignments;
     }
 
     private boolean isRoomTypeMatched(String courseType, String roomType) {
@@ -286,4 +392,25 @@ public class EngineContextLoader {
         }
         return true;
     }
+
+    // ---- Inner records for multi-value return between phases ----
+
+    private record CoreData(List<TeachingTask> tasks, List<TimeSlot> timeSlots, List<Classroom> allClassrooms,
+                            List<Teacher> allTeachers, List<ClassInfo> allClasses, List<Course> allCourses) {}
+
+    private record IndexMaps(Map<Long, Integer> teacherIdxMap, Map<Long, Integer> classIdxMap,
+                             Map<Long, Integer> courseIdxMap, Map<Long, Integer> slotIdxMap,
+                             Map<Long, Integer> roomIdxMap, List<EngineContext.TeacherData> teacherDataList,
+                             List<EngineContext.ClassData> classDataList, List<EngineContext.CourseData> courseDataList,
+                             List<EngineContext.TimeSlotData> slotDataList,
+                             List<EngineContext.ClassroomData> roomDataList) {}
+
+    private record DisabledFlags(boolean[] teacherDisabled, boolean[] classDisabled, boolean[] classroomDisabled) {}
+
+    private record Rules(int teacherMaxDailySlots, int classMaxDailySlots, boolean allowSameCourseSameDay,
+                         Map<String, Double> ruleWeights) {}
+
+    private record EngineTasksResult(List<EngineTask> engineTasks, Map<Long, Integer> taskIdToEngineIdx) {}
+
+    private record ExistingAssignmentsResult(List<Assignment> existingAssignments, int[] existingTaskScheduledCount) {}
 }

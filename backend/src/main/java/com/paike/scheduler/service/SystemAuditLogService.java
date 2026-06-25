@@ -34,6 +34,8 @@ public class SystemAuditLogService {
     public static final String ACTION_RUN_AUTO_SCHEDULE = "RUN_AUTO_SCHEDULE";
     public static final String ACTION_GENERATE_REPAIR_SUGGESTION = "GENERATE_REPAIR_SUGGESTION";
     public static final String ACTION_MARK_REPAIR_SUGGESTION = "MARK_REPAIR_SUGGESTION";
+    public static final String ACTION_CLEAR_SEMESTER_SCHEDULES = "CLEAR_SEMESTER_SCHEDULES";
+    public static final String ACTION_REVERT_APPLIED_PLAN = "REVERT_APPLIED_PLAN";
     public static final String ERROR_BUSINESS = "BUSINESS_ERROR";
     public static final String ERROR_SYSTEM = "SYSTEM_ERROR";
     public static final String TARGET_SCHEDULE_PLAN = "SCHEDULE_PLAN";

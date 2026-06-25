@@ -383,12 +383,35 @@ public class SchedulePlanService {
         assertNoConflictsBeforeApply(plan.getId());
         Long semesterId = plan.getSemesterId();
 
+        // --- 并发保护：锁定学期行，串行化同学期的方案应用 ---
+        // SELECT ... FOR UPDATE 确保同一学期的 applyPlan / rollbackPlan 不会交叉执行。
+        Semester lockedSemester = semesterMapper.selectByIdForUpdate(semesterId);
+        if (lockedSemester == null) {
+            throw new BusinessException("学期不存在，无法应用方案");
+        }
+
+        // --- 幂等保护：获锁后重新读取方案状态，防止双击或并发重复应用 ---
+        SchedulePlan freshPlan = planMapper.selectById(plan.getId());
+        if (freshPlan == null) {
+            throw new BusinessException("排课方案不存在");
+        }
+        if (SchedulePlanStatus.APPLIED.is(freshPlan.getStatus())) {
+            throw new BusinessException("该方案已应用，无需重复应用");
+        }
+        plan = freshPlan;
+
         List<SchedulePlan> oldAppliedPlans = planMapper.selectList(
                 new LambdaQueryWrapper<SchedulePlan>()
                         .eq(SchedulePlan::getSemesterId, semesterId)
                         .eq(SchedulePlan::getStatus, SchedulePlanStatus.APPLIED.getCode()));
         ensurePlansUnlocked(oldAppliedPlans, "存在已锁定课程，不能被新方案覆盖，请先解锁");
         ensureSemesterSchedulesUnlocked(semesterId, "存在已锁定课程，不能被新方案覆盖，请先解锁");
+
+        // --- 审计：记录清理旧课表前的数量 ---
+        List<Schedule> oldSchedules = scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getSemesterId, semesterId));
+        int deletedCount = oldSchedules.size();
+
         scheduleMapper.delete(new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getSemesterId, semesterId));
         for (SchedulePlan oldPlan : oldAppliedPlans) {
@@ -398,6 +421,26 @@ public class SchedulePlanService {
             oldPlan.setStatus(SchedulePlanStatus.DRAFT.getCode());
             oldPlan.setUpdatedAt(LocalDateTime.now());
             planMapper.updateById(oldPlan);
+        }
+
+        // --- 审计：记录旧课表清理与旧方案回退 ---
+        if (deletedCount > 0) {
+            auditLogService.recordSuccess(
+                    SystemAuditLogService.ACTION_CLEAR_SEMESTER_SCHEDULES,
+                    SystemAuditLogService.TARGET_SCHEDULE,
+                    semesterId,
+                    semesterId,
+                    plan.getId(),
+                    "应用方案前清理旧课表，删除 " + deletedCount + " 条记录");
+        }
+        for (SchedulePlan oldPlan : oldAppliedPlans) {
+            auditLogService.recordSuccess(
+                    SystemAuditLogService.ACTION_REVERT_APPLIED_PLAN,
+                    SystemAuditLogService.TARGET_SCHEDULE_PLAN,
+                    oldPlan.getId(),
+                    semesterId,
+                    oldPlan.getId(),
+                    "方案被新方案(id=" + plan.getId() + ")覆盖，回退为 DRAFT");
         }
 
         List<SchedulePlanItem> items = planItemMapper.selectList(
@@ -429,8 +472,10 @@ public class SchedulePlanService {
             schedule.setClassId(item.getClassId());
             schedule.setClassroomId(item.getClassroomId());
             schedule.setTimeSlotId(timeSlotId);
-            // V9 单双周：plan_item → schedule 透传 weekType（之前 schedule 无此列会丢）
+            // V10 周模式：plan_item -> schedule 透传 weekType/startWeek/endWeek，保证正式课表语义不丢失。
             schedule.setWeekType(WeekTypeSupport.normalize(item.getWeekType()));
+            schedule.setStartWeek(WeekPatternSupport.normalizeStartWeek(item.getStartWeek()));
+            schedule.setEndWeek(WeekPatternSupport.normalizeEndWeek(item.getEndWeek()));
             schedule.setSourceType("PLAN");
             schedule.setDeleted(0);
             schedule.setCreateTime(LocalDateTime.now());

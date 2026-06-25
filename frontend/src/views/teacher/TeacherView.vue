@@ -42,6 +42,11 @@ const {
 
 void formRef
 
+function handleSizeChange() {
+  currentPage.value = 1
+  fetchData()
+}
+
 const rules = {
   teacherNo: [{ required: true, message: '请输入教师编号', trigger: 'blur' }],
   name: [{ required: true, message: '请输入教师姓名', trigger: 'blur' }],
@@ -126,7 +131,7 @@ async function handleStatusChange(row: Teacher) {
         :page-sizes="[10, 20, 50]"
         layout="total, sizes, prev, pager, next, jumper"
         style="margin-top: 16px; justify-content: flex-end"
-        @current-change="fetchData" @size-change="fetchData"
+        @current-change="fetchData" @size-change="handleSizeChange"
       />
     </el-card>
 

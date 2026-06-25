@@ -70,6 +70,11 @@ const {
 
 void formRef
 
+function handleSizeChange() {
+  currentPage.value = 1
+  fetchData()
+}
+
 const rules = {
   name: [{ required: true, message: '请输入学期名称', trigger: 'blur' }],
   schoolYear: [{ required: true, message: '请输入学年', trigger: 'blur' }],
@@ -288,7 +293,7 @@ function statusTagType(status: string) {
         layout="total, sizes, prev, pager, next, jumper"
         style="margin-top: 16px; justify-content: flex-end"
         @current-change="fetchData"
-        @size-change="fetchData"
+        @size-change="handleSizeChange"
       />
     </el-card>
 
