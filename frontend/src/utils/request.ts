@@ -156,7 +156,7 @@ export function createCancellable() {
     }
   }
 
-  function withSignal<T = unknown>(config?: AxiosRequestConfig): AxiosRequestConfig {
+  function withSignal(config?: AxiosRequestConfig): AxiosRequestConfig {
     cancel()
     controller = new AbortController()
     return { ...config, signal: controller.signal }

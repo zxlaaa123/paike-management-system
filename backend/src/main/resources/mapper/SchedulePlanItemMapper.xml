@@ -6,13 +6,13 @@
     <insert id="insertBatch" parameterType="java.util.List">
         INSERT INTO schedule_plan_item
             (plan_id, semester_id, teaching_task_id, teacher_id, class_id, course_id, classroom_id,
-             weekday, start_period, end_period, week_type, score, conflict_flag, conflict_reason,
+             weekday, start_period, end_period, week_type, start_week, end_week, score, conflict_flag, conflict_reason,
              source_type, created_at, updated_at, deleted)
         VALUES
         <foreach collection="list" item="item" separator=",">
             (#{item.planId}, #{item.semesterId}, #{item.teachingTaskId}, #{item.teacherId},
              #{item.classId}, #{item.courseId}, #{item.classroomId}, #{item.weekday},
-             #{item.startPeriod}, #{item.endPeriod}, #{item.weekType}, #{item.score},
+             #{item.startPeriod}, #{item.endPeriod}, #{item.weekType}, #{item.startWeek}, #{item.endWeek}, #{item.score},
              #{item.conflictFlag}, #{item.conflictReason}, #{item.sourceType},
              #{item.createdAt}, #{item.updatedAt}, 0)
         </foreach>

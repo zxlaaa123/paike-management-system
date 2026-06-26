@@ -68,7 +68,11 @@ const hasCurrentSemester = computed(() => currentSemester.value !== null)
 async function fetchData() {
   loading.value = true
   try {
-    const params: Record<string, unknown> = { ...searchForm, page: currentPage.value, size: pageSize.value }
+    const params: Record<string, unknown> = {
+      ...searchForm,
+      pageNum: currentPage.value,
+      pageSize: pageSize.value,
+    }
     // 如果没有指定 semesterId 且有当前学期，则传当前学期
     if (!params.semesterId && currentSemester.value) {
       params.semesterId = currentSemester.value.id

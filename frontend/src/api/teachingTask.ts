@@ -48,8 +48,8 @@ export function getTeachingTaskList(params: {
   className?: string
   status?: number
   semesterId?: number
-  page?: number
-  size?: number
+  pageNum?: number
+  pageSize?: number
 }) {
   return request.get<ApiResponse<PageResult<TeachingTask>>>('/teaching-tasks', { params }).then((r) => {
     if (!r.data) {

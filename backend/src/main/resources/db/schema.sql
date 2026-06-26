@@ -71,16 +71,24 @@ CREATE TABLE IF NOT EXISTS course (
 
 CREATE TABLE IF NOT EXISTS teaching_task (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    semester_id BIGINT NULL COMMENT '所属学期ID',
     course_id BIGINT NOT NULL COMMENT '课程ID',
     teacher_id BIGINT NOT NULL COMMENT '教师ID',
     class_id BIGINT NOT NULL COMMENT '班级ID',
     weekly_hours INT NOT NULL DEFAULT 0 COMMENT '每周课时',
+    week_type VARCHAR(20) NOT NULL DEFAULT 'ALL' COMMENT '周次类型：ALL全周、ODD单周、EVEN双周',
+    start_week INT NOT NULL DEFAULT 1 COMMENT '连续周段起始周（闭区间，默认1）',
+    end_week INT NOT NULL DEFAULT 20 COMMENT '连续周段结束周（闭区间，默认20）',
     need_continuous TINYINT NOT NULL DEFAULT 0 COMMENT '是否需要连续排课：0否 1是',
     status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1启用 0停用',
     remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删 1已删',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tt_course (course_id),
+    KEY idx_tt_teacher (teacher_id),
+    KEY idx_tt_class (class_id),
+    KEY idx_tt_semester (semester_id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='教学任务表';
 
 CREATE TABLE IF NOT EXISTS time_slot (
@@ -117,13 +125,31 @@ INSERT IGNORE INTO time_slot (day_of_week, period_no, time_label, sort_order) VA
 -- V1 schedule table（使用 IF NOT EXISTS 避免重建）
 CREATE TABLE IF NOT EXISTS schedule (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    semester_id BIGINT NULL COMMENT '所属学期ID',
     teaching_task_id BIGINT NOT NULL COMMENT '教学任务ID',
     course_id BIGINT NOT NULL COMMENT '课程ID（冗余）',
     teacher_id BIGINT NOT NULL COMMENT '教师ID（冗余）',
     class_id BIGINT NOT NULL COMMENT '班级ID（冗余）',
     time_slot_id BIGINT NOT NULL COMMENT '时间段ID',
+    week_type VARCHAR(20) NOT NULL DEFAULT 'ALL' COMMENT '周次类型：ALL全周、ODD单周、EVEN双周',
+    start_week INT NOT NULL DEFAULT 1 COMMENT '连续周段起始周（闭区间，默认1）',
+    end_week INT NOT NULL DEFAULT 20 COMMENT '连续周段结束周（闭区间，默认20）',
     classroom_id BIGINT NOT NULL COMMENT '教室ID',
+    source_type VARCHAR(20) DEFAULT 'MANUAL' COMMENT '来源类型：MANUAL手动 AUTO自动生成',
+    batch_id BIGINT DEFAULT NULL COMMENT '自动排课批次ID',
+    plan_id BIGINT NULL COMMENT '来源排课方案ID',
+    version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本号（V25 并发编辑保护）',
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删 1已删',
+    active_key BIGINT GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN 0 ELSE NULL END) STORED,
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_schedule_time_slot (time_slot_id, deleted),
+    KEY idx_schedule_teacher (teacher_id, deleted),
+    KEY idx_schedule_class (class_id, deleted),
+    KEY idx_schedule_classroom (classroom_id, deleted),
+    KEY idx_schedule_semester (semester_id, deleted),
+    KEY idx_schedule_task (teaching_task_id, deleted),
+    UNIQUE KEY uk_schedule_teacher_slot (semester_id, time_slot_id, week_type, teacher_id, active_key),
+    UNIQUE KEY uk_schedule_class_slot (semester_id, time_slot_id, week_type, class_id, active_key),
+    UNIQUE KEY uk_schedule_classroom_slot (semester_id, time_slot_id, week_type, classroom_id, active_key)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排课表';
